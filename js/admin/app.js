@@ -208,6 +208,22 @@ async function open() {
 /* --- Rendu ------------------------------------------------------------------ */
 
 function renderTopbar() {
+  /* Le compte n'appartient pas au questionnaire ouvert : sa place est
+     dans la barre, pas dans un panneau d'édition. Hors espace il n'y a pas
+     de compte — le verrou tient ce rôle. */
+  const compte = dom.topActions.querySelector('[data-act="compte"]');
+  if (state.espace && state.remoteSession) {
+    const p = state.profils?.[state.remoteSession.uid];
+    const nom = (p && [p.prenom, p.nom].filter(Boolean).join(' ')) || state.remoteSession.email;
+    if (compte) {
+      compte.hidden = false;
+      compte.querySelector('.topbar__moi').textContent = nom;
+      compte.title = `${nom} — paramètres du compte`;
+    }
+  } else if (compte) {
+    compte.hidden = true;
+  }
+
   const label = state.quiz ? state.quiz.title : 'Aucun questionnaire ouvert';
   dom.quizName.replaceChildren(
     el('span', { class: 'topbar__doc__emoji', text: state.quiz?.emoji || '✦', 'aria-hidden': 'true' }),
@@ -855,6 +871,7 @@ function onClick(event) {
       quiz.auteurs = [...liste];
       return structural();
     }
+    case 'compte':           return parametresCompte();
     case 'mon-profil':       return monProfil();
     case 'inviter':          return inviter();
     case 'membre-retirer':   return retirerMembre(id);
@@ -981,6 +998,83 @@ function openQuizSheet() {
   dialog.addEventListener('click', (event) => {
     if (!event.target.closest('[data-act], [data-sheet]')) return;
     const action = event.target.closest('[data-act]');
+    dismiss(dialog, () => { if (action) onClick(event); });
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+/* --- Paramètres du compte ---------------------------------------------------
+   Tout ce qui concerne la personne connectée et son équipe, réuni hors du
+   questionnaire : qui je suis, mon mot de passe, qui d'autre a accès, et
+   la sortie. Ces choses ne dépendent pas du questionnaire ouvert, et
+   n'avaient donc rien à faire dans le panneau qui sert à le diffuser. */
+function parametresCompte() {
+  const moi = state.remoteSession?.uid;
+  if (!moi) return;
+  const monP = state.profils?.[moi];
+  const monNom = (monP && [monP.prenom, monP.nom].filter(Boolean).join(' ')) || null;
+
+  const ligne = (m) => {
+    const p = state.profils?.[m.uid];
+    const nom = (p && [p.prenom, p.nom].filter(Boolean).join(' ')) || null;
+    return el('div', { class: 'sheet__row' }, [
+      el('span', { class: 'sheet__emoji', text: m.gerant ? '🔑' : '👤' }),
+      el('span', { class: 'sheet__label' }, [
+        el('span', { text: (nom || m.uid) + (m.uid === moi ? ' — toi' : ''),
+          style: nom ? '' : 'font-family:var(--font-mono);font-size:var(--t-xs)' }),
+        p?.poste && el('span', { class: 'field__hint', style: { display: 'block' }, text: p.poste }),
+        !p && el('span', { class: 'field__hint', style: { display: 'block' }, text: 'sans profil' }),
+      ]),
+      state.vitrines?.[m.uid] && el('span', { class: 'pill pill--accent',
+        title: 'Cette personne a choisi d’être nommée publiquement.', text: 'public' }),
+      m.gerant && el('span', { class: 'pill', title: 'Un gérant ne peut être retiré que depuis la console.', text: 'gérant' }),
+      !m.gerant && m.uid !== moi && el('button', {
+        class: 'btn btn--icon btn--quiet', type: 'button',
+        'data-act': 'membre-retirer', 'data-id': m.uid,
+        title: 'Retirer de l’espace', text: '✕',
+      }),
+    ]);
+  };
+
+  const dialog = el('dialog', { class: 'modal sheet' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Mon compte' }),
+      el('p', { class: 'panel__hint', text: `${state.remoteSession.email} — espace « ${state.espace} »` }),
+
+      el('div', { class: 'row' }, [
+        el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'mon-profil',
+          text: monNom ? `👤 ${monNom}` : '👤 Renseigner mon profil' }),
+        el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'mon-mot-de-passe', text: '🔒 Mot de passe' }),
+        el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'copier-uid', text: '⧉ Mon identifiant' }),
+      ]),
+      !monNom && el('p', { class: 'field__hint', text:
+        'Sans profil, tes collègues te voient comme un identifiant technique — dans les messages de conflit, par exemple.' }),
+
+      el('div', { class: 'section__head', style: { marginTop: 'var(--s-4)', marginBottom: 'var(--s-3)' } }, [
+        el('h3', { style: 'font-size:var(--t-base)', text: `Équipe — ${state.membres.length} membre${state.membres.length > 1 ? 's' : ''}` }),
+        el('span', { class: 'section__spacer' }),
+        el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'inviter', text: '+ Inviter' }),
+      ]),
+      el('div', { class: 'sheet__list' }, state.membres.map(ligne)),
+      el('p', { class: 'field__hint', text:
+        'Inviter crée le compte et envoie un courriel : la personne choisit son mot de passe elle-même. Retirer quelqu’un lui ôte le droit de publier, sans supprimer son compte.' }),
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-act': 'remote-signout', text: 'Se déconnecter' }),
+      el('span', { class: 'section__spacer' }),
+      el('button', { class: 'btn btn--quiet', type: 'button', 'data-sheet': 'close', text: 'Fermer' }),
+    ]),
+  ]);
+
+  dialog.addEventListener('click', (event) => {
+    const cible = event.target.closest('[data-act], [data-sheet]');
+    if (!cible) return;
+    /* Le dialogue se referme dans tous les cas : ce qu'on ouvre ensuite —
+       profil, mot de passe, invitation — a sa propre fenêtre, et deux
+       modales empilées ne se referment jamais proprement. */
+    const action = cible.closest('[data-act]');
     dismiss(dialog, () => { if (action) onClick(event); });
   });
   dialog.addEventListener('close', () => dialog.remove());

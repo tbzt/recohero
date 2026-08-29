@@ -169,6 +169,16 @@
 }
 .topbar__doc__caret { flex: none; color: var(--ink-faint); font-size: var(--t-xs); }
 
+.topbar__compte { flex: none; max-width: 14rem; }
+.topbar__moi {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 46rem) {
+  .topbar__moi { display: none; }
+}
+
 @media (max-width: 48rem) {
   .topbar__actions .btn span { display: none; }
   .status { display: none; }

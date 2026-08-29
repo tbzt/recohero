@@ -455,52 +455,6 @@ function resultCard(quiz, result, index, ctx) {
 /* Le bloc de l'espace partagé. Il n'apparaît que si l'adresse en nomme un :
    sans ?espace=…, le backoffice est exactement ce qu'il était, et rien ne
    parle à un serveur. */
-/* L'équipe de l'espace. Chaque membre peut inviter et retirer — sauf un
-   gérant, que les règles de la base protègent. Sans cette exception, un
-   seul membre suffirait à verrouiller tout le monde dehors, propriétaire
-   compris, et il faudrait la console pour rouvrir.                     */
-function equipeBloc(ctx) {
-  if (!ctx.remoteSession) return null;
-  const moi = ctx.remoteSession.uid;
-
-  return el('div', { style: { marginTop: 'var(--s-5)' } }, [
-    el('div', { class: 'section__head', style: { marginBottom: 'var(--s-3)' } }, [
-      el('h3', { style: 'font-size:var(--t-base)', text: `Équipe — ${ctx.membres.length} membre${ctx.membres.length > 1 ? 's' : ''}` }),
-      el('span', { class: 'section__spacer' }),
-      el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'inviter', text: '+ Inviter' }),
-    ]),
-
-    el('div', { class: 'sheet__list' }, ctx.membres.map((m) => el('div', { class: 'sheet__row' }, [
-      el('span', { class: 'sheet__emoji', text: m.gerant ? '🔑' : '👤' }),
-      el('span', { class: 'sheet__label' }, (() => {
-        const p = ctx.profils?.[m.uid];
-        const nom = p && [p.prenom, p.nom].filter(Boolean).join(' ');
-        return [
-          el('span', { text: (nom || m.uid) + (m.uid === moi ? ' — toi' : '') , style: nom ? '' : 'font-family:var(--font-mono);font-size:var(--t-xs)' }),
-          p?.poste && el('span', { class: 'field__hint', style: { display: 'block' }, text: p.poste }),
-          !p && el('span', { class: 'field__hint', style: { display: 'block' }, text: 'sans profil' }),
-          ctx.vitrines?.[m.uid] && el('span', { class: 'pill pill--accent', style: { marginLeft: 'var(--s-2)' }, title: 'Cette personne a choisi d’être nommée publiquement.', text: 'public' }),
-        ];
-      })()),
-      m.gerant && el('span', { class: 'pill', title: 'Un gérant ne peut être retiré que depuis la console.', text: 'gérant' }),
-      !m.gerant && m.uid !== moi && el('button', {
-        class: 'btn btn--icon btn--quiet', type: 'button',
-        'data-act': 'membre-retirer', 'data-id': m.uid,
-        title: 'Retirer de l’espace', text: '✕',
-      }),
-    ]))),
-
-    el('p', { class: 'field__hint', style: { marginTop: 'var(--s-3)' }, text:
-      'Inviter crée le compte et envoie un courriel : la personne choisit son mot de passe elle-même, RecoHero ne le voit jamais. Retirer un membre lui ôte le droit de publier, sans supprimer son compte.' }),
-
-    el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
-      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'mon-profil', text: '👤 Mon profil' }),
-      el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'copier-uid', text: '⧉ Copier mon identifiant' }),
-      el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'mon-mot-de-passe', text: '🔒 Changer mon mot de passe' }),
-    ]),
-  ]);
-}
-
 /* Créditer. Le second des deux consentements : cocher ici ne suffit pas,
    il faut aussi que la personne ait publié sa vitrine. On le dit ligne par
    ligne plutôt qu'une fois en bas — c'est au moment de cocher qu'on a
@@ -531,6 +485,10 @@ function crediterBloc(quiz, ctx) {
   ]);
 }
 
+/* La carte de l'espace ne traite que d'une chose : mettre CE questionnaire
+   en ligne, ou l'en retirer. Tout ce qui relève du compte — profil, mot de
+   passe, équipe, déconnexion — a migré dans les paramètres du compte : ce
+   n'est pas au questionnaire ouvert d'être le prétexte à les atteindre. */
 function espaceCard(ctx) {
   if (!ctx.espace) return null;
 
@@ -545,35 +503,17 @@ function espaceCard(ctx) {
               el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
                 el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'remote-publish', text: '⇧ Publier dans l’espace' }),
                 ctx.inEspace && el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'remote-unpublish', text: '⌫ Retirer de l’espace' }),
-                el('span', { class: 'section__spacer' }),
-                el('span', { class: 'pill', text: ctx.remoteSession.email }),
-                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'remote-signout', text: 'Se déconnecter' }),
               ]),
-              /* Une règle de base de données absente ne se voit nulle
-                 part : l'espace a exactement la même apparence, protégé ou
-                 non. C'est pourquoi ce bandeau existe, et pourquoi il est
-                 en rouge — il annonce que deux personnes peuvent s'effacer
-                 mutuellement sans le savoir. */
-              ctx.guardActive === false && el('p', { class: 'alerte' }, [
+
+              /* Une règle de base de données absente ne se voit nulle part :
+                 l'espace a exactement la même apparence, protégé ou non.
+                 D'où ce bandeau, et d'où le rouge — il annonce que deux
+                 personnes peuvent s'effacer sans le savoir. */
+              ctx.guardActive === false && el('p', { class: 'alerte', style: { marginTop: 'var(--s-4)' } }, [
                 el('strong', { text: 'Protection contre l’écrasement inactive. ' }),
                 'La base a accepté une écriture qu’elle aurait dû refuser : la règle n’est pas publiée. ',
                 'Deux personnes qui modifient le même questionnaire peuvent s’effacer l’une l’autre. ',
                 'La règle est à publier depuis la console de la base.',
-              ]),
-
-              /* Le seul filet de cet espace : la base gratuite n'offre
-                 aucune restauration. Le bouton est donc au même niveau que
-                 « Publier », pas relégué en bas de page. */
-              el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-4)' }, text:
-                'Cet espace n’a pas de corbeille ni de restauration : une suppression y est définitive. L’export du catalogue est la seule sauvegarde possible — un fichier daté, réimportable tel quel.' }),
-              el('div', { class: 'row', style: { marginTop: 'var(--s-2)' } }, [
-                el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'export-espace', text: '↓ Exporter tout l’espace' }),
-                ctx.remoteCount ? el('span', { class: 'pill', text: `${ctx.remoteCount} questionnaire${ctx.remoteCount > 1 ? 's' : ''}` }) : null,
-              ]),
-
-              equipeBloc(ctx),
-
-              el('div', { class: 'row', style: { display: 'none' } }, [
               ]),
             ])
           : el('div', {}, [
@@ -637,8 +577,12 @@ export function publier(quiz, ctx = {}) {
           el('p', { class: 'field__hint', text: 'Un fichier peut contenir un questionnaire ou un catalogue entier. Si l’import trouve des identifiants déjà présents, il demande une fois s’il faut remplacer tes copies — c’est ce qui permet de restaurer une sauvegarde — ou en faire des variantes.' }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-4)' } }, [
             el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'export-drafts', text: '↓ Exporter tous mes brouillons' }),
-            el('span', { class: 'field__hint', text: 'Les brouillons ne vivent que dans ce navigateur.' }),
+            ctx.espace && el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'export-espace', text: '↓ Exporter tout l’espace' }),
+            ctx.remoteCount ? el('span', { class: 'pill', text: `${ctx.remoteCount} en ligne` }) : null,
           ]),
+          el('p', { class: 'field__hint', text: ctx.espace
+            ? 'Les brouillons ne vivent que dans ce navigateur. Et l’espace n’a ni corbeille ni restauration : une suppression y est définitive, l’export du catalogue en est la seule sauvegarde.'
+            : 'Les brouillons ne vivent que dans ce navigateur.' }),
         ]),
       ]),
     ]),
