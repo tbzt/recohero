@@ -40,8 +40,18 @@ la première écriture adopte le compteur.
 
 ## Poser la règle
 
-Console Firebase → Realtime Database → onglet **Règles** → coller le contenu
-de [`firebase.rules.json`](firebase.rules.json) → **Publier**.
+> ⚠️ **Une seule chose se colle dans la console : le contenu du fichier
+> [`firebase.rules.json`](firebase.rules.json).** Rien d'autre de ce document.
+> Les blocs plus bas sont des commandes de terminal ; collées dans l'onglet
+> Règles, elles produisent un « Parse error » — sans rien casser, Firebase
+> refusant d'enregistrer, mais sans rien poser non plus.
+
+Console Firebase → Realtime Database → onglet **Règles** → tout sélectionner,
+coller le contenu de `firebase.rules.json` à la place → **Publier**.
+
+Les règles d'accès n'y changent pas : lecture ouverte, écriture réservée aux
+membres, `membres` en lecture restreinte et jamais en écriture. Le seul ajout
+est la validation de `$quiz`.
 
 ## Vérifier qu'elle est bien là
 
@@ -50,7 +60,12 @@ Le backoffice le fait tout seul : à la connexion à un espace, il tente une
 carte Espace. Une règle qu'on croit posée et qui ne l'est pas ne se voit pas
 autrement.
 
-Et à la main, après toute modification des règles, les huit requêtes anonymes :
+### Le contrôle en terminal — facultatif, et surtout pas dans la console
+
+Ces commandes se tapent dans un **terminal**. Elles vérifient les règles
+d'accès, que le garde-fou ne modifie pas : elles doivent donc donner le même
+résultat avant et après. Elles servent à s'assurer qu'un copier-coller n'a
+rien cassé, pas à prouver que le compteur fonctionne.
 
 ```bash
 DB=https://recohero-f9cf9-default-rtdb.europe-west1.firebasedatabase.app
