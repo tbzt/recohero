@@ -428,6 +428,23 @@
   padding-left: var(--s-3);
 }
 
+/* La cote n'est ni une note ni une métadonnée : c'est une consigne pour
+   se déplacer. Elle a donc son propre traitement, lisible d'un coup d'œil
+   à bout de bras devant un rayonnage. */
+.reco__location {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-deep);
+  font-size: var(--t-sm);
+  font-weight: var(--fw-medium);
+}
+
 .result__actions {
   display: flex;
   flex-wrap: wrap;

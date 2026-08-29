@@ -308,6 +308,12 @@ function renderReco(reco, index) {
       el('h3', { class: 'reco__title', html: title }),
       meta && el('p', { class: 'reco__creator', text: meta }),
       reco.note && el('p', { class: 'reco__note', text: reco.note }),
+      /* Le seul élément de la reco qui serve une fois debout, dans le
+         bâtiment. Il se détache pour ça. */
+      reco.location && el('p', { class: 'reco__location' }, [
+        el('span', { 'aria-hidden': 'true', text: '📍' }),
+        el('span', { text: reco.location }),
+      ]),
     ]),
   ]);
 }

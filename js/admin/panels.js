@@ -431,6 +431,10 @@ function resultCard(quiz, result, index, ctx) {
             input(`reco:${result.id}:${reco.id}:year`, reco.year, { placeholder: 'Année', 'aria-label': 'Année', maxlength: '9' }),
           ]),
           input(`reco:${result.id}:${reco.id}:note`, reco.note, { placeholder: 'Pourquoi celle-là ? (une phrase)', 'aria-label': 'Note' }),
+          input(`reco:${result.id}:${reco.id}:location`, reco.location, {
+            placeholder: '📍 Où le trouver ? — Rayon Policier · cote R MAN',
+            'aria-label': 'Où trouver cette œuvre', maxlength: '80',
+          }),
           input(`reco:${result.id}:${reco.id}:link`, reco.link, { placeholder: 'https://… (facultatif)', 'aria-label': 'Lien', type: 'url' }),
           imageField('Couverture', `reco:${result.id}:${reco.id}:image`, reco.image, 'thumb'),
         ]))),

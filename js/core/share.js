@@ -62,6 +62,7 @@ function slim(quiz) {
         note: c.note || undefined,
         link: c.link || undefined,
         image: c.image || undefined,
+        location: c.location || undefined,
       })),
     })),
   };

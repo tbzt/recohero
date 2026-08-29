@@ -211,7 +211,10 @@ export async function renderResultCard(quiz, profile, scores) {
       ctx.fillStyle = INK;
       y = drawLines(ctx, wrap(ctx, reco.title, W - PAD * 2, 1), PAD, y, 50);
 
-      const meta = [reco.creator, reco.year].filter(Boolean).join(' · ');
+      /* La cote va sur la ligne de méta plutôt que sur une ligne à elle :
+         c'est l'information qu'on relit devant les rayons, et la carte est
+         justement ce qu'on emporte sur son téléphone. */
+      const meta = [reco.creator, reco.year, reco.location].filter(Boolean).join(' · ');
       if (meta) {
         ctx.font = sans(30);
         ctx.fillStyle = MUTED;

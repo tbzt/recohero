@@ -112,7 +112,7 @@ export function makeQuestion(axes = []) {
 }
 
 export function makeReco() {
-  return { id: uid('reco'), type: 'livre', title: '', creator: '', year: '', note: '', link: '', image: '' };
+  return { id: uid('reco'), type: 'livre', title: '', creator: '', year: '', note: '', link: '', image: '', location: '' };
 }
 
 export function makeResult(axes = []) {
@@ -218,6 +218,11 @@ export function normalize(raw) {
             note: String(c.note || ''),
             link: /^https?:\/\//i.test(c.link || '') ? c.link : '',
             image: safeImage(c.image),
+            /* Où trouver l'œuvre dans le bâtiment : cote, rayon, étage.
+               Un champ libre plutôt que deux : chaque établissement a ses
+               conventions, et « Jeunesse · R MAN » se lit aussi bien que
+               deux cases dont une resterait vide la moitié du temps. */
+            location: String(c.location || '').slice(0, 80),
           })),
       };
     });
