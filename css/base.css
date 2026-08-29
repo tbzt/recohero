@@ -5,6 +5,15 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* L'attribut `hidden` ne tient que par la feuille de l'agent utilisateur.
+   N'IMPORTE quelle règle d'auteur posant un `display` sur le même élément
+   la neutralise — en silence, sans erreur, sans avertissement. Trois
+   éléments du projet étaient dans ce cas (.gate, .admin-shell, .tally) :
+   l'attribut était bien posé, l'élément restait à l'écran.
+   Cette ligne rend `hidden` inconditionnel. C'est le seul !important
+   du projet, et il est là pour ça. */
+[hidden] { display: none !important; }
+
 html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;

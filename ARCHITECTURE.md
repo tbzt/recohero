@@ -167,6 +167,15 @@ redéclare ces media queries.
 - [ ] Aucune valeur d'espacement hors de l'échelle base 4.
 - [ ] Aucun texte sous 12 px.
 - [ ] Vérifié en thème sombre.
+- [ ] Un élément piloté par l'attribut `hidden` est contrôlé en **`display`
+      calculé**, jamais sur la propriété `.hidden`. `hidden` ne tient que par
+      la feuille de l'agent utilisateur : la moindre règle d'auteur posant un
+      `display` sur le même élément l'annule, sans erreur ni avertissement.
+      `base.css` neutralise le piège une fois pour toutes
+      (`[hidden] { display: none !important }`), mais un test qui lit
+      `node.hidden` continuera de dire « masqué » sur un élément parfaitement
+      visible. Ce défaut est passé en production sur ce projet : le
+      backoffice s'ouvrait bien, l'écran de garde restait par-dessus.
 - [ ] Une animation qui déplace un élément large est **clippée** par son
       conteneur, sinon elle rend la page scrollable horizontalement pendant
       la transition.
