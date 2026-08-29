@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "id": "quiz-roman-ete",
+  "title": "Quel roman pour cet été ?",
+  "tagline": "Huit questions, trois tempéraments, et un livre au bout.",
+  "intro": "Ce questionnaire ne cherche pas à savoir si vous avez bon goût. Il cherche à savoir ce dont vous avez envie, là, maintenant, sur ce transat.\n\nÀ chaque réponse, vous récoltez des ronds, des étoiles ou des triangles. Celui qui gagne décide de ce que vous emportez.",
+  "emoji": "🏖️",
+  "accent": "#C8452B",
+  "axes": [
+    { "id": "ressac", "glyph": "●", "label": "Le Ressac",     "color": "#2E6BA8" },
+    { "id": "large",  "glyph": "★", "label": "Le Grand Large", "color": "#B4531E" },
+    { "id": "loupe",  "glyph": "▲", "label": "La Loupe",       "color": "#3F7A3A" }
+  ],
+  "questions": [
+    {
+      "id": "q1", "text": "Il est 15 h, un dimanche d'août. Vous…", "hint": "", "type": "single",
+      "options": [
+        { "id": "q1a", "emoji": "😴", "text": "…dormez sur un transat, un livre ouvert sur le ventre", "scores": { "ressac": 2 } },
+        { "id": "q1b", "emoji": "🥾", "text": "…marchez vers un endroit que vous n'avez jamais vu", "scores": { "large": 2 } },
+        { "id": "q1c", "emoji": "🧩", "text": "…relisez trois fois le même paragraphe pour comprendre le truc", "scores": { "loupe": 2 } }
+      ]
+    },
+    {
+      "id": "q2", "text": "Une première phrase vous accroche quand elle…", "hint": "", "type": "single",
+      "options": [
+        { "id": "q2a", "emoji": "🫀", "text": "…vous serre un peu la gorge", "scores": { "ressac": 2 } },
+        { "id": "q2b", "emoji": "🧭", "text": "…sent le sel et la poussière", "scores": { "large": 2 } },
+        { "id": "q2c", "emoji": "🔑", "text": "…vous pose une devinette", "scores": { "loupe": 2 } }
+      ]
+    },
+    {
+      "id": "q3", "text": "Le livre idéal fait…", "hint": "", "type": "single",
+      "options": [
+        { "id": "q3a", "emoji": "🌙", "text": "180 pages, et vous le finissez en une nuit", "scores": { "ressac": 2, "loupe": 1 } },
+        { "id": "q3b", "emoji": "🧱", "text": "900 pages, et vous êtes triste que ça s'arrête", "scores": { "large": 2 } },
+        { "id": "q3c", "emoji": "🌀", "text": "Exactement le nombre de pages qu'il faut pour vous égarer", "scores": { "loupe": 2 } }
+      ]
+    },
+    {
+      "id": "q4", "text": "Vous pardonnez tout à un livre, sauf…", "hint": "", "type": "single",
+      "options": [
+        { "id": "q4a", "emoji": "🥱", "text": "…qu'il soit tiède", "scores": { "ressac": 1, "large": 1 } },
+        { "id": "q4b", "emoji": "🚏", "text": "…qu'il n'aille nulle part", "scores": { "large": 2 } },
+        { "id": "q4c", "emoji": "🙄", "text": "…qu'il vous prenne pour un imbécile", "scores": { "loupe": 2 } }
+      ]
+    },
+    {
+      "id": "q5", "text": "Avec les personnages, vous voulez…", "hint": "", "type": "single",
+      "options": [
+        { "id": "q5a", "emoji": "🤝", "text": "les aimer, quitte à leur pardonner beaucoup", "scores": { "ressac": 2 } },
+        { "id": "q5b", "emoji": "👣", "text": "les suivre, même de très loin", "scores": { "large": 2 } },
+        { "id": "q5c", "emoji": "🔍", "text": "les percer à jour avant la fin", "scores": { "loupe": 2 } }
+      ]
+    },
+    {
+      "id": "q6", "text": "Le décor qu'il vous faut, cet été", "hint": "", "type": "single",
+      "options": [
+        { "id": "q6a", "emoji": "🪟", "text": "Une chambre l'après-midi, volets mi-clos", "scores": { "ressac": 2 } },
+        { "id": "q6b", "emoji": "⚓", "text": "Une route, un pont, un port", "scores": { "large": 2 } },
+        { "id": "q6c", "emoji": "📚", "text": "Une bibliothèque dont on ne sort pas", "scores": { "loupe": 2 } }
+      ]
+    },
+    {
+      "id": "q7", "text": "La dernière page parfaite…", "hint": "", "type": "single",
+      "options": [
+        { "id": "q7a", "emoji": "🕳️", "text": "…vous laisse un peu vide", "scores": { "ressac": 2 } },
+        { "id": "q7b", "emoji": "🎒", "text": "…vous donne envie de partir", "scores": { "large": 2 } },
+        { "id": "q7c", "emoji": "↩️", "text": "…vous fait rouvrir la première", "scores": { "loupe": 2 } }
+      ]
+    },
+    {
+      "id": "q8", "text": "Cochez tout ce dont vous avez vraiment envie", "hint": "Plusieurs réponses, sans se justifier.", "type": "multiple",
+      "options": [
+        { "id": "q8a", "emoji": "😢", "text": "Pleurer un peu", "scores": { "ressac": 2 } },
+        { "id": "q8b", "emoji": "⛵", "text": "Apprendre à naviguer", "scores": { "large": 2 } },
+        { "id": "q8c", "emoji": "🎭", "text": "Me faire avoir", "scores": { "loupe": 2 } },
+        { "id": "q8d", "emoji": "😂", "text": "Rire franchement", "scores": { "ressac": 1, "large": 1 } }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "id": "r-ressac", "emoji": "🌊",
+      "title": "L'amateur de fins douces",
+      "subtitle": "Vous voulez que ça vous coûte un peu.",
+      "text": "Vous ne lisez pas pour vous distraire, vous lisez pour être remué à la bonne température. Ce qu'il vous faut tient dans une main, se lit en deux soirs, et vous laisse trois jours de silence.",
+      "rule": { "mode": "dominant", "axis": "ressac", "min": 0, "max": 999 },
+      "recos": [
+        { "id": "c1", "type": "livre", "title": "L'Amant", "creator": "Marguerite Duras", "year": "1984", "note": "Court, brûlant, et écrit comme on se souvient : par éclats.", "link": "" },
+        { "id": "c2", "type": "livre", "title": "La Promesse de l'aube", "creator": "Romain Gary", "year": "1960", "note": "Drôle jusqu'à la dernière page, où ça ne l'est plus du tout.", "link": "" },
+        { "id": "c3", "type": "livre", "title": "Les Vagues", "creator": "Virginia Woolf", "year": "1931", "note": "Si vous acceptez de lâcher l'intrigue, il reste tout le reste.", "link": "" }
+      ]
+    },
+    {
+      "id": "r-large", "emoji": "🧭",
+      "title": "Le partant",
+      "subtitle": "Il vous faut de la place.",
+      "text": "Vous voulez un livre qui vous emmène et qui ne demande pas la permission. Le volume ne vous fait pas peur : ce qui vous fait peur, c'est d'arriver trop vite.",
+      "rule": { "mode": "dominant", "axis": "large", "min": 0, "max": 999 },
+      "recos": [
+        { "id": "c4", "type": "livre", "title": "L'Usage du monde", "creator": "Nicolas Bouvier", "year": "1963", "note": "Le récit de voyage qui a ruiné tous les autres récits de voyage.", "link": "" },
+        { "id": "c5", "type": "livre", "title": "Moby Dick", "creator": "Herman Melville", "year": "1851", "note": "Oui, il y a les chapitres sur la baleine. C'est précisément le sujet.", "link": "" },
+        { "id": "c6", "type": "livre", "title": "Le Comte de Monte-Cristo", "creator": "Alexandre Dumas", "year": "1844", "note": "Mille pages et pas une où l'on s'ennuie. Le pari de l'été.", "link": "" }
+      ]
+    },
+    {
+      "id": "r-loupe", "emoji": "🔍",
+      "title": "Le démonteur d'horloges",
+      "subtitle": "Vous lisez avec un tournevis.",
+      "text": "Ce qui vous tient, c'est le mécanisme. Vous voulez un livre qui vous voie venir, qui vous laisse croire que vous avez compris, et qui referme le piège au bon moment.",
+      "rule": { "mode": "dominant", "axis": "loupe", "min": 0, "max": 999 },
+      "recos": [
+        { "id": "c7", "type": "livre", "title": "Le Nom de la rose", "creator": "Umberto Eco", "year": "1980", "note": "Une enquête médiévale qui est en réalité un traité sur le rire.", "link": "" },
+        { "id": "c8", "type": "livre", "title": "Fictions", "creator": "Jorge Luis Borges", "year": "1944", "note": "Des nouvelles de dix pages qui contiennent des bibliothèques infinies.", "link": "" },
+        { "id": "c9", "type": "livre", "title": "La Vie mode d'emploi", "creator": "Georges Perec", "year": "1978", "note": "Un immeuble, quatre-vingt-dix-neuf chapitres, une contrainte cachée partout.", "link": "" }
+      ]
+    },
+    {
+      "id": "r-mix", "emoji": "🎲",
+      "title": "L'indécis magnifique",
+      "subtitle": "Vous voulez tout, et vous avez raison.",
+      "text": "Aucun tempérament ne l'emporte chez vous, et ce n'est pas un défaut : c'est un appétit. Il vous faut des livres qui font trois choses à la fois.",
+      "rule": { "mode": "fallback", "axis": null, "min": 0, "max": 999 },
+      "recos": [
+        { "id": "c10", "type": "livre", "title": "Si par une nuit d'hiver un voyageur", "creator": "Italo Calvino", "year": "1979", "note": "Dix romans commencés, aucun fini, et c'est le plus satisfaisant de tous.", "link": "" },
+        { "id": "c11", "type": "livre", "title": "L'Écume des jours", "creator": "Boris Vian", "year": "1947", "note": "On rit pendant cent pages, puis on comprend ce qui se passe.", "link": "" },
+        { "id": "c12", "type": "livre", "title": "Le Guide du voyageur galactique", "creator": "Douglas Adams", "year": "1979", "note": "L'aventure, l'absurde et le vertige, servis avec une serviette.", "link": "" }
+      ]
+    }
+  ]
+}

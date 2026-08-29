@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Backoffice — RecoHero</title>
+  <meta name="robots" content="noindex">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>✦</text></svg>">
+  <link rel="stylesheet" href="css/foundation.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+  <!-- La porte. Cosmétique et assumée comme telle : sans serveur, il n'y a
+       aucune donnée partagée à protéger. Voir js/admin/app.js. -->
+  <section class="gate" id="gate" hidden>
+    <form class="card gate__card stack" id="gateForm">
+      <div class="gate__emoji">✦</div>
+      <h1>Backoffice RecoHero</h1>
+      <label class="field">
+        <span class="field__label">Phrase d’accès</span>
+        <input class="input" type="password" id="gatePass" autocomplete="current-password"
+               placeholder="……" required>
+      </label>
+      <button class="btn btn--primary btn--block" type="submit">Entrer</button>
+      <p class="gate__note">
+        Cette phrase masque l’entrée, elle ne chiffre rien&nbsp;: RecoHero est
+        entièrement statique, il n’y a aucune donnée en ligne à protéger.
+      </p>
+    </form>
+  </section>
+
+  <header class="topbar">
+    <div class="page topbar__inner">
+      <a class="brand" href="index.html">
+        <span class="brand__mark">✦</span>
+        <span>RecoHero</span>
+      </a>
+      <span class="topbar__doc" id="quizName"></span>
+      <span class="topbar__spacer"></span>
+      <span class="status" id="saveStatus"></span>
+      <span class="topbar__actions" id="topActions">
+        <button class="btn btn--ghost btn--sm" type="button" data-act="test">▷&nbsp;<span>Tester</span></button>
+        <button class="btn btn--primary btn--sm" type="button" data-act="panel" data-id="publier">⤴&nbsp;<span>Diffuser</span></button>
+        <button class="btn btn--icon btn--quiet" type="button" data-act="lock" title="Verrouiller le backoffice" aria-label="Verrouiller le backoffice">⏻</button>
+      </span>
+    </div>
+  </header>
+
+  <div class="page">
+    <div class="admin-shell" id="shell" hidden>
+      <aside class="rail" id="rail" aria-label="Navigation du backoffice"></aside>
+      <div id="panel"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/admin/app.js"></script>
+</body>
+</html>

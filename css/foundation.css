@@ -1,0 +1,184 @@
+/* ==========================================================================
+   RecoHero — foundation.css
+   Le vocabulaire de matière : couleur, typographie, espace, mouvement.
+   Loi : aucun sélecteur autre que :root ici. Aucune règle de composant.
+   ========================================================================== */
+
+:root {
+  /* --- Typographie -------------------------------------------------------
+     Deux familles. La serif porte l'identité (titres, glyphes, résultats),
+     la sans porte le fonctionnel (interface, formulaires, listes).        */
+  --font-display: "Iowan Old Style", "Palatino Linotype", "URW Palladio L",
+                  P052, Palatino, "Liberation Serif", Georgia, serif;
+  --font-text: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo,
+               Consolas, monospace;
+
+  /* Échelle à 9 pas, ratio ~1.25. Plancher assumé : 12px, jamais moins. */
+  --t-xs:   0.75rem;    /* 12 — méta, compteurs */
+  --t-sm:   0.8125rem;  /* 13 — libellés de champ */
+  --t-base: 1rem;       /* 16 — corps, plancher de lecture */
+  --t-md:   1.125rem;   /* 18 — corps confortable */
+  --t-lg:   1.3125rem;  /* 21 — sous-titres */
+  --t-xl:   1.625rem;   /* 26 — titres de section */
+  --t-2xl:  2.0625rem;  /* 33 — titres de page */
+  --t-3xl:  2.625rem;   /* 42 — questions */
+  --t-4xl:  3.375rem;   /* 54 — révélation du résultat */
+
+  --lh-tight: 1.15;
+  --lh-snug:  1.35;
+  --lh-body:  1.6;
+
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-bold:   700;
+
+  /* --- Espace ------------------------------------------------------------
+     Base 4. On n'invente pas de valeur intermédiaire.                     */
+  --s-1: 0.25rem;  /*  4 */
+  --s-2: 0.5rem;   /*  8 */
+  --s-3: 0.75rem;  /* 12 */
+  --s-4: 1rem;     /* 16 */
+  --s-5: 1.5rem;   /* 24 */
+  --s-6: 2rem;     /* 32 */
+  --s-7: 3rem;     /* 48 */
+  --s-8: 4rem;     /* 64 */
+  --s-9: 6rem;     /* 96 */
+
+  /* --- Rayons ------------------------------------------------------------ */
+  --r-sm:   6px;
+  --r-md:   12px;
+  --r-lg:   20px;
+  --r-xl:   28px;
+  --r-full: 999px;
+
+  /* --- Cibles tactiles ---------------------------------------------------
+     Loi : tout contrôle actionnable au doigt fait au moins --tap.         */
+  --tap: 44px;
+  --tap-sm: 36px; /* dérogation réservée aux contrôles secondaires groupés */
+
+  /* --- Mouvement ---------------------------------------------------------
+     prefers-reduced-motion est traité ICI, au niveau des variables, une
+     seule fois. Aucun composant ne redéclare la media query.              */
+  --dur-fast: 130ms;
+  --dur-base: 240ms;
+  --dur-slow: 460ms;
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* --- Bandes de z-index, sémantiques et ordonnées ----------------------- */
+  --z-base:    0;
+  --z-raised:  10;
+  --z-sticky:  100;
+  --z-overlay: 200;
+  --z-modal:   300;
+  --z-toast:   400;
+
+  /* --- Couleur : thème clair (défaut) ------------------------------------
+     --accent est la SEULE couleur qu'un questionnaire a le droit de
+     redéfinir. Tout le reste en découle par color-mix.                    */
+  --accent: #C8452B;
+  --accent-ink: #FFFFFF;
+
+  --bg:         #FBF7F1;
+  --bg-sunk:    #F2EBE1;
+  --surface:    #FFFFFF;
+  --surface-2:  #FAF6F0;
+  --line:       #E6DED2;
+  --line-strong:#CFC3B2;
+
+  --ink:        #1B1613;
+  --ink-muted:  #6A5F55;
+  --ink-faint:  #9B8F83;
+
+  --danger:  #B3261E;
+  --warning: #A16207;
+  --success: #15803D;
+
+  --shadow-1: 0 1px 2px rgba(35, 24, 15, 0.06),
+              0 1px 3px rgba(35, 24, 15, 0.05);
+  --shadow-2: 0 2px 6px rgba(35, 24, 15, 0.07),
+              0 8px 20px rgba(35, 24, 15, 0.07);
+  --shadow-3: 0 4px 12px rgba(35, 24, 15, 0.09),
+              0 20px 48px rgba(35, 24, 15, 0.12);
+
+  /* Dérivés de l'accent. La déclaration statique précède le color-mix :
+     si color-mix n'est pas supporté, la règle suivante est simplement
+     ignorée et la valeur de repli tient.                                  */
+  --accent-soft: #F7E9E4;
+  --accent-soft: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  --accent-line: #E8C4B9;
+  --accent-line: color-mix(in oklab, var(--accent) 34%, var(--line));
+  --accent-deep: #8E2F1D;
+  --accent-deep: color-mix(in oklab, var(--accent) 78%, var(--ink));
+
+  --focus: var(--accent);
+  --focus-ring: 0 0 0 3px var(--surface), 0 0 0 5px var(--focus);
+
+  --content: 44rem;    /* largeur de lecture confortable */
+  --content-wide: 68rem;
+}
+
+/* --- Couleur : thème sombre ---------------------------------------------
+   Seuls les tokens changent. Aucun composant ne connaît le thème.        */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:         #14100D;
+    --bg-sunk:    #0D0A08;
+    --surface:    #1E1915;
+    --surface-2:  #262019;
+    --line:       #342C24;
+    --line-strong:#4C4136;
+
+    --ink:        #F6EFE6;
+    --ink-muted:  #B0A395;
+    --ink-faint:  #7D7266;
+
+    --accent: #F0714F;
+    --danger:  #F2776C;
+    --warning: #E0A22E;
+    --success: #4ADE80;
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 20px rgba(0, 0, 0, 0.34);
+    --shadow-3: 0 4px 12px rgba(0, 0, 0, 0.45), 0 20px 48px rgba(0, 0, 0, 0.5);
+
+    --accent-soft: #331C15;
+    --accent-soft: color-mix(in oklab, var(--accent) 18%, var(--surface));
+    --accent-line: #6A3527;
+    --accent-line: color-mix(in oklab, var(--accent) 40%, var(--line));
+    --accent-deep: #FFA98F;
+    --accent-deep: color-mix(in oklab, var(--accent) 70%, var(--ink));
+  }
+}
+
+[data-theme="dark"] {
+  --bg:         #14100D;
+  --bg-sunk:    #0D0A08;
+  --surface:    #1E1915;
+  --surface-2:  #262019;
+  --line:       #342C24;
+  --line-strong:#4C4136;
+  --ink:        #F6EFE6;
+  --ink-muted:  #B0A395;
+  --ink-faint:  #7D7266;
+  --danger:  #F2776C;
+  --warning: #E0A22E;
+  --success: #4ADE80;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 20px rgba(0, 0, 0, 0.34);
+  --shadow-3: 0 4px 12px rgba(0, 0, 0, 0.45), 0 20px 48px rgba(0, 0, 0, 0.5);
+  --accent-soft: color-mix(in oklab, var(--accent) 18%, var(--surface));
+  --accent-line: color-mix(in oklab, var(--accent) 40%, var(--line));
+  --accent-deep: color-mix(in oklab, var(--accent) 70%, var(--ink));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+  }
+}

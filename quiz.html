@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Questionnaire — RecoHero</title>
+  <meta name="description" content="Réponds au questionnaire, récolte tes glyphes, repars avec tes recommandations.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>✦</text></svg>">
+  <link rel="stylesheet" href="css/foundation.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/quiz.css">
+</head>
+<body class="quiz-body">
+
+  <a class="skip-link" href="#stage">Aller au questionnaire</a>
+
+  <header class="quizbar" id="quizbar" hidden>
+    <div class="page quizbar__inner">
+      <a class="btn btn--quiet btn--sm" href="index.html" id="exitLink">← Kiosque</a>
+      <span class="quizbar__title" id="quizTitle"></span>
+      <div class="tally quizbar__tally" id="quizTally" aria-label="Ton compteur" hidden></div>
+    </div>
+    <div class="progress"><div class="progress__fill" id="quizProgress"></div></div>
+  </header>
+
+  <main class="stage" id="stage" tabindex="-1">
+    <div class="stage__inner page">
+      <p style="text-align:center;color:var(--ink-faint)">Chargement…</p>
+    </div>
+  </main>
+
+  <script type="module" src="js/quiz.js"></script>
+</body>
+</html>

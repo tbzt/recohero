@@ -1,0 +1,337 @@
+/* ==========================================================================
+   RecoHero — components.css
+   Le vocabulaire d'objets : ce qui est réutilisé par au moins deux pages.
+   Un composant qui ne sert qu'à une page vit dans le CSS de cette page.
+   ========================================================================== */
+
+/* --- Bouton --------------------------------------------------------------
+   Une seule base, trois variantes de force, deux tailles.                 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: var(--tap);
+  padding: var(--s-2) var(--s-5);
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: var(--t-base);
+  font-weight: var(--fw-medium);
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+.btn:hover { background: var(--bg-sunk); }
+.btn:active { transform: translateY(1px); }
+.btn[disabled], .btn[aria-disabled="true"] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-1);
+}
+.btn--primary:hover {
+  background: var(--accent-deep);
+  box-shadow: var(--shadow-2);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink-muted);
+}
+.btn--ghost:hover {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.btn--quiet {
+  background: transparent;
+  color: var(--ink-muted);
+  padding-inline: var(--s-3);
+}
+.btn--quiet:hover { background: var(--surface-2); color: var(--ink); }
+
+.btn--danger { color: var(--danger); }
+.btn--danger:hover { background: var(--danger); color: #fff; }
+
+.btn--sm {
+  min-height: var(--tap-sm);
+  padding: var(--s-1) var(--s-3);
+  font-size: var(--t-sm);
+}
+.btn--icon {
+  min-height: var(--tap-sm);
+  width: var(--tap-sm);
+  padding: 0;
+  border-radius: var(--r-sm);
+  font-size: var(--t-base);
+}
+.btn--block { width: 100%; }
+
+/* --- Carte ---------------------------------------------------------------
+   La surface de base. Elle ne décide ni de son espacement externe ni de
+   sa largeur : c'est le conteneur qui les porte.                          */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+}
+.card--flat { box-shadow: none; }
+.card--raised { box-shadow: var(--shadow-1); }
+.card--tight { padding: var(--s-4); }
+
+/* --- Champs de formulaire ------------------------------------------------ */
+.field { display: block; }
+.field + .field { margin-top: var(--s-4); }
+
+.field__label {
+  display: block;
+  margin-bottom: var(--s-1);
+  font-size: var(--t-sm);
+  font-weight: var(--fw-medium);
+  color: var(--ink-muted);
+  letter-spacing: 0.01em;
+}
+.field__hint {
+  margin-top: var(--s-1);
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+}
+
+.input, .textarea, .select {
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  font-size: var(--t-base);
+  transition: border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+.input::placeholder, .textarea::placeholder { color: var(--ink-faint); }
+.input:hover, .textarea:hover, .select:hover { border-color: var(--ink-faint); }
+.input:focus, .textarea:focus, .select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.textarea {
+  min-height: 6rem;
+  line-height: var(--lh-body);
+  resize: vertical;
+}
+.select {
+  appearance: none;
+  padding-right: var(--s-6);
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 1.15rem center, right 0.85rem center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.input--mono { font-family: var(--font-mono); font-size: var(--t-sm); }
+
+/* --- Glyphe d'axe --------------------------------------------------------
+   Le signe (★ ● ▲ …) qui compte les points. Il porte sa propre couleur
+   via --axis, posée en style inline par le JS.                            */
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  color: var(--axis, var(--accent));
+  line-height: 1;
+  user-select: none;
+}
+
+/* --- Compteur d'axes -----------------------------------------------------
+   Le cœur visuel du produit : les glyphes qui s'accumulent.               */
+.tally {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-4);
+}
+.tally__axis {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.tally__glyph {
+  font-size: var(--t-md);
+  color: var(--axis, var(--accent));
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+.tally__count {
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+  min-width: 1.2em;
+}
+.tally__axis.is-bumped .tally__glyph {
+  transform: scale(1.5) rotate(-8deg);
+}
+
+/* --- Pastille / étiquette ------------------------------------------------ */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 2px var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: var(--t-xs);
+  font-weight: var(--fw-medium);
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+.pill--accent {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-deep);
+}
+.pill--warn { color: var(--warning); border-color: var(--warning); background: transparent; }
+.pill--danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+
+/* --- Barre de progression ------------------------------------------------ */
+.progress {
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--line);
+  overflow: hidden;
+}
+.progress__fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+/* --- État vide ------------------------------------------------------------ */
+.empty {
+  padding: var(--s-7) var(--s-5);
+  text-align: center;
+  color: var(--ink-muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+}
+.empty__icon {
+  font-size: var(--t-3xl);
+  line-height: 1;
+  margin-bottom: var(--s-3);
+  opacity: 0.5;
+}
+
+/* --- Notification éphémère ------------------------------------------------ */
+.toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: var(--s-5);
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  pointer-events: none;
+}
+.toast {
+  padding: var(--s-3) var(--s-5);
+  border-radius: var(--r-full);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: var(--t-sm);
+  font-weight: var(--fw-medium);
+  box-shadow: var(--shadow-3);
+  animation: toast-in var(--dur-base) var(--ease-spring);
+}
+.toast--danger { background: var(--danger); color: #fff; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- Boîte de dialogue ---------------------------------------------------- */
+.modal {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 0;
+  max-width: min(34rem, calc(100vw - var(--s-6)));
+  width: 100%;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-3);
+}
+.modal::backdrop {
+  background: rgba(20, 14, 10, 0.5);
+  backdrop-filter: blur(3px);
+}
+.modal__body { padding: var(--s-5); }
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-5);
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+
+/* --- En-tête de site ------------------------------------------------------ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: color-mix(in oklab, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.topbar__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: 60px;
+  padding-block: var(--s-2);
+}
+.brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: var(--fw-bold);
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+.brand__mark { color: var(--accent); }
+.brand__tagline {
+  font-family: var(--font-text);
+  font-size: var(--t-xs);
+  font-weight: var(--fw-normal);
+  color: var(--ink-faint);
+  letter-spacing: 0;
+}
+@media (max-width: 46rem) {
+  .brand__tagline { display: none; }
+}
+.topbar__spacer { flex: 1; }

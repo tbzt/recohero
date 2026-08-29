@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>RecoHero — la reco dont vous êtes le héros</title>
+  <meta name="description" content="Des questionnaires qui comptent les étoiles et les ronds, et qui finissent par une recommandation culturelle.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>✦</text></svg>">
+  <link rel="stylesheet" href="css/foundation.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/gallery.css">
+</head>
+<body>
+
+  <a class="skip-link" href="#main">Aller au contenu</a>
+
+  <header class="topbar">
+    <div class="page topbar__inner">
+      <a class="brand" href="index.html">
+        <span class="brand__mark">✦</span>
+        <span>RecoHero</span>
+        <span class="brand__tagline">la reco dont vous êtes le héros</span>
+      </a>
+      <span class="topbar__spacer"></span>
+      <a class="btn btn--ghost btn--sm" href="admin.html">Backoffice</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="page">
+
+      <section class="hero">
+        <h1 class="hero__title">La reco dont vous êtes <em>le héros</em></h1>
+        <p class="hero__tagline">
+          Huit questions, des étoiles et des ronds à récolter, et au bout&nbsp;:
+          ce qu’il vous faut lire, voir ou écouter.
+        </p>
+      </section>
+
+      <section class="section">
+        <div class="section__head">
+          <h2>Les questionnaires</h2>
+          <span class="section__spacer"></span>
+          <span class="pill" id="quizCount"></span>
+        </div>
+        <div class="quiz-grid" id="quizGrid"></div>
+      </section>
+
+      <section class="section" id="historySection" hidden>
+        <div class="section__head">
+          <h2>Tes résultats</h2>
+          <span class="section__spacer"></span>
+          <button class="btn btn--quiet btn--sm" type="button" id="clearHistory">Effacer</button>
+        </div>
+        <div class="history" id="history"></div>
+      </section>
+
+      <footer class="footer">
+        <span>RecoHero — statique, sans compte, sans serveur.</span>
+        <span class="footer__spacer"></span>
+        <a href="admin.html">Créer un questionnaire</a>
+      </footer>
+
+    </div>
+  </main>
+
+  <script type="module" src="js/gallery.js"></script>
+</body>
+</html>

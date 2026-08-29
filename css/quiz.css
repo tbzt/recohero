@@ -1,0 +1,394 @@
+/* ==========================================================================
+   RecoHero — quiz.css — le parcours du répondant.
+   Un écran = une question. Tout le reste s'efface.
+   ========================================================================== */
+
+.quiz-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* --- Tableau de bord collant ---------------------------------------------
+   Il porte les deux seules informations qui comptent pendant le parcours :
+   où j'en suis, et ce que j'ai récolté.                                  */
+.quizbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: color-mix(in oklab, var(--bg) 90%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.quizbar__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: 56px;
+  padding-block: var(--s-2);
+}
+.quizbar__title {
+  font-family: var(--font-display);
+  font-size: var(--t-base);
+  font-weight: var(--fw-bold);
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}
+.quizbar__tally { margin-left: auto; }
+.quizbar .progress {
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 3px;
+  border-radius: 0;
+  background: transparent;
+}
+.quizbar { position: sticky; }
+@media (max-width: 34rem) {
+  .quizbar__title { max-width: 8rem; font-size: var(--t-sm); }
+}
+
+/* --- La scène -------------------------------------------------------------
+   Une seule vue à la fois, centrée verticalement quand la place le permet. */
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding-block: var(--s-6) var(--s-8);
+  /* L'animation d'entrée translate la vue de 22px : sans clip, la page
+     devient scrollable horizontalement pendant la transition sur mobile.
+     `clip` plutôt que `hidden` : il ne crée pas de conteneur de scroll. */
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+.stage__inner { width: 100%; }
+
+.view-enter {
+  animation: view-in var(--dur-slow) var(--ease-out) both;
+}
+.view-enter--back { animation-name: view-in-back; }
+@keyframes view-in {
+  from { opacity: 0; transform: translate3d(22px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes view-in-back {
+  from { opacity: 0; transform: translate3d(-22px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- Écran de couverture -------------------------------------------------- */
+.cover { text-align: center; }
+.cover__emoji {
+  font-size: var(--t-4xl);
+  line-height: 1;
+  margin-bottom: var(--s-4);
+}
+.cover__title {
+  font-size: clamp(var(--t-2xl), 6vw, var(--t-4xl));
+  margin-bottom: var(--s-3);
+}
+.cover__tagline {
+  font-size: var(--t-lg);
+  color: var(--accent-deep);
+  font-family: var(--font-display);
+  font-style: italic;
+  margin-bottom: var(--s-5);
+}
+.cover__intro {
+  max-width: 36rem;
+  margin: 0 auto var(--s-6);
+  color: var(--ink-muted);
+  font-size: var(--t-md);
+}
+.cover__axes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-6);
+}
+.cover__axis {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  font-size: var(--t-sm);
+  color: var(--ink-muted);
+}
+.cover__axis .glyph { font-size: var(--t-md); }
+.cover__meta {
+  font-size: var(--t-sm);
+  color: var(--ink-faint);
+  margin-top: var(--s-4);
+}
+.cover__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-3);
+}
+
+/* --- Question -------------------------------------------------------------- */
+.question { max-width: var(--content); margin-inline: auto; }
+.question__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--t-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: var(--s-3);
+}
+.question__text {
+  font-size: clamp(var(--t-xl), 4.6vw, var(--t-3xl));
+  margin-bottom: var(--s-3);
+}
+.question__hint {
+  color: var(--ink-muted);
+  font-size: var(--t-md);
+  margin-bottom: var(--s-5);
+}
+
+.options {
+  display: grid;
+  gap: var(--s-3);
+  margin-bottom: var(--s-6);
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  width: 100%;
+  min-height: 62px;
+  padding: var(--s-3) var(--s-4);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  font-size: var(--t-md);
+  line-height: var(--lh-snug);
+  transition: border-color var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+.option:hover {
+  border-color: var(--accent-line);
+  background: var(--surface-2);
+  transform: translateX(3px);
+}
+.option:active { transform: translateX(1px) scale(0.995); }
+
+.option.is-picked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.option.is-confirmed {
+  animation: option-confirm var(--dur-base) var(--ease-spring);
+}
+@keyframes option-confirm {
+  50% { transform: scale(1.015); }
+}
+
+.option__key {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  transition: inherit;
+}
+.option.is-picked .option__key {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+@media (hover: none) {
+  .option__key { display: none; }
+}
+.option__emoji { flex: none; font-size: var(--t-lg); line-height: 1; }
+.option__text { flex: 1; min-width: 0; }
+
+.navrow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.navrow__spacer { flex: 1; }
+
+/* --- Résultat --------------------------------------------------------------- */
+.result { max-width: var(--content); margin-inline: auto; }
+.result__banner { text-align: center; margin-bottom: var(--s-7); }
+.result__kicker {
+  font-size: var(--t-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: var(--s-3);
+}
+.result__emoji {
+  font-size: var(--t-4xl);
+  line-height: 1;
+  margin-bottom: var(--s-3);
+  animation: pop var(--dur-slow) var(--ease-spring) both;
+}
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.6) rotate(-10deg); }
+  to   { opacity: 1; transform: none; }
+}
+.result__title {
+  font-size: clamp(var(--t-2xl), 6.5vw, var(--t-4xl));
+  color: var(--accent-deep);
+  margin-bottom: var(--s-2);
+}
+.result__subtitle {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--t-lg);
+  color: var(--ink-muted);
+}
+.result__text {
+  max-width: 34rem;
+  margin: var(--s-5) auto 0;
+  font-size: var(--t-md);
+  color: var(--ink-muted);
+  text-align: left;
+}
+
+/* Les jauges d'axes : la « feuille de score » du questionnaire d'été. */
+.scores {
+  display: grid;
+  gap: var(--s-3);
+  margin-bottom: var(--s-7);
+}
+.score {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s-3);
+}
+.score__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--t-sm);
+  color: var(--ink-muted);
+  min-width: 8rem;
+}
+.score__label .glyph { font-size: var(--t-md); }
+.score__track {
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--bg-sunk);
+  overflow: hidden;
+}
+.score__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--axis, var(--accent));
+  transform-origin: left center;
+  animation: score-grow var(--dur-slow) var(--ease-out) both;
+}
+/* La largeur finale est posée en style inline ; le dépouillement se joue
+   sur scaleX, ce qui ne dépend d'aucun réglage JS après coup. */
+@keyframes score-grow {
+  from { transform: scaleX(0); }
+  to   { transform: none; }
+}
+.score__value {
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+.score.is-lead .score__label { color: var(--ink); font-weight: var(--fw-medium); }
+@media (max-width: 34rem) {
+  .score { grid-template-columns: 1fr auto; }
+  .score__track { grid-column: 1 / -1; }
+}
+
+/* --- Les recommandations ------------------------------------------------------ */
+.recos__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+  padding-bottom: var(--s-3);
+  border-bottom: 2px solid var(--accent);
+}
+.recos__list { display: grid; gap: var(--s-3); }
+.reco {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-4);
+  padding: var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  transition: border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+  animation: reco-in var(--dur-slow) var(--ease-out) both;
+}
+.reco:hover { border-color: var(--accent-line); box-shadow: var(--shadow-1); }
+@keyframes reco-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+.reco__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  font-size: var(--t-lg);
+}
+.reco__title {
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  font-weight: var(--fw-bold);
+  margin-bottom: 2px;
+}
+.reco__title a { color: inherit; }
+.reco__creator { font-size: var(--t-sm); color: var(--ink-muted); }
+.reco__note {
+  margin-top: var(--s-2);
+  font-size: var(--t-sm);
+  color: var(--ink-muted);
+  border-left: 2px solid var(--line);
+  padding-left: var(--s-3);
+}
+
+.result__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin-top: var(--s-7);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line);
+}
+
+/* --- Écran d'erreur -------------------------------------------------------- */
+.failure { text-align: center; max-width: 32rem; margin-inline: auto; }
+.failure__icon { font-size: var(--t-3xl); margin-bottom: var(--s-3); }
+.failure__detail {
+  margin-top: var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  word-break: break-word;
+}
