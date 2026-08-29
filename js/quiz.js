@@ -104,7 +104,10 @@ function render() {
      remonter est l'affaire de la page hôte. Jamais au premier rendu — le
      seul chargement de l'embed happerait la page vers lui.             */
   if (!isEmbed) window.scrollTo(0, 0);
-  else if (!firstPaint) window.parent.postMessage({ type: 'recohero:scroll' }, EMBED_TARGET);
+  else {
+    measureEmbed();
+    if (!firstPaint) window.parent.postMessage({ type: 'recohero:scroll' }, EMBED_TARGET);
+  }
   firstPaint = false;
 }
 
@@ -408,11 +411,25 @@ let lastHeight = 0;
 function wireEmbed() {
   document.documentElement.classList.add('is-embed');
   dom.exit.remove();
-  /* documentElement, et non body : `min-height` neutralisé (quiz.css), sa
-     hauteur est exactement celle du contenu. L'observateur rattrape seul
-     ce qui arrive après coup — une image chargée, une vue plus longue. */
-  new ResizeObserver(postHeight).observe(document.documentElement);
+  /* L'observateur est un supplément, jamais le socle : il ne rattrape que
+     ce que personne n'a annoncé — l'hôte qui change de largeur, une police
+     qui se substitue. Il ne peut pas porter la mesure à lui seul, car ses
+     rappels sont livrés à l'étape de peinture, et un cadre hors écran ne
+     peint pas. Même raison que le `requestAnimationFrame` proscrit
+     (ARCHITECTURE.md) : la valeur au repos doit être juste sans lui.   */
+  new ResizeObserver(postHeight).observe(document.body);
   postHeight();
+}
+
+/* Appelé à chaque rendu, sur le champ : la vue vient de changer en entier,
+   et `getBoundingClientRect` force le calcul de mise en page — la hauteur
+   est donc juste tout de suite, sans attendre une peinture. Les images,
+   elles, arrivent après ; chacune rallonge la page, et chacune le dira. */
+function measureEmbed() {
+  postHeight();
+  for (const image of dom.stage.querySelectorAll('img')) {
+    if (!image.complete) image.addEventListener('load', postHeight, { once: true });
+  }
 }
 
 function postHeight() {
