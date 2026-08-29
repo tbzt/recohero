@@ -11,6 +11,8 @@ import {
   normalize, diagnose, uid, slugify, safeImage, imageWeight,
 } from '../core/schema.js';
 import { reachability } from '../core/scoring.js';
+import { bindSortables } from '../core/sortable.js';
+import { questionView } from '../core/views.js';
 import { loadPublished } from '../core/catalog.js';
 import * as store from '../core/store.js';
 import { linkFor, encode } from '../core/share.js';
@@ -38,6 +40,8 @@ const state = {
   panel: 'identite',
   reach: null,
   expanded: new Set(),  /* réponses dont le champ image est déplié */
+  focused: null,        /* question sous le curseur, pour l'aperçu */
+  previewOpen: true,
 };
 
 const dom = {};
@@ -89,6 +93,25 @@ async function open() {
   dom.shell.addEventListener('change', onChange);
   dom.topActions.addEventListener('click', onClick);
   window.addEventListener('beforeunload', flush);
+  dom.shell.addEventListener('focusin', (event) => {
+    const bind = event.target.closest('[data-bind]')?.dataset.bind || '';
+    /* Que le curseur soit dans l'énoncé, dans une réponse ou dans une
+       pesée, l'identifiant retenu est celui de la question qui les porte :
+       c'est elle qu'on veut à l'aperçu. */
+    const id = /^(?:question|option|score):([^:]+)/.exec(bind)?.[1];
+    if (!id || id === state.focused) return;
+    state.focused = id;
+    paintPreview();
+  });
+  window.addEventListener('keydown', (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z' || event.shiftKey) return;
+    /* Dans un champ de saisie, Ctrl+Z appartient au champ : le navigateur
+       y défait la frappe, ce qu'aucune pile de notre côté ne ferait mieux. */
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    event.preventDefault();
+    undo();
+  });
 }
 
 /* --- Rendu ------------------------------------------------------------------ */
@@ -196,11 +219,13 @@ async function renderPanel() {
   }
 
   const panel = PANELS.find((p) => p.id === state.panel) || PANELS[0];
-  const ctx = { reach: state.reach, expanded: state.expanded };
+  const ctx = { reach: state.reach, expanded: state.expanded, previewOpen: state.previewOpen };
   if (panel.id === 'publier') ctx.linkSize = (await encode(state.quiz)).length + 40;
 
   dom.panel.replaceChildren(panel.render(state.quiz, ctx));
   applyAccent(state.quiz.accent);
+  bindSortables(dom.panel, dropped);
+  if (panel.id === 'questions') paintPreview();
 
   if (panel.id === 'resultats') scheduleReach();
 }
@@ -214,6 +239,108 @@ const scheduleReach = debounce(() => {
   state.reach = next;
   if (JSON.stringify(next.hit || {}) !== before) renderPanel();
 }, 500);
+
+/* --- Annulation -----------------------------------------------------------
+   On n'interrompt pas l'auteur pour lui demander s'il est sûr : on fait ce
+   qu'il a demandé, et on lui laisse un chemin de retour. Un `confirm()`
+   coûte une interruption à chaque geste et ne protège que d'un clic
+   distrait — pas du regret, qui vient trois secondes plus tard.
+
+   Seuls les gestes de STRUCTURE sont empilés (ajout, suppression,
+   déplacement, duplication). La frappe au clavier ne l'est pas : ce serait
+   des centaines d'états pour un service que Ctrl+Z rend déjà dans le champ
+   lui-même.                                                              */
+
+const UNDO_DEPTH = 40;
+const undoStack = [];
+
+function remember(label) {
+  if (!state.quiz) return;
+  const snapshot = structuredClone(state.quiz);
+  const panel = state.panel;
+  pushUndo(label, () => {
+    state.quiz = snapshot;
+    state.panel = panel;
+    flush();
+    renderTopbar();
+    renderRail();
+    renderPanel();
+  });
+}
+
+function pushUndo(label, apply) {
+  undoStack.push({ label, apply });
+  if (undoStack.length > UNDO_DEPTH) undoStack.shift();
+}
+
+function undo() {
+  const step = undoStack.pop();
+  if (!step) return toast('Rien à annuler.');
+  step.apply();
+  return toast(`Annulé : ${step.label.toLowerCase()}.`);
+}
+
+/* Le geste destructeur : on l'exécute, et on propose le retour. */
+function undoable(label, mutate) {
+  remember(label);
+  mutate();
+  flush();
+  renderRail();
+  renderPanel();
+  toast(label, { action: { label: 'Annuler', onClick: undo } });
+}
+
+/* --- Aperçu ---------------------------------------------------------------
+   Il montre la question sous le curseur, avec le rendu exact du parcours
+   (views.js). Il se repeint tout seul à la frappe et ne redessine jamais
+   le panneau : un redessin déplacerait le curseur du champ en cours.   */
+
+function paintPreview() {
+  const stage = document.getElementById('previewStage');
+  const hint = document.getElementById('previewHint');
+  if (!stage || !state.quiz) return;
+
+  const index = state.quiz.questions.findIndex((q) => q.id === state.focused);
+  if (index < 0) {
+    stage.replaceChildren(el('p', { class: 'preview__empty', text: 'Placez le curseur dans une question pour la voir telle que le répondant la verra.' }));
+    if (hint) hint.textContent = '';
+    return;
+  }
+
+  const question = state.quiz.questions[index];
+  if (hint) hint.textContent = `question ${index + 1} sur ${state.quiz.questions.length}`;
+  stage.replaceChildren(questionView(state.quiz, question, index, { interactive: false }));
+}
+
+const repaintPreview = debounce(paintPreview, 140);
+
+/* Le glisser-déposer aboutit ici. Chaque liste déclare ce qu'elle ordonne
+   dans `data-sortable` ; on retrouve le tableau, on déplace, on annule
+   comme n'importe quel autre geste de structure.                        */
+function dropped(key, from, to) {
+  const quiz = state.quiz;
+  if (!quiz) return;
+  const [kind, ownerId] = key.split(':');
+
+  const target =
+    kind === 'axes'      ? quiz.axes :
+    kind === 'questions' ? quiz.questions :
+    kind === 'results'   ? quiz.results :
+    kind === 'options'   ? quiz.questions.find((q) => q.id === ownerId)?.options :
+    kind === 'recos'     ? quiz.results.find((r) => r.id === ownerId)?.recos :
+    null;
+  if (!target || from === to) return;
+
+  const labels = {
+    axes: 'Axe déplacé', questions: 'Question déplacée', results: 'Profil déplacé',
+    options: 'Réponse déplacée', recos: 'Recommandation déplacée',
+  };
+  remember(labels[kind] || 'Déplacement');
+  target.splice(to, 0, target.splice(from, 1)[0]);
+  flush();
+  renderRail();
+  renderPanel();
+}
 
 /* --- Sauvegarde --------------------------------------------------------------- */
 
@@ -313,6 +440,7 @@ function onInput(event) {
   touch();
   live(target);
   refreshDiag();
+  if (state.panel === 'questions') repaintPreview();
 }
 
 function onChange(event) {
@@ -373,6 +501,9 @@ function onClick(event) {
   const quiz = state.quiz;
 
   const structural = () => { flush(); renderRail(); renderPanel(); };
+  /* Un déplacement est annulable mais ne mérite pas de bandeau : son
+     effet est déjà sous les yeux de celui qui vient de le provoquer. */
+  const reorder = (label, mutate) => { remember(label); mutate(); structural(); };
   const byId = (list, key) => list.find((item) => item.id === key);
   const move = (list, key, delta) => {
     const from = list.findIndex((item) => item.id === key);
@@ -411,13 +542,25 @@ function onClick(event) {
       return structural();
     }
     case 'delete-quiz': {
-      if (!quiz || !confirm(`Supprimer « ${quiz.title} » de ce navigateur ?`)) return undefined;
+      if (!quiz) return undefined;
+      const removed = structuredClone(quiz);
+      const panel = state.panel;
+      pushUndo('Questionnaire supprimé', () => {
+        store.saveDraft(removed);
+        select(removed.id);
+        state.panel = panel;
+        renderRail();
+        renderPanel();
+      });
       store.deleteDraft(quiz.id);
       state.quiz = null;
       const next = store.allDrafts()[0];
       if (next) select(next.id);
-      toast('Questionnaire supprimé.');
-      return structural();
+      renderRail();
+      renderPanel();
+      renderTopbar();
+      toast(`« ${removed.title} » supprimé`, { action: { label: 'Annuler', onClick: undo } });
+      return undefined;
     }
 
     case 'accent': {
@@ -425,89 +568,80 @@ function onClick(event) {
       return structural();
     }
 
-    case 'axis-add': {
+    case 'axis-add': return undoable('Axe ajouté', () => {
       const axis = makeAxis(quiz.axes.length);
       quiz.axes.push(axis);
       for (const q of quiz.questions) for (const o of q.options) o.scores[axis.id] = 0;
-      return structural();
-    }
-    case 'axis-del': {
-      if (!confirm('Supprimer cet axe ? Les points qu’il recevait sont perdus.')) return undefined;
+    });
+    case 'axis-del': return undoable('Axe supprimé', () => {
       quiz.axes = quiz.axes.filter((a) => a.id !== id);
       for (const q of quiz.questions) for (const o of q.options) delete o.scores[id];
       for (const r of quiz.results) {
         if (r.rule.axis === id) { r.rule.mode = 'fallback'; r.rule.axis = null; }
       }
-      return structural();
-    }
-    case 'axis-up':   return (move(quiz.axes, id, -1), structural());
-    case 'axis-down': return (move(quiz.axes, id, 1), structural());
+    });
+    case 'axis-up':   return reorder('Axe déplacé', () => move(quiz.axes, id, -1));
+    case 'axis-down': return reorder('Axe déplacé', () => move(quiz.axes, id, 1));
 
-    case 'q-add': {
+    case 'q-add': return undoable('Question ajoutée', () => {
       quiz.questions.push(makeQuestion(quiz.axes));
-      return structural();
-    }
-    case 'q-del': {
-      if (!confirm('Supprimer cette question ?')) return undefined;
+    });
+    case 'q-del': return undoable('Question supprimée', () => {
       quiz.questions = quiz.questions.filter((q) => q.id !== id);
-      return structural();
-    }
-    case 'q-dup': {
+    });
+    case 'q-dup': return undoable('Question dupliquée', () => {
       const source = byId(quiz.questions, id);
-      if (!source) return undefined;
+      if (!source) return;
       const clone = structuredClone(source);
       clone.id = uid('q');
       clone.options.forEach((o) => { o.id = uid('opt'); });
       quiz.questions.splice(quiz.questions.indexOf(source) + 1, 0, clone);
-      return structural();
-    }
-    case 'q-up':   return (move(quiz.questions, id, -1), structural());
-    case 'q-down': return (move(quiz.questions, id, 1), structural());
+    });
+    case 'q-up':   return reorder('Question déplacée', () => move(quiz.questions, id, -1));
+    case 'q-down': return reorder('Question déplacée', () => move(quiz.questions, id, 1));
 
-    case 'opt-add': {
+    case 'opt-add': return undoable('Réponse ajoutée', () => {
       byId(quiz.questions, id)?.options.push(makeOption(quiz.axes));
-      return structural();
-    }
+    });
     case 'opt-del': {
       const question = byId(quiz.questions, ownerId);
       if (!question) return undefined;
       if (question.options.length <= 2) return toast('Il faut au moins deux réponses.', 'danger');
-      question.options = question.options.filter((o) => o.id !== childId);
-      return structural();
+      return undoable('Réponse supprimée', () => {
+        question.options = question.options.filter((o) => o.id !== childId);
+      });
     }
 
-    case 'res-add': {
+    case 'res-add': return undoable('Profil ajouté', () => {
       quiz.results.push(makeResult(quiz.axes));
-      return structural();
-    }
-    case 'res-del': {
-      if (!confirm('Supprimer ce profil et ses recommandations ?')) return undefined;
+    });
+    case 'res-del': return undoable('Profil supprimé', () => {
       quiz.results = quiz.results.filter((r) => r.id !== id);
-      return structural();
-    }
-    case 'res-dup': {
+    });
+    case 'res-dup': return undoable('Profil dupliqué', () => {
       const source = byId(quiz.results, id);
-      if (!source) return undefined;
+      if (!source) return;
       const clone = structuredClone(source);
       clone.id = uid('res');
       clone.title = `${source.title} (copie)`;
       clone.recos.forEach((c) => { c.id = uid('reco'); });
       quiz.results.splice(quiz.results.indexOf(source) + 1, 0, clone);
-      return structural();
-    }
-    case 'res-up':   return (move(quiz.results, id, -1), structural());
-    case 'res-down': return (move(quiz.results, id, 1), structural());
+    });
+    case 'res-up':   return reorder('Profil déplacé', () => move(quiz.results, id, -1));
+    case 'res-down': return reorder('Profil déplacé', () => move(quiz.results, id, 1));
 
-    case 'reco-add': {
+    case 'reco-add': return undoable('Recommandation ajoutée', () => {
       byId(quiz.results, id)?.recos.push(makeReco());
-      return structural();
-    }
-    case 'reco-del': {
+    });
+    case 'reco-del': return undoable('Recommandation retirée', () => {
       const result = byId(quiz.results, ownerId);
       if (result) result.recos = result.recos.filter((c) => c.id !== childId);
-      return structural();
-    }
+    });
 
+    case 'preview-toggle': {
+      state.previewOpen = !state.previewOpen;
+      return renderPanel();
+    }
     case 'opt-image': {
       state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
       return renderPanel();
@@ -525,6 +659,7 @@ function onClick(event) {
     }
     case 'test':      return testRun();
     case 'copy-link': return copyLink();
+    case 'embed':     return showEmbed();
     case 'export':    return exportJson();
     case 'copy-json': return copyJson();
     case 'import-paste': return importPaste();
@@ -579,6 +714,89 @@ async function copyLink() {
   flush();
   const url = await linkFor(state.quiz);
   toast(await copy(url) ? 'Lien copié — il contient tout le questionnaire.' : 'Copie impossible.', '');
+}
+
+/* --- Intégration dans un autre site --------------------------------------
+   Deux formes d'adresse, et le choix n'est pas cosmétique. Un questionnaire
+   déjà dans le dépôt s'embarque par son identifiant : l'embed suit alors le
+   dépôt, et ce qui sera poussé demain s'affichera sans retoucher au code
+   collé. Un brouillon s'embarque par son contenu : l'embed fige le
+   questionnaire tel qu'il est à la seconde où l'auteur copie.
+
+   Le script qui accompagne l'iframe est délibérément sans dépendance et sans
+   identifiant : il rattache chaque message au cadre dont il vient en
+   comparant `contentWindow` à `event.source`, ce qui reste juste quand la
+   page hôte en embarque plusieurs.                                        */
+
+async function embedSnippet() {
+  flush();
+  const published = state.published.some((q) => q.id === state.quiz.id);
+  const url = published
+    ? new URL(`quiz.html?q=${encodeURIComponent(state.quiz.id)}&embed=1`, location.href).toString()
+    : await linkFor(state.quiz, 'quiz.html?embed=1');
+
+  const code = `<iframe
+  src="${url}"
+  title="${state.quiz.title.replace(/"/g, '&quot;')}"
+  style="width:100%;height:720px;border:0;display:block"
+  allow="web-share"></iframe>
+<script>
+window.addEventListener('message', function (event) {
+  var data = event.data;
+  if (!data || typeof data !== 'object') return;
+  var frames = document.querySelectorAll('iframe');
+  for (var i = 0; i < frames.length; i++) {
+    if (frames[i].contentWindow !== event.source) continue;
+    if (data.type === 'recohero:height') frames[i].style.height = data.height + 'px';
+    if (data.type === 'recohero:scroll') frames[i].scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+});
+<\/script>`;
+
+  return { code, published };
+}
+
+async function showEmbed() {
+  const { code, published } = await embedSnippet();
+  const local = location.protocol === 'file:'
+    || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+
+  const area = el('textarea', {
+    class: 'textarea input--mono', rows: '10', readonly: true, spellcheck: 'false',
+  });
+  area.value = code;
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Intégrer dans un autre site' }),
+      el('p', { class: 'panel__hint', text: published
+        ? 'Ce questionnaire est dans le dépôt : le code ci-dessous le suit. Ce que tu pousseras plus tard s’affichera dans l’intégration sans y retoucher.'
+        : 'Ce questionnaire n’est pas encore dans le dépôt : le code ci-dessous en emporte une copie figée. Le modifier ici ne changera rien à ce qui est déjà collé ailleurs.' }),
+      local && el('p', {}, [el('span', {
+        class: 'pill pill--warn',
+        text: `Adresse locale (${location.host || 'file://'}) — ce code ne marchera que sur cette machine.`,
+      })]),
+      area,
+      el('p', { class: 'panel__hint', text: 'Le script ajuste la hauteur du cadre au fil des questions et remonte la page hôte à chaque écran. Sans lui, le parcours défile dans un cadre de 720 px. Dans une iframe, le navigateur peut refuser le stockage : la reprise d’un parcours interrompu et l’historique ne fonctionnent alors pas, le reste si.' }),
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', 'data-embed': 'close', text: 'Fermer' }),
+      el('button', { class: 'btn btn--primary', type: 'button', 'data-embed': 'copy', text: '⧉ Copier le code' }),
+    ]),
+  ]);
+
+  dialog.addEventListener('click', async (event) => {
+    const action = event.target.closest('[data-embed]')?.dataset.embed;
+    if (!action) return;
+    if (action === 'copy') {
+      toast(await copy(code) ? 'Code d’intégration copié.' : 'Copie impossible.', '');
+      return;
+    }
+    dialog.close();
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
 function payload() {

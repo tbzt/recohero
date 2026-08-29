@@ -40,19 +40,46 @@ export function paragraphs(text) {
 }
 
 let toastHost = null;
-export function toast(message, variant = '') {
+
+/* toast('message')                       — une notification simple
+   toast('message', 'danger')             — avec une variante
+   toast('message', { action: { label, onClick } }) — avec un geste de rattrapage
+
+   Un bandeau porteur d'action reste deux fois plus longtemps : le temps de
+   lire, de comprendre qu'on s'est trompé, et d'atteindre le bouton.       */
+export function toast(message, options = '') {
+  const config = typeof options === 'string' ? { variant: options } : (options || {});
+  const { variant = '', action = null } = config;
+  const duration = config.duration ?? (action ? 6000 : 2600);
+
   if (!toastHost) {
     toastHost = el('div', { class: 'toast-host', 'aria-live': 'polite' });
     document.body.append(toastHost);
   }
-  const node = el('div', { class: 'toast' + (variant ? ` toast--${variant}` : ''), text: message });
-  toastHost.append(node);
-  setTimeout(() => {
+
+  const node = el('div', { class: 'toast' + (variant ? ` toast--${variant}` : '') }, [
+    el('span', { text: message }),
+    action && el('button', {
+      class: 'toast__action', type: 'button', text: action.label,
+      onClick: () => { dismiss(); action.onClick(); },
+    }),
+  ]);
+  if (action) node.classList.add('toast--actionable');
+
+  let closed = false;
+  const dismiss = () => {
+    if (closed) return;
+    closed = true;
+    clearTimeout(timer);
     node.style.transition = 'opacity 200ms, transform 200ms';
     node.style.opacity = '0';
     node.style.transform = 'translateY(6px)';
     setTimeout(() => node.remove(), 220);
-  }, 2600);
+  };
+
+  toastHost.append(node);
+  const timer = setTimeout(dismiss, duration);
+  return dismiss;
 }
 
 /* Noir ou blanc sur une couleur donnée — luminance relative WCAG. */

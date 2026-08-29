@@ -269,7 +269,7 @@
 .opts { display: grid; gap: var(--s-2); margin-top: var(--s-3); }
 .opt {
   display: grid;
-  grid-template-columns: 3.2rem 1fr auto auto;
+  grid-template-columns: 20px 3.2rem 1fr auto auto;
   align-items: center;
   gap: var(--s-2);
   padding: var(--s-2);
@@ -281,7 +281,7 @@
    elle passe dessous, sur toute la largeur. Le seuil est en em pour
    suivre la taille de texte, pas la taille d'écran. */
 @media (max-width: 62rem) {
-  .opt { grid-template-columns: 3.2rem 1fr auto; }
+  .opt { grid-template-columns: 20px 3.2rem 1fr auto; }
   .opt .scoreset { grid-column: 1 / -1; justify-content: flex-start; }
 }
 .opt .input { min-height: var(--tap-sm); }
@@ -320,6 +320,105 @@
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 .scorechip.is-set { border-color: var(--axis); background: color-mix(in oklab, var(--axis) 10%, var(--surface)); }
+
+/* --- Aperçu vivant -----------------------------------------------------------
+   Collant en haut du panneau : il suit l'auteur pendant qu'il descend
+   dans sa liste de questions. Plafonné en hauteur, parce qu'il ne doit
+   jamais coûter plus de place que l'édition elle-même.               */
+.preview {
+  position: sticky;
+  top: 68px;
+  z-index: var(--z-raised);
+  margin-bottom: var(--s-4);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+.preview__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--accent-line);
+}
+.preview__title {
+  font-size: var(--t-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+}
+.preview__hint { font-size: var(--t-xs); color: var(--ink-muted); }
+.preview__stage {
+  padding: var(--s-5);
+  max-height: 42vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.preview__empty {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--ink-faint);
+  text-align: center;
+}
+.preview.is-closed .preview__stage { display: none; }
+
+/* Dans l'aperçu, la question n'est pas jouable : rien ne doit suggérer
+   qu'on peut cliquer. Les tailles, elles, restent celles du parcours —
+   c'est tout l'intérêt. */
+.question--static { pointer-events: none; }
+.question--static .question__text { font-size: var(--t-xl); }
+.question--static .option { cursor: default; }
+@media (max-width: 62rem) {
+  .preview { position: static; }
+  .preview__stage { max-height: 32vh; }
+}
+
+/* --- Poignée de déplacement -----------------------------------------------
+   `touch-action: none` est indispensable : sans lui, le navigateur
+   interprète le geste comme un défilement et le déplacement ne démarre
+   jamais au doigt. */
+.grip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  min-height: var(--tap-sm);
+  color: var(--ink-faint);
+  font-size: var(--t-sm);
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  border-radius: var(--r-sm);
+  transition: color var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out);
+}
+.grip:hover { color: var(--ink); background: var(--bg-sunk); }
+.grip:active { cursor: grabbing; }
+
+/* Pendant le geste : l'élément tiré se soulève, les autres s'écartent.
+   `transition: none` sur le tiré — il suit le doigt, il ne le poursuit pas. */
+.is-sorting > * {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.is-sorting > .is-dragging {
+  transition: none;
+  position: relative;
+  z-index: var(--z-raised);
+  scale: var(--drag-lift);
+  rotate: var(--drag-tilt);
+  box-shadow: var(--shadow-3);
+  cursor: grabbing;
+}
+.is-sorting { cursor: grabbing; }
+/* Pendant un déplacement, les autres éléments cessent de réagir au survol.
+   L'élément tiré est exclu : il porte la poignée, qui détient la capture
+   du pointeur et doit continuer de recevoir les évènements. */
+.is-sorting > *:not(.is-dragging) { pointer-events: none; }
 
 /* --- Champ image -------------------------------------------------------------------
    Trois provenances possibles (adresse, chemin du dépôt, fichier intégré),
@@ -368,7 +467,7 @@
 /* --- Axes ------------------------------------------------------------------------ */
 .axis-row {
   display: grid;
-  grid-template-columns: 4.2rem 1fr 46px auto;
+  grid-template-columns: 20px 4.2rem 1fr 46px auto;
   align-items: center;
   gap: var(--s-2);
   padding: var(--s-2);
@@ -412,12 +511,12 @@
 }
 .reco-edit__top {
   display: grid;
-  grid-template-columns: 8rem 1fr auto;
+  grid-template-columns: 20px 8rem 1fr auto;
   gap: var(--s-2);
   align-items: center;
 }
 @media (max-width: 40rem) {
-  .reco-edit__top { grid-template-columns: 1fr auto; }
+  .reco-edit__top { grid-template-columns: 20px 1fr auto; }
 }
 .reco-edit .input, .reco-edit .select { min-height: var(--tap-sm); }
 

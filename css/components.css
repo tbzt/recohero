@@ -265,6 +265,29 @@
   animation: toast-in var(--dur-base) var(--ease-spring);
 }
 .toast--danger { background: var(--danger); color: #fff; }
+
+/* Un bandeau porteur d'action doit être cliquable : l'hôte, lui, reste
+   transparent aux clics pour ne pas masquer la page derrière. */
+.toast--actionable {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding-right: var(--s-2);
+}
+.toast__action {
+  padding: var(--s-1) var(--s-3);
+  min-height: var(--tap-sm);
+  border: 1px solid currentColor;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: inherit;
+  font-size: var(--t-sm);
+  font-weight: var(--fw-bold);
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.toast__action:hover { background: color-mix(in oklab, currentColor 18%, transparent); }
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(10px) scale(0.96); }
   to   { opacity: 1; transform: none; }

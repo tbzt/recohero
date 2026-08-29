@@ -1,0 +1,53 @@
+# quizzes/index.json est la liste des questionnaires servis au kiosque.
+# L'écrire à la main est l'étape la plus fragile de la publication : une
+# faute de frappe ne produit aucune erreur, le questionnaire n'apparaît
+# simplement pas. Ce workflow la reconstruit à partir du dossier lui-même.
+#
+# Un site statique ne peut pas lister un répertoire ; c'est donc au dépôt de
+# le faire, une fois, au moment où il change.
+
+name: Indexer les questionnaires
+
+on:
+  push:
+    branches: [main]
+    paths: ['quizzes/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: index-quizzes
+  cancel-in-progress: false
+
+jobs:
+  indexer:
+    runs-on: ubuntu-latest
+    # Sans ce garde, le commit du robot déclencherait le workflow qui l'a
+    # produit. La seconde exécution ne trouverait rien à changer et
+    # s'arrêterait — mais autant ne pas la lancer du tout.
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruire quizzes/index.json
+        run: |
+          find quizzes -maxdepth 1 -name '*.json' ! -name 'index.json' -printf '%f\n' \
+            | LC_ALL=C sort \
+            | jq -R . | jq -s . > quizzes/index.json.new
+          mv quizzes/index.json.new quizzes/index.json
+          echo "Index reconstruit :"
+          cat quizzes/index.json
+
+      - name: Committer si le fichier a changé
+        run: |
+          if git diff --quiet -- quizzes/index.json; then
+            echo "Index déjà à jour, rien à committer."
+            exit 0
+          fi
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add quizzes/index.json
+          git commit -m 'Réindexer les questionnaires [skip ci]'
+          git push

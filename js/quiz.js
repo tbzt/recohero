@@ -8,6 +8,7 @@
 import { resolveQuiz } from './core/catalog.js';
 import { tally, resolve, ceilings } from './core/scoring.js';
 import { RECO_TYPES, slugify } from './core/schema.js';
+import { questionView } from './core/views.js';
 import * as store from './core/store.js';
 import { linkFor } from './core/share.js';
 import { renderResultCard, toBlob } from './core/card.js';
@@ -15,6 +16,7 @@ import { el, paragraphs, escapeHtml, applyAccent, toast, copy, downloadBlob } fr
 
 const params = new URLSearchParams(location.search);
 const isTest = params.has('test');
+const isEmbed = params.has('embed');
 
 const dom = {
   bar: document.getElementById('quizbar'),
@@ -50,6 +52,7 @@ async function boot() {
     dom.bar.hidden = false;
 
     if (isTest) dom.exit.textContent = '← Retour au backoffice';
+    if (isEmbed) wireEmbed();
 
     const saved = store.getSession(quiz.id);
     if (saved && !isTest) state.answers = saved.answers || {};
@@ -57,6 +60,7 @@ async function boot() {
     render();
     window.addEventListener('keydown', onKey);
     dom.stage.addEventListener('click', onStageClick);
+    wireSwipe();
   } catch (err) {
     fail('Ce lien de questionnaire n’a pas pu être lu.', err.message);
   }
@@ -68,7 +72,7 @@ function fail(message, detail) {
       el('div', { class: 'failure__icon', text: '🧭' }),
       el('h1', { text: message }),
       detail && el('p', { class: 'failure__detail', text: detail }),
-      el('p', { class: 'navrow', style: { justifyContent: 'center', marginTop: '1.5rem' } }, [
+      !isEmbed && el('p', { class: 'navrow', style: { justifyContent: 'center', marginTop: '1.5rem' } }, [
         el('a', { class: 'btn btn--primary', href: 'index.html', text: 'Aller au kiosque' }),
       ]),
     ]),
@@ -95,7 +99,13 @@ function render() {
     heading.setAttribute('tabindex', '-1');
     heading.focus({ preventScroll: true });
   }
-  window.scrollTo(0, 0);
+
+  /* Embarqué et auto-dimensionné, le cadre n'a pas de défilement interne :
+     remonter est l'affaire de la page hôte. Jamais au premier rendu — le
+     seul chargement de l'embed happerait la page vers lui.             */
+  if (!isEmbed) window.scrollTo(0, 0);
+  else if (!firstPaint) window.parent.postMessage({ type: 'recohero:scroll' }, EMBED_TARGET);
+  firstPaint = false;
 }
 
 function updateBar() {
@@ -174,41 +184,22 @@ function renderQuestion(question, index) {
   const chosen = new Set(Array.isArray(picked) ? picked : picked ? [picked] : []);
   const multiple = question.type === 'multiple';
 
-  return el('section', { class: 'question' }, [
-    el('p', { class: 'question__meta' }, [
-      `Question ${index + 1} / ${quiz.questions.length}`,
-      multiple && el('span', { class: 'pill', text: 'plusieurs réponses possibles' }),
-    ]),
-    question.image && el('img', { class: 'question__image', src: question.image, alt: '' }),
-    el('h1', { class: 'question__text', text: question.text }),
-    question.hint && el('p', { class: 'question__hint', text: question.hint }),
+  /* La vue elle-même est partagée avec l'aperçu du backoffice (views.js) :
+     ce que l'auteur voit en éditant est littéralement ce que le répondant
+     verra. Seule la barre de navigation est propre au parcours. */
+  const view = questionView(quiz, question, index, { chosen, total: quiz.questions.length });
 
-    el('div', { class: 'options', role: multiple ? 'group' : 'radiogroup' },
-      question.options.map((option, i) => el('button', {
-        class: 'option' + (chosen.has(option.id) ? ' is-picked' : ''),
-        type: 'button',
-        'data-act': 'pick',
-        'data-option': option.id,
-        'aria-pressed': multiple ? String(chosen.has(option.id)) : null,
-        role: multiple ? null : 'radio',
-        'aria-checked': multiple ? null : String(chosen.has(option.id)),
-      }, [
-        el('span', { class: 'option__key', text: i < 9 ? String(i + 1) : '·', 'aria-hidden': 'true' }),
-        option.image && el('img', { class: 'option__thumb', src: option.image, alt: '', loading: 'lazy' }),
-        option.emoji && el('span', { class: 'option__emoji', text: option.emoji, 'aria-hidden': 'true' }),
-        el('span', { class: 'option__text', text: option.text }),
-      ]))),
+  view.append(el('div', { class: 'navrow' }, [
+    el('button', { class: 'btn btn--quiet', type: 'button', 'data-act': 'back', text: '← Précédent' }),
+    el('span', { class: 'navrow__spacer' }),
+    (multiple || chosen.size) && el('button', {
+      class: 'btn btn--primary', type: 'button', 'data-act': 'next',
+      text: index + 1 === quiz.questions.length ? 'Voir le résultat' : 'Suivant →',
+      'aria-disabled': chosen.size ? null : 'true',
+    }),
+  ]));
 
-    el('div', { class: 'navrow' }, [
-      el('button', { class: 'btn btn--quiet', type: 'button', 'data-act': 'back', text: '← Précédent' }),
-      el('span', { class: 'navrow__spacer' }),
-      (multiple || chosen.size) && el('button', {
-        class: 'btn btn--primary', type: 'button', 'data-act': 'next',
-        text: index + 1 === quiz.questions.length ? 'Voir le résultat' : 'Suivant →',
-        'aria-disabled': chosen.size ? null : 'true',
-      }),
-    ]),
-  ]);
+  return view;
 }
 
 /* --- Résultat --------------------------------------------------------------- */
@@ -283,7 +274,7 @@ function renderResult() {
       el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'card', text: '🖼 Ma carte de résultat' }),
       el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'share', text: '⤴ Partager ce questionnaire' }),
       el('button', { class: 'btn btn--quiet', type: 'button', 'data-act': 'restart', text: '↺ Refaire' }),
-      el('a', { class: 'btn btn--quiet', href: 'index.html', text: 'Retour au kiosque' }),
+      !isEmbed && el('a', { class: 'btn btn--quiet', href: 'index.html', text: 'Retour au kiosque' }),
     ]),
   ]);
 
@@ -391,6 +382,46 @@ function persist() {
   if (!isTest) store.saveSession(state.quiz.id, state.answers);
 }
 
+/* --- Mode embarqué -----------------------------------------------------------
+   `?embed=1` : le parcours vit dans l'iframe d'un autre site. Deux choses
+   changent, deux seulement.
+
+   Les sorties disparaissent. Un « ← Kiosque » dans un cadre de 720 px éjecte
+   le visiteur du site qui l'accueille vers le nôtre : c'est le contraire de
+   ce qui lui est promis. Le bandeau, lui, reste — il porte la progression et
+   le compteur, qui sont le parcours même, pas de la navigation.
+
+   La hauteur est annoncée à la page hôte, qui seule peut redimensionner le
+   cadre. Sans cela le parcours défile dans un hublot. Le protocole tient en
+   deux messages sans charge utile sensible — une hauteur, une demande de
+   remontée — d'où le `*` : nous ne connaissons pas l'origine de l'hôte, et
+   il n'y a rien là-dedans qu'on ne puisse crier.
+
+   Rien n'est désactivé par ailleurs. Le stockage tiers est bloqué par Safari
+   et cloisonné par Chrome : store.js encaisse le refus sans broncher, la
+   reprise de parcours et l'historique cessent simplement d'exister.       */
+
+const EMBED_TARGET = '*';
+let firstPaint = true;
+let lastHeight = 0;
+
+function wireEmbed() {
+  document.documentElement.classList.add('is-embed');
+  dom.exit.remove();
+  /* documentElement, et non body : `min-height` neutralisé (quiz.css), sa
+     hauteur est exactement celle du contenu. L'observateur rattrape seul
+     ce qui arrive après coup — une image chargée, une vue plus longue. */
+  new ResizeObserver(postHeight).observe(document.documentElement);
+  postHeight();
+}
+
+function postHeight() {
+  const height = Math.ceil(document.documentElement.getBoundingClientRect().height);
+  if (height === lastHeight) return;
+  lastHeight = height;
+  window.parent.postMessage({ type: 'recohero:height', height }, EMBED_TARGET);
+}
+
 async function shareQuiz() {
   const url = state.quiz.source === 'published'
     ? new URL(`quiz.html?q=${encodeURIComponent(state.quiz.id)}`, location.href).toString()
@@ -457,6 +488,44 @@ async function showCard() {
   dialog.addEventListener('close', () => dialog.remove());
   document.body.append(dialog);
   dialog.showModal();
+}
+
+/* Le balayage : réservé au tactile. À la souris, un glissement horizontal
+   veut dire « sélectionner du texte », et le détourner serait hostile.  */
+function wireSwipe() {
+  let start = null;
+
+  dom.stage.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse') return;
+    start = { x: event.clientX, y: event.clientY, at: Date.now() };
+  });
+
+  dom.stage.addEventListener('pointerup', (event) => {
+    if (!start || event.pointerType === 'mouse') return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    const elapsed = Date.now() - start.at;
+    start = null;
+
+    /* Trois conditions : assez loin, assez horizontal, et pas interminable.
+       C'est le RAPPORT dx/dy qui fait le gros du tri — sans lui, un
+       défilement du pouce un peu oblique changerait de question. La durée
+       n'écarte que le glissement lent et hésitant ; 900 ms laisse la place
+       à un geste posé, ce que 700 refusait déjà à certains. */
+    if (elapsed > 900 || Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+
+    /* Le geste va produire un `click` sur la réponse survolée : on
+       l'avale, sinon balayer depuis une réponse la sélectionnerait. */
+    const swallow = (click) => { click.stopPropagation(); click.preventDefault(); };
+    dom.stage.addEventListener('click', swallow, { capture: true });
+    setTimeout(() => dom.stage.removeEventListener('click', swallow, { capture: true }), 120);
+
+    if (state.step < 0) return;
+    if (dx < 0) advance();
+    else go(state.step - 1);
+  });
+
+  dom.stage.addEventListener('pointercancel', () => { start = null; });
 }
 
 function onKey(event) {

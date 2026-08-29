@@ -9,6 +9,16 @@
   min-height: 100dvh;
 }
 
+/* --- Mode embarqué ---------------------------------------------------------
+   Dans une iframe, `100dvh` vaut la hauteur du cadre : la page ne peut plus
+   dire sa hauteur naturelle, et l'auto-dimensionnement se fige sur celle
+   qu'on lui a donnée à la main. On rend donc la hauteur au contenu — et la
+   scène cesse d'être centrée verticalement, puisqu'il n'y a plus de vide à
+   centrer. Un seul sélecteur porte le mode : quiz.js pose `is-embed` sur la
+   racine, jamais sur un noeud intermédiaire.                              */
+.is-embed body { min-height: 0; }
+.is-embed .stage { align-items: flex-start; }
+
 /* --- Tableau de bord collant ---------------------------------------------
    Il porte les deux seules informations qui comptent pendant le parcours :
    où j'en suis, et ce que j'ai récolté.                                  */

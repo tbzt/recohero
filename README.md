@@ -135,21 +135,40 @@ tous les navigateurs et toutes les messageries l'acceptent. Le panneau
 
 1. Backoffice → **Diffuser** → télécharger le `.json`
 2. Déposer le fichier dans `quizzes/`
-3. Ajouter son nom à `quizzes/index.json`
-4. Commit, push. GitHub Pages fait le reste.
+3. Commit, push. GitHub Pages fait le reste.
 
-```json
-[
-  "quel-roman-pour-cet-ete.json",
-  "votre-nouveau-questionnaire.json"
-]
-```
+`quizzes/index.json` n'est pas à écrire : l'action
+[Indexer les questionnaires](.github/workflows/index-quizzes.yml) le
+reconstruit à partir du dossier à chaque poussée. C'était l'étape la plus
+fragile de la publication — une faute de frappe ne produisait aucune erreur,
+le questionnaire n'apparaissait simplement pas.
 
 Pour **modifier** un questionnaire déjà publié : le backoffice le liste sous
 « Publiés au dépôt », le bouton ✎ en fait une copie locale éditable. Une fois
 satisfait, réexportez et écrasez le fichier. Tant que vous n'avez pas poussé,
 le kiosque continue de montrer la version du dépôt — c'est voulu : ce que
 voient les autres ne change que quand vous le décidez.
+
+---
+
+## L'édition au quotidien
+
+**Rien ne demande confirmation, tout s'annule.** Supprimer une question, un
+axe, un profil ou même un questionnaire entier se fait sans boîte de dialogue :
+un bandeau propose « Annuler » pendant six secondes, et `Ctrl+Z` remonte la
+pile des quarante derniers gestes de structure. La frappe au clavier n'y est
+pas empilée — le `Ctrl+Z` du champ lui-même fait déjà ce travail, mieux.
+
+**Tout se réordonne au glisser-déposer**, à la souris comme au doigt : les
+axes, les questions, les réponses, les profils, les recommandations. La
+poignée est le `⠿` à gauche. Les flèches ↑↓ restent à côté : c'est le chemin
+clavier, et il ne disparaît pas. `Échap` en cours de geste annule le
+déplacement. Le défilement suit tout seul quand on approche d'un bord.
+
+**Un aperçu montre la question sous le curseur**, en haut du panneau, telle
+que le répondant la verra — même code de rendu, pas une imitation qui
+dériverait. Il se met à jour à la frappe, sans jamais déplacer le curseur du
+champ. Le bouton « Masquer » le replie.
 
 ---
 
@@ -180,6 +199,19 @@ et emmène à l'endroit fautif.
 Sur le panneau **Profils**, un profil que *aucune* combinaison de réponses ne
 peut atteindre est marqué « jamais atteint ». Le calcul est exhaustif tant
 qu'il y a moins de 20 000 combinaisons possibles, échantillonné au-delà.
+
+---
+
+## Naviguer dans le parcours
+
+Au clavier : les touches `1` à `9` choisissent une réponse, `Entrée` avance,
+`←` et `→` reculent et avancent.
+
+Au doigt : on balaie horizontalement. Un geste trop court, trop oblique ou
+trop lent est ignoré — c'est le rapport entre l'écart horizontal et vertical
+qui fait le tri, pour qu'un défilement du pouce un peu de travers ne change
+pas de question. À la souris, le balayage est délibérément inactif : un
+glissement horizontal y veut dire « sélectionner du texte ».
 
 ---
 

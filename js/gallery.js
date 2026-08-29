@@ -19,11 +19,22 @@ boot();
 async function boot() {
   renderQuizzes(await loadAll());
   renderHistory();
+  /* Même règle que dans le backoffice : on agit, on laisse un retour.
+     L'historique est reconstitué depuis la mémoire, pas depuis le disque. */
   dom.clear.addEventListener('click', () => {
-    if (!confirm('Effacer tout ton historique de résultats ?')) return;
+    const saved = store.allResults();
+    if (!saved.length) return;
     store.clearResults();
     renderHistory();
-    toast('Historique effacé.');
+    toast('Historique effacé', {
+      action: {
+        label: 'Annuler',
+        onClick: () => {
+          for (const entry of [...saved].reverse()) store.addResult(entry);
+          renderHistory();
+        },
+      },
+    });
   });
 }
 

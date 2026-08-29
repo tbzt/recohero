@@ -14,6 +14,12 @@ const tool = (act, id, label, glyph, extra = {}) => el('button', {
   'data-act': act, 'data-id': id, title: label, 'aria-label': label, text: glyph, ...extra,
 });
 
+/* La poignée de déplacement. `aria-hidden` : le chemin accessible est le
+   couple de boutons ↑↓, qui reste à côté. */
+const grip = (title) => el('span', {
+  class: 'grip', title: `Glisser pour déplacer — ${title}`, 'aria-hidden': 'true', text: '⠿',
+});
+
 const field = (label, control, hint) => el('label', { class: 'field' }, [
   el('span', { class: 'field__label', text: label }),
   control,
@@ -124,9 +130,10 @@ export function axes(quiz) {
       el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'axis-add', text: '+ Axe' }),
     ]),
     quiz.axes.length
-      ? el('div', { class: 'editor-list' }, quiz.axes.map((axis, i) => el('div', {
+      ? el('div', { class: 'editor-list', 'data-sortable': 'axes' }, quiz.axes.map((axis, i) => el('div', {
           class: 'axis-row', style: { '--axis': axis.color },
         }, [
+          grip(axis.label || `axe ${i + 1}`),
           el('input', {
             class: 'input axis-row__glyph', 'data-bind': `axis:${axis.id}:glyph`,
             value: axis.glyph, maxlength: '3', list: 'glyphs', 'aria-label': 'Glyphe',
@@ -160,8 +167,24 @@ export function questions(quiz, ctx = {}) {
     head('Questions', "Une question par écran. Les points de chaque réponse se règlent à droite, un compteur par axe.", [
       el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'q-add', text: '+ Question' }),
     ]),
+
+    /* L'aperçu se remplit depuis app.js et se met à jour à la frappe, sans
+       redessiner le panneau — sans quoi le curseur sauterait du champ. */
+    el('div', { class: 'preview' + (ctx.previewOpen === false ? ' is-closed' : ''), id: 'questionPreview' }, [
+      el('div', { class: 'preview__bar' }, [
+        el('span', { class: 'preview__title', text: 'Aperçu' }),
+        el('span', { class: 'preview__hint', id: 'previewHint', text: 'Placez le curseur dans une question' }),
+        el('span', { class: 'panel__spacer' }),
+        el('button', {
+          class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'preview-toggle',
+          text: ctx.previewOpen === false ? 'Afficher' : 'Masquer',
+        }),
+      ]),
+      el('div', { class: 'preview__stage', id: 'previewStage' }),
+    ]),
     quiz.questions.length
-      ? el('div', { class: 'editor-list' }, quiz.questions.map((q, i) => questionCard(quiz, q, i, ctx)))
+      ? el('div', { class: 'editor-list', 'data-sortable': 'questions' },
+          quiz.questions.map((q, i) => questionCard(quiz, q, i, ctx)))
       : el('div', { class: 'empty' }, [
           el('div', { class: 'empty__icon', text: '❓' }),
           el('p', { text: 'Aucune question pour l’instant.' }),
@@ -172,6 +195,7 @@ export function questions(quiz, ctx = {}) {
 function questionCard(quiz, question, index, ctx = {}) {
   return el('article', { class: 'editor-card' }, [
     el('header', { class: 'editor-card__head' }, [
+      grip(`question ${index + 1}`),
       el('span', { class: 'editor-card__index', text: String(index + 1) }),
       el('span', { class: 'editor-card__label', text: question.text || 'Question sans texte' }),
       el('span', { class: 'editor-card__tools' }, [
@@ -206,12 +230,13 @@ function questionCard(quiz, question, index, ctx = {}) {
 
       el('div', {}, [
         el('span', { class: 'field__label', text: `Réponses (${question.options.length})` }),
-        el('div', { class: 'opts' }, question.options.map((option, j) => {
+        el('div', { class: 'opts', 'data-sortable': `options:${question.id}` }, question.options.map((option, j) => {
           /* Le champ image d'une réponse se déplie : la ligne est déjà
              dense, et la plupart des questionnaires n'illustrent rien. */
           const open = ctx.expanded?.has(option.id) || Boolean(option.image);
           return el('div', { class: 'opt-wrap' + (open ? ' is-open' : '') }, [
             el('div', { class: 'opt' }, [
+              grip(`réponse ${j + 1}`),
               el('input', {
                 class: 'input', 'data-bind': `option:${question.id}:${option.id}:emoji`,
                 value: option.emoji, maxlength: '4', placeholder: '🙂',
@@ -266,7 +291,8 @@ export function resultats(quiz, ctx = {}) {
       el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'res-add', text: '+ Profil' }),
     ]),
     quiz.results.length
-      ? el('div', { class: 'editor-list' }, quiz.results.map((r, i) => resultCard(quiz, r, i, ctx)))
+      ? el('div', { class: 'editor-list', 'data-sortable': 'results' },
+          quiz.results.map((r, i) => resultCard(quiz, r, i, ctx)))
       : el('div', { class: 'empty' }, [
           el('div', { class: 'empty__icon', text: '🎁' }),
           el('p', { text: 'Aucun profil : le parcours ne mène nulle part.' }),
@@ -286,6 +312,7 @@ function resultCard(quiz, result, index, ctx) {
 
   return el('article', { class: 'editor-card' }, [
     el('header', { class: 'editor-card__head' }, [
+      grip(`profil ${index + 1}`),
       el('span', { class: 'editor-card__index', text: String(index + 1) }),
       el('span', { class: 'editor-card__label', text: result.title || 'Profil sans titre' }),
       unreachable && el('span', {
@@ -334,8 +361,10 @@ function resultCard(quiz, result, index, ctx) {
 
       el('div', {}, [
         el('span', { class: 'field__label', text: `Recommandations (${result.recos.length})` }),
-        el('div', { class: 'editor-list' }, result.recos.map((reco, j) => el('div', { class: 'reco-edit' }, [
+        el('div', { class: 'editor-list', 'data-sortable': `recos:${result.id}` },
+          result.recos.map((reco, j) => el('div', { class: 'reco-edit' }, [
           el('div', { class: 'reco-edit__top' }, [
+            grip(`recommandation ${j + 1}`),
             select(`reco:${result.id}:${reco.id}:type`, reco.type,
               RECO_TYPES.map((t) => ({ value: t.id, label: `${t.icon} ${t.label}` })), { 'aria-label': 'Type d’œuvre' }),
             input(`reco:${result.id}:${reco.id}:title`, reco.title,
@@ -374,10 +403,11 @@ export function publier(quiz, ctx = {}) {
         el('span', { class: 'publish-step__num', text: '1' }),
         el('div', {}, [
           el('h3', { text: 'Par lien — immédiat' }),
-          el('p', { text: 'Le questionnaire entier est compressé dans l’adresse. Rien à déployer, rien à héberger : celui qui reçoit le lien peut répondre tout de suite.' }),
+          el('p', { text: 'Le questionnaire entier est compressé dans l’adresse. Rien à déployer, rien à héberger : celui qui reçoit le lien peut répondre tout de suite. Le même lien s’intègre dans une page d’un autre site.' }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
             el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'copy-link', text: '⧉ Copier le lien' }),
             el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'test', text: '▷ Tester le parcours' }),
+            el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'embed', text: '⧉ Code d’intégration' }),
             ctx.linkSize && el('span', { class: 'pill', text: `${ctx.linkSize} caractères` }),
           ]),
         ]),

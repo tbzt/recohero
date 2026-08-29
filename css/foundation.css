@@ -117,6 +117,12 @@
   --focus: var(--accent);
   --focus-ring: 0 0 0 3px var(--surface), 0 0 0 5px var(--focus);
 
+  /* Tokens de feel : ce que ça fait quand on saisit un élément pour le
+     déplacer. Le glisser-déposer est une signature d'édition, pas une
+     mécanique neutre — il mérite ses propres valeurs. */
+  --drag-lift: 1.02;
+  --drag-tilt: -0.6deg;
+
   --content: 44rem;    /* largeur de lecture confortable */
   --content-wide: 68rem;
 }

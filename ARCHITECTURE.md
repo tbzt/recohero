@@ -31,7 +31,7 @@ placés sous lui.
                       └───────────────┴───────────────┘
                                       │
    noyau                         js/core/
-              catalog · schema · scoring · share · store · ui · card
+     catalog · schema · scoring · share · store · ui · card · views · sortable
 ```
 
 | Module | Responsabilité | Ne fait jamais |
@@ -41,6 +41,8 @@ placés sous lui.
 | `core/scoring.js` | Le comptage, la résolution du profil, la joignabilité. Fonctions **pures**. | lire le DOM, écrire du stockage |
 | `core/share.js` | Encodage / décodage d'un questionnaire dans une URL. | valider le contenu |
 | `core/catalog.js` | D'où viennent les questionnaires : lien, dépôt, brouillons. | modifier un questionnaire |
+| `core/views.js` | La vue d'une question, **partagée** par le parcours et l'aperçu du backoffice. | connaître l'état de l'un ou de l'autre |
+| `core/sortable.js` | Réordonner une liste au pointeur. | connaître ce qu'elle contient |
 | `core/card.js` | Dessiner la carte de résultat sur un canvas. | lire le DOM de la page |
 | `core/ui.js` | Les gestes d'interface : nœud, notification, copie, thème, réduction d'image. | connaître le métier |
 
@@ -182,6 +184,29 @@ redéclare ces media queries.
 - [ ] Aucun état visuel ne dépend d'un `requestAnimationFrame` : il ne
       s'exécute pas dans un onglet en arrière-plan. La valeur au repos doit
       être juste sans JS ; l'animation est un supplément.
+- [ ] Un test automatisé qui mesure une **durée** ment dans un onglet non
+      affiché : `setTimeout` y est bridé à ~1 s. Un seuil temporel de 110 ms
+      y devient 1000 ms, et le geste testé est rejeté à raison. Faire suivre
+      les évènements sans attente plutôt que d'incriminer le code.
+
+---
+
+## Trois pièges payés comptant
+
+**Les listes s'imbriquent.** Les réponses vivent dans les questions, les
+recommandations dans les profils. Un `pointerdown` sur une poignée intérieure
+remonte donc jusqu'au conteneur extérieur, qui réclamait le geste à son tour
+et écrasait celui en cours. `sortable.js` ne prend le geste que si la liste
+est le plus proche ancêtre triable de la poignée.
+
+**Les écouteurs de `window` ne se posent qu'une fois.** Le panneau se
+redessine à chaque geste de structure ; poser `pointermove` par appel de
+`sortable()` en aurait ajouté un par liste et par rendu, sans jamais rien
+retirer. L'état du glissement vit au niveau du module, pas de l'appel.
+
+**L'aperçu ne réimplémente rien.** Une imitation dérive au premier changement,
+et finit par montrer autre chose que ce que voit le répondant. `views.js` est
+appelé par les deux, avec `interactive: false` d'un côté.
 
 ---
 
