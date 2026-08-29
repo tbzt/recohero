@@ -61,6 +61,19 @@ async function boot() {
                     'quizName', 'saveStatus', 'topActions', 'tabbar']) {
     dom[id] = document.getElementById(id);
   }
+  state.espace = new URLSearchParams(location.search).get('espace');
+
+  /* Deux portes, et une seule s'ouvre selon l'adresse.
+
+     Sans espace, le backoffice n'édite que des brouillons locaux : la
+     phrase d'accès suffit, et elle n'a jamais prétendu à mieux.
+
+     Avec un espace, il y a un vrai compte derrière, avec de vrais droits
+     d'écriture. Demander d'abord une phrase partagée puis un compte, ce
+     serait deux barrières dont la première est décorative — et ce serait
+     apprendre à une équipe qu'un secret d'équipe protège quelque chose.
+     Le compte EST la porte.                                            */
+  if (state.espace) return gateCompte();
 
   if (!PASS_SHA256 || store.isUnlocked(UNLOCK_TTL)) return open();
 
@@ -77,6 +90,60 @@ async function boot() {
     dom.gate.hidden = true;
     open();
   });
+  return undefined;
+}
+
+/* La porte d'un espace : le compte, et rien d'autre. */
+function gateCompte() {
+  if (remote.session()) return open();
+
+  const email = el('input', {
+    class: 'input', type: 'email', autocomplete: 'username',
+    placeholder: 'adresse@exemple.fr', required: true,
+  });
+  const pass = el('input', {
+    class: 'input', type: 'password', autocomplete: 'current-password', required: true,
+  });
+  const erreur = el('p', { class: 'alerte', hidden: true });
+  const valider = el('button', { class: 'btn btn--primary btn--block', type: 'submit', text: 'Se connecter' });
+
+  const form = el('form', { class: 'card gate__card stack' }, [
+    el('div', { class: 'gate__emoji', text: '⌂' }),
+    el('h1', { text: `Espace « ${state.espace} »` }),
+    el('p', { class: 'gate__note', style: { marginTop: 0 }, text:
+      'Le backoffice de cette équipe. Répondre aux questionnaires ne demande aucun compte — ceci ne sert qu’à publier.' }),
+    el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Adresse e-mail' }), email]),
+    el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Mot de passe' }), pass]),
+    erreur,
+    valider,
+    el('p', { class: 'gate__note' }, [
+      'Pas de compte ? Il s’en crée un depuis la console Firebase du projet — ',
+      'voir la marche à suivre dans le README, § « Monter son propre espace ».',
+    ]),
+  ]);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    valider.disabled = true;
+    erreur.hidden = true;
+    try {
+      state.remoteSession = await remote.signIn(email.value.trim(), pass.value);
+      dom.gate.hidden = true;
+      await open();
+      toast(`Connecté — ${state.remoteSession.email}`);
+    } catch (err) {
+      erreur.textContent = err.message;
+      erreur.hidden = false;
+      valider.disabled = false;
+      pass.value = '';
+      pass.focus();
+    }
+  });
+
+  dom.gate.replaceChildren(form);
+  dom.gate.hidden = false;
+  email.focus();
+  return undefined;
 }
 
 async function sha256(text) {
@@ -87,8 +154,6 @@ async function sha256(text) {
 async function open() {
   dom.gate.hidden = true;
   dom.shell.hidden = false;
-
-  state.espace = new URLSearchParams(location.search).get('espace');
   state.remoteSession = remote.session();
   [state.published, state.remote] = await Promise.all([
     loadPublished(), loadEspace(state.espace),
@@ -1096,6 +1161,12 @@ function showSignIn() {
 async function signOutRemote() {
   remote.signOut();
   state.remoteSession = null;
+  if (state.espace) {
+    /* On revient à la porte : rester dans un backoffice d'espace sans
+       compte n'offre rien à faire et laisse croire à une session. */
+    location.reload();
+    return;
+  }
   await refreshEspace();
   toast('Déconnecté de l’espace.');
   repaint();
