@@ -191,7 +191,7 @@ redéclare ces media queries.
 
 ---
 
-## Trois pièges payés comptant
+## Quatre pièges payés comptant
 
 **Les listes s'imbriquent.** Les réponses vivent dans les questions, les
 recommandations dans les profils. Un `pointerdown` sur une poignée intérieure
@@ -207,6 +207,13 @@ retirer. L'état du glissement vit au niveau du module, pas de l'appel.
 **L'aperçu ne réimplémente rien.** Une imitation dérive au premier changement,
 et finit par montrer autre chose que ce que voit le répondant. `views.js` est
 appelé par les deux, avec `interactive: false` d'un côté.
+
+**L'évènement `close` d'un `<dialog>` ne porte pas le comportement.** Il n'a
+pas été observé dans tous les environnements où ce code tourne, et une action
+qui ne se produit jamais ne laisse aucune trace pour le dire : un import par
+collage n'importait rien, en silence. `dismiss(dialog, then)` ferme, retire et
+exécute explicitement ; l'écouteur `close` ne garde que le ramassage des
+fermetures qu'on ne provoque pas soi-même — Échap, clic sur le fond.
 
 ---
 
@@ -231,6 +238,67 @@ exporter. `isSafeToDraw()` n'accepte donc qu'un `data:` URI ou une image du
 même hébergeur, et la carte retombe sur l'emoji sinon. Cet échec-là est
 silencieux **par choix** : l'auteur n'y peut rien au moment où le répondant
 appuie sur le bouton.
+
+---
+
+## Le mode embarqué
+
+`quiz.html?embed=1` fait vivre le parcours dans l'iframe d'un autre site.
+Le mode tient dans `quiz.js` et six lignes de `quiz.css` ; aucun autre module
+n'en sait rien.
+
+**La hauteur ne peut pas reposer sur un observateur.** `ResizeObserver` livre
+ses rappels à l'étape de peinture : un cadre hors écran, ou un onglet qui ne
+compose pas, ne les reçoit jamais — et le questionnaire reste figé à la
+hauteur de son écran de chargement. C'est le même piège que le
+`requestAnimationFrame` proscrit plus haut, et il a été payé ici aussi : la
+première version n'observait que `documentElement` et annonçait 179 px pour
+un parcours de 670. La hauteur est donc **annoncée à chaque rendu**, sur le
+champ — `getBoundingClientRect()` force le calcul de mise en page, la valeur
+est juste tout de suite. Les images, qui arrivent après, le redisent une fois
+chacune. L'observateur ne rattrape plus que le reste : l'hôte qui change de
+largeur, une police qui se substitue.
+
+**Le protocole est volontairement anonyme.** Deux messages, `recohero:height`
+et `recohero:scroll`, sans charge utile sensible, postés à `*` : nous ne
+connaissons pas l'origine de l'hôte, et il n'y a rien là-dedans qu'on ne
+puisse crier. C'est l'hôte qui rattache un message à un cadre, en comparant
+`contentWindow` à `event.source`.
+
+**Ce qui est retiré, et pourquoi seulement cela.** Les sorties vers le kiosque,
+et rien d'autre. Un lien qui ramène chez nous depuis le site d'un autre est
+une trahison de l'hôte ; la progression et le compteur, eux, sont le parcours
+même et restent. Le stockage tiers, bloqué par Safari et cloisonné par Chrome,
+n'appelle aucun code : `store.js` encaisse déjà le refus, la reprise de
+parcours et l'historique cessent d'exister sans un mot.
+
+---
+
+## Les deux étagères du dépôt
+
+`quizzes/` sert le kiosque ; `quizzes/wip/` sert le backoffice, et lui seul.
+La séparation ne tient pas à un drapeau dans les fichiers mais à la **forme du
+dossier** : l'action d'indexation balaie `quizzes` avec `find -maxdepth 1`,
+donc elle ne descend pas dans le sous-dossier et rien de ce qui s'y trouve
+n'entre dans `quizzes/index.json`. Elle en construit un second, à côté.
+
+C'est délibérément le mécanisme le plus bête possible. Une convention de nom
+de fichier, un champ `draft: true`, une liste d'exclusion : chacun aurait
+demandé qu'on s'en souvienne quelque part. La profondeur du dossier, elle, se
+vérifie d'un coup d'œil et ne peut pas dériver.
+
+`catalog.js` lit les deux par la même fonction, et n'expose la seconde qu'à
+travers `loadShared()`. `loadAll()` — le catalogue du kiosque — ne l'appelle
+pas, et `resolveQuiz()` non plus : un identifiant deviné n'ouvre pas un
+brouillon. Ce dernier point est une mesure de propreté, **pas une frontière de
+sécurité**. Les fichiers restent servis par l'hébergeur ; sans serveur, une
+étagère que le navigateur sait lire est une étagère publique. Ce qui se décide
+ici, c'est ce qui est *montré*.
+
+Ce que ça ne donne pas : l'édition simultanée. Deux personnes sur le même
+fichier restent un conflit git, que rien n'arbitre. Le besoin réel — se passer
+un questionnaire inachevé sans le publier — est couvert ; le besoin théorique
+ne l'est pas, et une base externe serait le seul chemin (voir plus bas).
 
 ---
 

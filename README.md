@@ -118,7 +118,7 @@ texte mordre sur la signature.
 
 ## Diffuser un questionnaire
 
-Deux voies, et elles ne servent pas à la même chose.
+Trois voies, et elles ne servent pas à la même chose.
 
 ### Par lien — immédiat, rien à déployer
 
@@ -149,6 +149,83 @@ satisfait, réexportez et écrasez le fichier. Tant que vous n'avez pas poussé,
 le kiosque continue de montrer la version du dépôt — c'est voulu : ce que
 voient les autres ne change que quand vous le décidez.
 
+#### Partager sans publier
+
+Déposer dans `quizzes/` **veut dire publier**. Pour passer un questionnaire
+inachevé à quelqu'un, il y a une seconde étagère : `quizzes/wip/`.
+
+```
+quizzes/
+├── index.json                  ← reconstruit, sert le kiosque
+├── quel-roman-pour-cet-ete.json
+└── wip/
+    ├── index.json              ← reconstruit aussi, ne sert que le backoffice
+    └── mon-brouillon.json
+```
+
+Le backoffice les liste sous « **Brouillons du dépôt** », avec un ✎ qui en
+fait une copie locale **en conservant l'identifiant** — c'est ce qui permet de
+réécraser le fichier d'origine plutôt que d'accumuler des variantes. Le
+kiosque ne les voit jamais, et `quiz.html?q=…` ne les ouvre pas non plus.
+
+Le mécanisme est le sous-dossier lui-même : l'action d'indexation ne descend
+pas dedans (`find -maxdepth 1`), donc rien de ce qui s'y trouve n'entre dans
+`quizzes/index.json`. Elle en construit un second, séparé.
+
+> **Discret n'est pas privé.** Ces fichiers restent servis par l'hébergeur :
+> qui connaît l'adresse les lit. L'étagère décide de ce qui est *montré*, pas
+> de ce qui est accessible — et sans serveur, il ne peut pas en être
+> autrement. Une étagère que le navigateur sait lire est une étagère
+> publique. Pour un brouillon qui doit vraiment le rester, passez-vous le
+> `.json` par un canal privé et importez-le : il ne touche jamais le site.
+
+Ça ne permet pas d'éditer **à deux en même temps** : deux personnes sur le
+même fichier, c'est un conflit git, et il n'y a rien pour l'arbitrer. Chacun
+son tour, en revanche, fonctionne.
+
+### Par intégration — dans la page de quelqu'un d'autre
+
+Backoffice → **Diffuser** → **⧉ Code d'intégration**. Le dialogue produit une
+`<iframe>` et le court script qui l'accompagne ; on colle les deux dans la page
+hôte, et le questionnaire s'y déroule sans que le visiteur quitte le site.
+
+L'adresse produite prend l'une de deux formes, et le dialogue dit laquelle :
+
+| Le questionnaire est… | L'adresse porte… | Conséquence |
+|---|---|---|
+| déjà dans le dépôt | son identifiant (`?q=…`) | l'intégration suit le dépôt : ce que vous pousserez demain s'affichera sans retoucher au code collé |
+| encore un brouillon | son contenu (`#k=…`) | l'intégration fige le questionnaire tel qu'il est à la seconde où vous copiez |
+
+Le paramètre qui fait tout est `embed=1`. Il change deux choses, et deux
+seulement. **Les sorties disparaissent** — le « ← Kiosque » du bandeau, le
+« Retour au kiosque » du résultat : sur le site d'un autre, ces liens éjectent
+le visiteur. Le bandeau reste, lui : il porte la progression et le compteur,
+qui sont le parcours même. Et **la hauteur est annoncée à la page hôte**, qui
+seule peut redimensionner le cadre — sans quoi le parcours défilerait dans un
+hublot de 720 px.
+
+Le script fourni écoute deux messages, et rien d'autre :
+
+| Message | Ce que fait l'hôte |
+|---|---|
+| `recohero:height` | ajuste la hauteur du cadre |
+| `recohero:scroll` | remonte la page sur le cadre au changement d'écran |
+
+Il rattache chaque message au cadre dont il vient en comparant `contentWindow`
+à `event.source` : plusieurs questionnaires peuvent cohabiter sur la même page.
+
+Deux limites à connaître. Dans une iframe tierce, Safari **bloque** le stockage
+et Chrome le **cloisonne** : la reprise d'un parcours interrompu et l'historique
+cessent alors de fonctionner, silencieusement — le questionnaire, lui, marche
+intégralement. Et le partage natif de la carte de résultat réclame
+`allow="web-share"` sur l'iframe ; le code fourni le pose déjà.
+
+Enfin, le piège du travail en local : l'adresse est construite à partir de
+**celle de la page où vous êtes**. Un code d'intégration copié depuis
+`localhost` contient `localhost` et ne marchera nulle part ailleurs. Le
+dialogue le signale en orange le cas échéant ; générez-le depuis l'adresse
+publique du site.
+
 ---
 
 ## L'édition au quotidien
@@ -169,6 +246,21 @@ déplacement. Le défilement suit tout seul quand on approche d'un bord.
 que le répondant la verra — même code de rendu, pas une imitation qui
 dériverait. Il se met à jour à la frappe, sans jamais déplacer le curseur du
 champ. Le bouton « Masquer » le replie.
+
+**Les questions et les profils se replient**, un par un ou tous ensemble. Une
+carte repliée montre l'essentiel — nombre de réponses, choix multiple, image,
+et les glyphes des axes qu'elle alimente — ce qui suffit à la reconnaître et à
+la déplacer. C'est aussi ce qui rend le glisser-déposer praticable sur un long
+questionnaire : on tire cinquante pixels au lieu de deux mille.
+
+**Sur téléphone, une barre d'onglets collante** remplace la navigation du
+rail, qui passe sous la surface d'édition. Le nom du questionnaire, dans le
+bandeau, ouvre la liste pour en changer.
+
+**Chaque section porte le nombre de problèmes** que le diagnostic y a trouvés,
+en rouge s'il faut corriger, en orange s'il faut vérifier.
+
+`Ctrl+S` force l'enregistrement, `Ctrl+Z` annule le dernier geste de structure.
 
 ---
 
@@ -227,6 +319,10 @@ Rien ne quitte le navigateur. Tout vit dans le `localStorage`, sous le préfixe
 | `session` | un parcours interrompu, pour pouvoir le reprendre |
 | `unlock` | l'horodatage du déverrouillage du backoffice (12 h) |
 
+Embarqué dans le site d'un autre (`embed=1`), rien ne change à cette liste —
+sauf que le navigateur peut refuser le stockage tiers. Le refus est encaissé
+sans erreur : `drafts`, `results` et `session` deviennent simplement muets.
+
 Il n'y a **aucun moyen de voir les réponses des autres** : c'est une
 conséquence directe du choix « pas de serveur ». Si ce besoin apparaît un
 jour, il faudra ajouter une base externe — voir la note en fin
@@ -253,6 +349,10 @@ Navigateurs à jour, desktop et mobile. Les fonctions modernes utilisées et
 leur seuil : `color-mix()` (Chrome 111, Firefox 113, Safari 16.2),
 `CompressionStream` pour les liens de partage (Chrome 80, Firefox 113,
 Safari 16.4), `structuredClone`, `<dialog>`.
+
+L'intégration en iframe demande `postMessage` (universel) et `ResizeObserver`
+(Chrome 64, Firefox 69, Safari 13.1) — ce dernier n'est qu'un supplément : la
+hauteur est annoncée à chaque écran sans lui.
 
 S'y ajoutent, pour les fonctions récentes : `createImageBitmap` et l'encodage
 WebP du canvas pour intégrer une image depuis un fichier ; `navigator.share`
