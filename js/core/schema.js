@@ -244,7 +244,7 @@ export function normalize(raw) {
     /* Le compteur de révision du garde-fou. Il ne sert qu'aux espaces —
        un brouillon local n'a personne avec qui se marcher dessus — mais il
        voyage avec le questionnaire pour survivre à un export/import.
-       0 veut dire « jamais publié ». Voir NOTES-REGLES.md. */
+       0 veut dire « jamais publié ». Voir ARCHITECTURE.md. */
     rev: Number.isFinite(+raw.rev) && +raw.rev > 0 ? Math.floor(+raw.rev) : 0,
     updatedBy: String(raw.updatedBy || ''),
   };

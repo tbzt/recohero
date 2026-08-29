@@ -272,7 +272,8 @@ export async function loadSpace(espace) {
    exactement le suivant. Deux personnes parties de la même version ne
    peuvent donc pas publier l'une après l'autre : la seconde est refusée
    par la BASE, pas par notre politesse — ce qui protège même d'un défaut
-   de notre côté. Le raisonnement complet est dans NOTES-REGLES.md.      */
+   de notre côté. Le raisonnement complet est dans ARCHITECTURE.md,
+   § « Le garde-fou contre l'écrasement ».                              */
 
 export class ConflitError extends Error {
   constructor(distant) {

@@ -518,7 +518,7 @@ function espaceCard(ctx) {
                 el('strong', { text: 'Protection contre l’écrasement inactive. ' }),
                 'La base a accepté une écriture qu’elle aurait dû refuser : la règle n’est pas publiée. ',
                 'Deux personnes qui modifient le même questionnaire peuvent s’effacer l’une l’autre. ',
-                'Voir NOTES-REGLES.md pour la poser.',
+                'La règle est à publier depuis la console de la base.',
               ]),
 
               /* Le seul filet de cet espace : la base gratuite n'offre

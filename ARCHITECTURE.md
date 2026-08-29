@@ -191,6 +191,53 @@ redéclare ces media queries.
 
 ---
 
+## Le garde-fou contre l'écrasement
+
+Deux personnes ouvrent le même questionnaire d'un espace. La seconde à publier
+effaçait le travail de la première, sans que personne le sache.
+
+**La protection est dans les règles de la base, pas dans le navigateur.**
+Comparer les versions côté client n'aurait rien garanti : deux écritures
+peuvent se croiser entre la lecture et l'envoi, un onglet resté ouvert ignore
+ce qui s'est passé ailleurs, et un défaut de notre code annulerait la
+protection en silence. La base, elle, arbitre au moment d'écrire.
+
+Chaque questionnaire porte un compteur `rev`. Publier envoie `rev + 1`, et la
+règle exige exactement le suivant :
+
+    newData.child('rev').val() === data.child('rev').val() + 1
+
+Deux personnes parties de `5` : la première écrit `6`, la seconde est refusée.
+`updatedBy` porte l'UID de qui a écrit, et la règle vérifie qu'il correspond au
+compte connecté — personne ne signe à la place d'un autre. Un questionnaire
+antérieur à la règle, sans `rev`, n'est pas bloqué : la première écriture
+adopte le compteur.
+
+**Le refus ne se lit pas dans le message.** La base renvoie le même 401 pour
+« tu n'es pas membre » et pour « ta révision n'est pas la suivante ». On ne
+devine donc pas : on relit le questionnaire distant, et c'est sa révision qui
+tranche. Un refus de droits n'est jamais pris pour un conflit.
+
+**Le rang de gérant.** Les membres d'un espace s'invitent et se retirent entre
+eux, sans quoi chaque arrivée passerait par le propriétaire. Mais un seul
+membre suffirait alors à verrouiller tout le monde dehors. Un compte inscrit
+dans `espaces/<nom>/gerants` ne peut être retiré par personne, et cette branche
+n'est modifiable que depuis la console : il reste donc toujours quelqu'un pour
+rouvrir.
+
+**Et la règle vérifie qu'elle est là.** Une règle qu'on croit posée et qui ne
+l'est pas ne se voit nulle part : l'espace a la même apparence, protégé ou non.
+Le backoffice tente donc, à la connexion, une écriture qui *doit* être refusée
+— réécrire `rev` à sa valeur actuelle, ce qui n'abîme rien si elle passe — et
+affiche un bandeau rouge le cas échéant. C'est le même mouvement que partout
+ailleurs dans ce projet : rendre la règle mécanique plutôt que mémorielle.
+
+*La marche à suivre en console — poser les règles, inviter, éprouver — vit hors
+du dépôt : elle nomme des espaces, des comptes et des écrans qui n'ont pas leur
+place dans un dépôt public.*
+
+---
+
 ## Cinq pièges payés comptant
 
 **Les listes s'imbriquent.** Les réponses vivent dans les questions, les
