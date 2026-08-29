@@ -303,6 +303,15 @@ publique du site.
 
 ## L'édition au quotidien
 
+Un bandeau en tête de la colonne d'édition donne l'état du questionnaire —
+taille, santé, publication, parcours terminés — depuis n'importe quel panneau.
+Les compteurs vivaient auparavant dans « Profils » : une donnée qui décrit le
+questionnaire entier, rangée là où l'on parle des sorties. On ne cherche pas
+ce qu'on ignore.
+
+Le bouton **?** de la barre liste les raccourcis et les gestes — ils
+existaient tous sans qu'aucun ne soit annoncé nulle part.
+
 **Rien ne demande confirmation, tout s'annule.** Supprimer une question, un
 axe, un profil ou même un questionnaire entier se fait sans boîte de dialogue :
 un bandeau propose « Annuler » pendant six secondes, et `Ctrl+Z` remonte la
@@ -320,7 +329,10 @@ que le répondant la verra — même code de rendu, pas une imitation qui
 dériverait. Il se met à jour à la frappe, sans jamais déplacer le curseur du
 champ. Le bouton « Masquer » le replie.
 
-**Les questions et les profils se replient**, un par un ou tous ensemble. Une
+**Les questions et les profils se replient**, un par un ou tous ensemble, et
+une liste trop longue s'ouvre pliée d'office — le seuil suit la hauteur
+estimée du contenu, pas le nombre de cartes : un profil avec ses
+recommandations vaut trois questions. Une
 carte repliée montre l'essentiel — nombre de réponses, choix multiple, image,
 et les glyphes des axes qu'elle alimente — ce qui suffit à la reconnaître et à
 la déplacer. C'est aussi ce qui rend le glisser-déposer praticable sur un long
