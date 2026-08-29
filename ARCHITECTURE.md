@@ -302,6 +302,54 @@ ne l'est pas, et une base externe serait le seul chemin (voir plus bas).
 
 ---
 
+## L'espace partagé
+
+`core/remote.js` est le seul module qui parle à un serveur, et le seul qui
+puisse être absent sans que rien ne casse : sans `?espace=…` dans l'adresse,
+aucune requête ne part, et le projet est exactement ce qu'il était. C'est la
+cinquième source de `catalog.js`, pas une refonte.
+
+**Realtime Database, pas Firestore.** La première a une API REST qui se
+consomme au simple `fetch` ; la seconde suppose un SDK. Le choix découle
+directement de l'interdit sur les dépendances et l'étape de build.
+
+**La configuration est publique, et ce n'est pas une négligence.** URL de base
+et clé d'API sont en clair dans le module. Dans une application web, ces
+valeurs sont un identifiant, pas un secret : le navigateur du visiteur les
+émet à chaque requête, et son onglet Réseau les affiche. Un site statique
+public n'a aucune cachette — ni gist, ni secret d'action GitHub, puisque tout
+ce qui doit être lu à l'exécution finit dans les fichiers déployés. Toute
+tentative de « cacher » la configuration serait un théâtre, et un théâtre
+coûteux : il laisserait croire à une protection.
+
+**La protection est ailleurs, et elle est vérifiable.** Les règles
+(`firebase.rules.json`) accordent la lecture à tous — c'est ce qui permet de
+répondre sans compte — et l'écriture aux seuls comptes inscrits dans
+`espaces/$espace/membres`. Cette liste n'est ni lisible ni modifiable depuis
+le web : elle ne se touche que depuis la console. Conséquence voulue :
+personne ne peut se fabriquer un espace.
+
+Ces règles ont été éprouvées avant qu'une ligne de câblage soit écrite : huit
+requêtes anonymes, une seule acceptée (la lecture des questionnaires), sept
+refusées — écriture, suppression, lecture des membres, écriture des membres,
+lecture de tous les espaces, création d'un espace, lecture de la racine.
+C'est l'ordre à garder : les règles d'abord, le code ensuite.
+
+**Le mot de passe ne traverse pas le projet.** Il est saisi dans un formulaire,
+échangé contre un jeton par l'API d'authentification, et oublié. Seul le jeton
+est conservé — par `store.js`, comme tout le reste, parce qu'aucun module
+n'écrit dans `localStorage` de son côté. Il expire en une heure et se
+renouvelle en silence : une session de travail d'une après-midi ne doit pas
+se couper au milieu d'une phrase.
+
+**Le kiosque d'un espace ne montre que cet espace.** Ni les questionnaires du
+dépôt, ni les brouillons locaux — alors même que le kiosque ordinaire montre
+les seconds. L'exception est délibérée : celle qui publie doit voir exactement
+ce que verra le visiteur, sinon elle ne peut pas relire sa propre page avant
+de la diffuser. Un kiosque qui s'embellit pour son auteur ne sert à rien.
+
+---
+
 ## Travailler à plusieurs sur ce dossier
 
 Ce dépôt est édité par plusieurs sessions à la fois. Une règle en découle,
@@ -322,12 +370,10 @@ autre. S'arrêter là, ne rien réécrire, et le dire.
 
 ## Ce qui n'existe pas, et pourquoi
 
-**Voir les réponses des autres.** Impossible sans serveur, et c'est le choix
-fondateur. Si le besoin apparaît, la marche à suivre la plus économe serait
-une base externe (Firebase Realtime Database, comme le projet Bingo) branchée
-sur un unique nouveau module `core/remote.js` : `catalog.js` gagnerait une
-quatrième source, `quiz.js` un envoi en fin de parcours, et rien d'autre ne
-bougerait. Les couches sont dessinées pour que ce soit vrai.
+**Voir les réponses des autres.** Toujours pas, et c'est le choix fondateur.
+`core/remote.js` existe désormais et pourrait le porter — `quiz.js` gagnerait
+un envoi en fin de parcours — mais personne ne l'a demandé, et cela ferait
+entrer des données de visiteurs dans un projet qui n'en collecte aucune.
 
 **Un moteur de Markdown.** Les champs de texte libre acceptent les
 paragraphes (une ligne vide en sépare deux) et rien d'autre. Une dépendance

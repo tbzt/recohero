@@ -118,7 +118,7 @@ texte mordre sur la signature.
 
 ## Diffuser un questionnaire
 
-Trois voies, et elles ne servent pas à la même chose.
+Quatre voies, et elles ne servent pas à la même chose.
 
 ### Par lien — immédiat, rien à déployer
 
@@ -182,6 +182,64 @@ pas dedans (`find -maxdepth 1`), donc rien de ce qui s'y trouve n'entre dans
 Ça ne permet pas d'éditer **à deux en même temps** : deux personnes sur le
 même fichier, c'est un conflit git, et il n'y a rien pour l'arbitrer. Chacun
 son tour, en revanche, fonctionne.
+
+### Par un espace partagé — à plusieurs, sans toucher au dépôt
+
+Les trois autres voies supposent que l'auteur a accès au dépôt. Pour qu'une
+équipe — une médiathèque, par exemple — publie sans git, RecoHero sait parler
+à une **base partagée** : une Realtime Database Firebase, en REST pur, sans
+SDK ni étape de build.
+
+Un **espace** est une équipe et son catalogue. Il se nomme dans l'adresse :
+
+| Adresse | Qui | Ce qui se passe |
+|---|---|---|
+| `…/?espace=maupassant` | tout le monde | Le kiosque de cette équipe, et lui seul. On répond **sans compte**. |
+| `…/admin.html?espace=maupassant` | l'équipe | Le backoffice. Demande une adresse et un mot de passe, une fois. |
+
+Le kiosque d'un espace ne montre **que** cet espace : ni les questionnaires du
+dépôt, ni les brouillons locaux. Ce n'est pas un oubli — c'est la condition
+pour que celle qui publie voie exactement ce que verra le visiteur.
+
+Une fois connecté, le panneau **Diffuser** gagne « ⇧ Publier dans l'espace ».
+Le questionnaire paraît aussitôt sur le kiosque de l'équipe. « ⌫ Retirer de
+l'espace » l'en enlève sans toucher à la copie locale.
+
+#### Ce qui est public, et pourquoi ce n'est pas un oubli
+
+Les deux constantes en tête de [`js/core/remote.js`](js/core/remote.js) — URL
+de la base et clé d'API — sont **en clair, et c'est la manière normale**. Dans
+une application web, la configuration Firebase est un identifiant, pas un mot
+de passe : elle est lisible dans le trafic réseau de n'importe quel visiteur,
+quoi qu'on fasse. Aucune cachette n'existe pour un site statique public — un
+gist, un secret d'action GitHub, tout finit dans le navigateur du visiteur ou
+dans les fichiers déployés.
+
+Ce qui protège les données est ailleurs : dans les **règles** de la base
+([`firebase.rules.json`](firebase.rules.json)), appliquées côté serveur.
+Lecture ouverte à tous, écriture réservée aux comptes inscrits comme membres
+de l'espace. Le mot de passe, lui, n'est nulle part dans le dépôt : il est tapé
+par la personne, et seul le jeton qui en résulte est conservé — il expire, et
+se renouvelle tout seul tant que la session dure.
+
+#### Monter son propre espace
+
+Pour une structure qui veut son autonomie complète, sans dépendre de personne :
+
+1. Créer un projet sur `console.firebase.google.com` (Analytics : non).
+2. **Realtime Database** — pas Firestore : c'est celle qui a une API REST
+   utilisable au simple `fetch`. Emplacement `europe-west1`, **définitif**.
+3. **Authentication → E-mail/Mot de passe**, activer le premier interrupteur
+   seulement. Créer un utilisateur par personne, noter son UID.
+4. Coller [`firebase.rules.json`](firebase.rules.json) dans l'onglet Règles.
+5. Créer `espaces/<nom>/membres/<UID>` à `true`, pour chaque personne.
+6. Remplacer `DB` et `API_KEY` en tête de
+   [`js/core/remote.js`](js/core/remote.js).
+
+Créer un espace passe toujours par la console : les règles interdisent d'en
+fabriquer un depuis le web. C'est voulu.
+
+---
 
 ### Par intégration — dans la page de quelqu'un d'autre
 
@@ -330,6 +388,7 @@ Rien ne quitte le navigateur. Tout vit dans le `localStorage`, sous le préfixe
 | `drafts` | vos questionnaires en cours d'édition |
 | `results` | l'historique de vos résultats (60 derniers) |
 | `session` | un parcours interrompu, pour pouvoir le reprendre |
+| `remote`  | le jeton de la base partagée — jamais le mot de passe |
 | `unlock` | l'horodatage du déverrouillage du backoffice (12 h) |
 
 Embarqué dans le site d'un autre (`embed=1`), rien ne change à cette liste —
