@@ -266,20 +266,33 @@ en rouge s'il faut corriger, en orange s'il faut vérifier.
 
 ## Le backoffice
 
-Il s'ouvre sur une phrase d'accès. Phrase livrée : **`reco2026`**.
+Il s'ouvre sur une phrase d'accès. **Elle n'est pas publiée ici** — seule son
+empreinte SHA-256 figure dans le code, dans la constante `PASS_SHA256` en tête
+de [`js/admin/app.js`](js/admin/app.js). Gardez la vôtre dans un gestionnaire
+de mots de passe : ce dépôt ne la contient nulle part.
 
 Cette phrase **ne protège rien**, et c'est assumé : RecoHero est entièrement
 statique, il n'existe aucune donnée en ligne à protéger, et le code de la page
 est public. Elle évite d'ouvrir le backoffice par mégarde, rien de plus.
 
-Pour la changer, remplacez la constante `PASS_SHA256` en tête de
-[`js/admin/app.js`](js/admin/app.js) par l'empreinte de la vôtre :
+Il faut être précis sur ce « rien ». La porte ne compare la phrase qu'une fois,
+puis note un horodatage dans le `localStorage` du visiteur — qui peut l'écrire
+lui-même depuis la console, sans jamais connaître la phrase. Une empreinte
+imprenable n'y changerait rien. Ce que le backoffice ouvre, de toute façon,
+c'est le stockage de celui qui l'ouvre : il n'atteint ni vos questionnaires,
+ni la publication, ni les réponses de qui que ce soit.
+
+Pour poser la vôtre, remplacez la constante par son empreinte :
 
 ```bash
 printf '%s' 'votre-nouvelle-phrase' | sha256sum
 ```
 
 Mettre la constante à la chaîne vide supprime la porte.
+
+Une phrase déjà écrite en clair dans un commit y reste : l'historique ne
+s'efface pas en modifiant le fichier. Si la vôtre a été publiée un jour, la
+seule façon de refermer est d'en choisir une autre.
 
 ### Le diagnostic
 

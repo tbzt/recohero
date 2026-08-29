@@ -25,9 +25,11 @@ import {
    SHA-256 de la phrase d'accès. Elle n'est PAS un mécanisme de sécurité :
    sans serveur, il n'y a aucune donnée partagée à protéger, et le code de
    cette page est public. Elle évite d'ouvrir le backoffice par mégarde,
-   rien de plus. Phrase livrée : « reco2026 ». Pour la changer, remplacer
-   la constante par le SHA-256 de la nouvelle (README, § Backoffice).
-   Mettre la chaîne vide supprime la porte.                              */
+   rien de plus — la porte note ensuite un horodatage dans le localStorage,
+   que n'importe qui peut écrire sans connaître la phrase.
+   La phrase elle-même n'est pas dans ce dépôt : seule son empreinte l'est.
+   Pour la changer, remplacer la constante par le SHA-256 de la nouvelle
+   (README, § Backoffice). Mettre la chaîne vide supprime la porte.     */
 const PASS_SHA256 = '7afa3390516c3b831bde7acb98a061db9c626524677f643a9f55083c1bc427bc';
 const UNLOCK_TTL = 12 * 60 * 60 * 1000;
 
