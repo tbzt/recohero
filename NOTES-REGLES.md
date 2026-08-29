@@ -147,3 +147,64 @@ curl -s 'https://VOTRE-DOMAINE/__/auth/action' | head -c 200
 Un `200` ne suffit pas : il faut que le contenu soit le gestionnaire Firebase,
 pas une page de parking. En cas de doute, garder le domaine par défaut
 `<projet>.firebaseapp.com`, qui sert le gestionnaire.
+
+---
+
+## La clé publique et l'alerte de GitHub
+
+GitHub signale la clé d'API de `js/core/remote.js` comme un secret exposé.
+C'est une détection juste et une conclusion fausse : dans une application web,
+cette clé est un **identifiant de projet**, pas un mot de passe. Elle est
+lisible dans le trafic réseau de n'importe quel visiteur, quoi qu'on fasse.
+
+**Ne pas la faire tourner.** La nouvelle serait tout aussi publique le jour
+même, et l'application cesserait de fonctionner entre-temps.
+
+### Ce que la clé permet réellement — mesuré, pas supposé
+
+| API | Réponse |
+|---|---|
+| Identity Toolkit | acceptée — c'est celle qu'on utilise |
+| Maps, YouTube, Translation | refusées, non activées sur le projet |
+
+Aucun risque de facturation, donc. Le seul usage abusif possible passe par
+Identity Toolkit : créer des comptes, tenter des connexions, ou **déclencher
+des courriels de réinitialisation vers des adresses arbitraires** — ces
+courriels porteraient le nom du projet. Firebase limite le débit, mais la
+gêne est réelle.
+
+### Les deux mesures qui valent quelque chose
+
+**Restreindre la clé** — Google Cloud Console → API et services → Identifiants
+→ la clé « Browser key » :
+
+- *Restrictions relatives aux API* : n'autoriser que **Identity Toolkit API**
+  et **Token Service API**. Aujourd'hui les autres ne sont pas activées, mais
+  le jour où l'une le sera, la clé y donnerait accès sans qu'on y pense.
+- *Restrictions relatives aux applications* : **Sites web**, avec
+  `tbzt.github.io/*`.
+
+Sur ce second point, être exact : la restriction porte sur l'en-tête
+`Referer`, que n'importe qui peut falsifier. Elle arrête les robots qui
+moissonnent les clés sur GitHub, pas quelqu'un de déterminé. C'est un
+ralentisseur, pas un mur — mais un ralentisseur qui coûte deux minutes.
+
+### Le compromis sur la création de compte
+
+Firebase Console → Authentication → Settings → *Actions utilisateur* permet de
+**désactiver la création de compte**. Ce serait la mesure la plus efficace
+contre l'abus… et elle **casserait l'invitation depuis le backoffice**, qui
+repose précisément sur `accounts:signUp`.
+
+Le choix se pose donc ainsi : soit une équipe qui s'invite elle-même, soit une
+création de compte fermée où seule la console ajoute quelqu'un. Pas les deux.
+Tant que l'invitation compte plus, on laisse ouvert — en sachant qu'un compte
+créé de l'extérieur **ne donne aucun droit** : c'est l'appartenance à l'espace
+qui en donne, et les règles la gardent.
+
+### Fermer l'alerte
+
+Sur GitHub, ouvrir l'alerte → *Close as* → **Won't fix**, en indiquant la
+raison. `.github/secret_scanning.yml` évite par ailleurs qu'elle revienne à
+chaque commit touchant ce fichier — pour qu'une alerte future signifie encore
+quelque chose.
