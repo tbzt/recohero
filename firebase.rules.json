@@ -1,0 +1,24 @@
+{
+  "rules": {
+    "espaces": {
+      "$espace": {
+
+        "quizzes": {
+          ".read": true,
+
+          ".write": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
+
+          "$quiz": {
+            ".validate": "newData.hasChildren(['id', 'title'])"
+          }
+        },
+
+        "membres": {
+          ".read": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
+          ".write": false
+        }
+
+      }
+    }
+  }
+}

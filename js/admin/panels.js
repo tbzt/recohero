@@ -447,11 +447,46 @@ function resultCard(quiz, result, index, ctx) {
 
 /* --- 5. Publication ---------------------------------------------------------------- */
 
+/* Le bloc de l'espace partagé. Il n'apparaît que si l'adresse en nomme un :
+   sans ?espace=…, le backoffice est exactement ce qu'il était, et rien ne
+   parle à un serveur. */
+function espaceCard(ctx) {
+  if (!ctx.espace) return null;
+
+  return el('div', { class: 'card' }, [
+    el('div', { class: 'publish-step' }, [
+      el('span', { class: 'publish-step__num', text: '⌂' }),
+      el('div', {}, [
+        el('h3', { text: `Espace « ${ctx.espace} »` }),
+        ctx.remoteSession
+          ? el('div', {}, [
+              el('p', { text: 'Publier dépose le questionnaire dans l’espace : il paraît aussitôt sur son kiosque, pour tout le monde, sans que personne ait à se connecter pour y répondre.' }),
+              el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
+                el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'remote-publish', text: '⇧ Publier dans l’espace' }),
+                ctx.inEspace && el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'remote-unpublish', text: '⌫ Retirer de l’espace' }),
+                el('span', { class: 'section__spacer' }),
+                el('span', { class: 'pill', text: ctx.remoteSession.email }),
+                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'remote-signout', text: 'Se déconnecter' }),
+              ]),
+            ])
+          : el('div', {}, [
+              el('p', { text: 'Connecte-toi pour publier dans cet espace. C’est le seul moment où un mot de passe est demandé — les visiteurs qui répondent n’ont besoin de rien.' }),
+              el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
+                el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'remote-signin', text: '→ Se connecter' }),
+              ]),
+            ]),
+      ]),
+    ]),
+  ]);
+}
+
 export function publier(quiz, ctx = {}) {
   const file = `${slugify(quiz.title, quiz.id)}.json`;
 
   return el('section', { class: 'panel' }, [
-    head('Diffuser', "Deux façons : un lien, qui ne demande rien à personne ; ou le dépôt, pour que le questionnaire figure au kiosque."),
+    head('Diffuser', "Un lien, qui ne demande rien à personne ; le dépôt, pour que le questionnaire figure au kiosque ; l'espace partagé, pour publier à plusieurs sans toucher au dépôt."),
+
+    espaceCard(ctx),
 
     el('div', { class: 'card' }, [
       el('div', { class: 'publish-step' }, [

@@ -6,6 +6,14 @@ import { loadAll } from './core/catalog.js';
 import * as store from './core/store.js';
 import { el, formatDate, toast } from './core/ui.js';
 
+/* L'espace vient de l'adresse, jamais du code : une même page sert le
+   kiosque du dépôt et celui de n'importe quelle médiathèque. */
+const espace = new URLSearchParams(location.search).get('espace');
+
+/* Tout lien interne doit reconduire l'espace, sinon un clic ramène au
+   kiosque du dépôt et le visiteur change de catalogue sans le vouloir. */
+const withEspace = (url) => (espace ? `${url}&espace=${encodeURIComponent(espace)}` : url);
+
 const dom = {
   grid: document.getElementById('quizGrid'),
   count: document.getElementById('quizCount'),
@@ -17,7 +25,7 @@ const dom = {
 boot();
 
 async function boot() {
-  renderQuizzes(await loadAll());
+  renderQuizzes(await loadAll({ espace }));
   renderHistory();
   /* Même règle que dans le backoffice : on agit, on laisse un retour.
      L'historique est reconstitué depuis la mémoire, pas depuis le disque. */
@@ -68,7 +76,7 @@ function card(quiz) {
   const questions = quiz.questions.length;
   return el('a', {
     class: 'quiz-card',
-    href: `quiz.html?q=${encodeURIComponent(quiz.id)}`,
+    href: withEspace(`quiz.html?q=${encodeURIComponent(quiz.id)}`),
     style: { '--card-accent': quiz.accent },
   }, [
     quiz.image && el('img', { class: 'quiz-card__cover', src: quiz.image, alt: '', loading: 'lazy' }),
@@ -113,7 +121,7 @@ function renderHistory() {
     ))),
     el('a', {
       class: 'btn btn--quiet btn--sm',
-      href: `quiz.html?q=${encodeURIComponent(entry.quizId)}`,
+      href: withEspace(`quiz.html?q=${encodeURIComponent(entry.quizId)}`),
       text: 'Refaire',
     }),
   ])));

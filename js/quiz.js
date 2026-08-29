@@ -17,6 +17,11 @@ import { el, paragraphs, escapeHtml, applyAccent, toast, copy, downloadBlob } fr
 const params = new URLSearchParams(location.search);
 const isTest = params.has('test');
 const isEmbed = params.has('embed');
+const espace = params.get('espace');
+
+/* Le kiosque d'origine, celui du dépôt ou celui d'un espace : toute sortie
+   doit y revenir, sinon le visiteur d'une médiathèque atterrit chez nous. */
+const kiosque = espace ? `index.html?espace=${encodeURIComponent(espace)}` : 'index.html';
 
 const dom = {
   bar: document.getElementById('quizbar'),
@@ -41,7 +46,7 @@ boot();
 
 async function boot() {
   try {
-    const quiz = await resolveQuiz({ id: params.get('q') });
+    const quiz = await resolveQuiz({ id: params.get('q'), espace });
     if (!quiz) return fail('Questionnaire introuvable.', "Vérifie le lien, ou reviens au kiosque.");
     if (!quiz.questions.length) return fail('Ce questionnaire n’a pas encore de question.', quiz.title);
 
@@ -51,6 +56,7 @@ async function boot() {
     dom.title.textContent = quiz.title;
     dom.bar.hidden = false;
 
+    dom.exit.href = kiosque;
     if (isTest) dom.exit.textContent = '← Retour au backoffice';
     if (isEmbed) wireEmbed();
 
@@ -73,7 +79,7 @@ function fail(message, detail) {
       el('h1', { text: message }),
       detail && el('p', { class: 'failure__detail', text: detail }),
       !isEmbed && el('p', { class: 'navrow', style: { justifyContent: 'center', marginTop: '1.5rem' } }, [
-        el('a', { class: 'btn btn--primary', href: 'index.html', text: 'Aller au kiosque' }),
+        el('a', { class: 'btn btn--primary', href: kiosque, text: 'Aller au kiosque' }),
       ]),
     ]),
   ]));
@@ -277,7 +283,7 @@ function renderResult() {
       el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'card', text: '🖼 Ma carte de résultat' }),
       el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'share', text: '⤴ Partager ce questionnaire' }),
       el('button', { class: 'btn btn--quiet', type: 'button', 'data-act': 'restart', text: '↺ Refaire' }),
-      !isEmbed && el('a', { class: 'btn btn--quiet', href: 'index.html', text: 'Retour au kiosque' }),
+      !isEmbed && el('a', { class: 'btn btn--quiet', href: kiosque, text: 'Retour au kiosque' }),
     ]),
   ]);
 
@@ -440,8 +446,16 @@ function postHeight() {
 }
 
 async function shareQuiz() {
-  const url = state.quiz.source === 'published'
-    ? new URL(`quiz.html?q=${encodeURIComponent(state.quiz.id)}`, location.href).toString()
+  /* Un questionnaire qui vit sur un serveur ou dans le dépôt se partage
+     par son adresse : elle reste courte, et elle suit les corrections.
+     Un brouillon local n'existe nulle part ailleurs : il voyage entier. */
+  const addressable = state.quiz.source === 'published' || state.quiz.source === 'remote';
+  const url = addressable
+    ? new URL(
+        `quiz.html?q=${encodeURIComponent(state.quiz.id)}`
+        + (espace ? `&espace=${encodeURIComponent(espace)}` : ''),
+        location.href,
+      ).toString()
     : await linkFor(state.quiz);
   if (navigator.share) {
     try {

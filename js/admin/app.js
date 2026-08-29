@@ -13,7 +13,8 @@ import {
 import { reachability } from '../core/scoring.js';
 import { bindSortables } from '../core/sortable.js';
 import { questionView } from '../core/views.js';
-import { loadPublished, loadShared } from '../core/catalog.js';
+import { loadPublished, loadShared, loadEspace, forgetEspace } from '../core/catalog.js';
+import * as remote from '../core/remote.js';
 import * as store from '../core/store.js';
 import { linkFor, encode } from '../core/share.js';
 import {
@@ -40,6 +41,9 @@ const state = {
   quiz: null,
   published: [],
   shared: [],           /* les brouillons partagés de quizzes/wip/ */
+  espace: null,         /* le nom de l'espace partagé, s'il y en a un */
+  remote: [],           /* les questionnaires de cet espace */
+  remoteSession: null,  /* { email, uid } une fois connecté */
   panel: 'identite',
   reach: null,
   expanded: new Set(),  /* réponses dont le champ image est déplié */
@@ -84,7 +88,11 @@ async function open() {
   dom.gate.hidden = true;
   dom.shell.hidden = false;
 
-  [state.published, state.shared] = await Promise.all([loadPublished(), loadShared()]);
+  state.espace = new URLSearchParams(location.search).get('espace');
+  state.remoteSession = remote.session();
+  [state.published, state.shared, state.remote] = await Promise.all([
+    loadPublished(), loadShared(), loadEspace(state.espace),
+  ]);
   const drafts = store.allDrafts();
   if (drafts.length) select(drafts[0].id);
 
@@ -227,6 +235,20 @@ function renderRail() {
       ]))),
     ]),
 
+    state.remote.length > 0 && el('div', {}, [
+      el('div', { class: 'rail__head' }, [el('h2', { text: `Espace « ${state.espace} »` })]),
+      el('div', { class: 'rail__list' }, state.remote.map((quiz) => el('div', { class: 'rail__item' }, [
+        el('span', { class: 'rail__item__emoji', text: quiz.emoji || '✦' }),
+        el('span', { class: 'rail__item__label', text: quiz.title }),
+        el('button', {
+          class: 'btn btn--icon btn--quiet', type: 'button',
+          'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-remote', 'data-id': quiz.id,
+          title: draftIds.has(quiz.id) ? 'Copie locale déjà ouverte' : 'Modifier (crée une copie locale)',
+          text: draftIds.has(quiz.id) ? '●' : '✎',
+        }),
+      ]))),
+    ]),
+
     state.quiz && el('div', {}, [
       el('div', { class: 'rail__head' }, [el('h2', { text: 'Sections' })]),
       el('div', { class: 'rail__list' }, PANELS.map((panel) => el('button', {
@@ -314,7 +336,12 @@ async function renderPanel() {
     reach: state.reach, expanded: state.expanded,
     previewOpen: state.previewOpen, folded: state.folded,
   };
-  if (panel.id === 'publier') ctx.linkSize = (await encode(state.quiz)).length + 40;
+  if (panel.id === 'publier') {
+    ctx.linkSize = (await encode(state.quiz)).length + 40;
+    ctx.espace = state.espace;
+    ctx.remoteSession = state.remoteSession;
+    ctx.inEspace = state.remote.some((q) => q.id === state.quiz.id);
+  }
 
   dom.panel.replaceChildren(panel.render(state.quiz, ctx));
   applyAccent(state.quiz.accent);
@@ -625,8 +652,9 @@ function onClick(event) {
        d'origine ; en changer, c'est fabriquer une variante.          */
     case 'edit-published':
     case 'fork-published':
-    case 'edit-shared': {
-      const shelf = act === 'edit-shared' ? state.shared : state.published;
+    case 'edit-shared':
+    case 'edit-remote': {
+      const shelf = { 'edit-shared': state.shared, 'edit-remote': state.remote }[act] || state.published;
       const source = shelf.find((q) => q.id === id);
       if (!source) return undefined;
       const copyQuiz = structuredClone({ ...source, source: undefined, file: undefined });
@@ -640,6 +668,7 @@ function onClick(event) {
         'edit-published': 'Copie locale ouverte. Le kiosque montre encore la version du dépôt.',
         'fork-published': 'Copie créée.',
         'edit-shared': 'Brouillon repris. Réexporte-le vers quizzes/wip/ quand tu auras fini.',
+        'edit-remote': 'Copie locale ouverte. L’espace montre encore la version publiée.',
       }[act]);
       return structural();
     }
@@ -775,6 +804,10 @@ function onClick(event) {
     case 'test':      return testRun();
     case 'copy-link': return copyLink();
     case 'embed':     return showEmbed();
+    case 'remote-signin':    return showSignIn();
+    case 'remote-signout':   return signOutRemote();
+    case 'remote-publish':   return publishRemote();
+    case 'remote-unpublish': return unpublishRemote();
     case 'export':    return exportJson();
     case 'copy-json': return copyJson();
     case 'import-paste': return importPaste();
@@ -969,6 +1002,122 @@ async function showEmbed() {
   dialog.addEventListener('close', () => dialog.remove());
   document.body.append(dialog);
   dialog.showModal();
+}
+
+/* --- L'espace partagé ------------------------------------------------------
+   Le seul endroit du backoffice qui parle à un serveur. Tout y est
+   facultatif : sans ?espace=… dans l'adresse, rien de ce qui suit ne
+   s'exécute et le backoffice reste ce qu'il a toujours été.
+
+   Le mot de passe ne quitte pas ce formulaire : remote.signIn l'échange
+   contre un jeton, et c'est le jeton seul qui est conservé.            */
+
+function repaint() { flush(); renderRail(); renderPanel(); }
+
+async function refreshEspace() {
+  forgetEspace();
+  state.remote = await loadEspace(state.espace);
+}
+
+function showSignIn() {
+  const email = el('input', {
+    class: 'input', type: 'email', autocomplete: 'username',
+    placeholder: 'adresse@exemple.fr',
+  });
+  const pass = el('input', { class: 'input', type: 'password', autocomplete: 'current-password' });
+  const erreur = el('p', { class: 'panel__hint', style: { color: 'var(--danger)' }, hidden: true });
+  const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Se connecter' });
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: `Se connecter à « ${state.espace} »` }),
+      el('p', { class: 'panel__hint', text: 'Ces identifiants ne servent qu’à publier. Répondre aux questionnaires n’en demande aucun.' }),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Adresse e-mail' }), email]),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Mot de passe' }), pass]),
+      erreur,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', {
+        class: 'btn btn--quiet', type: 'button', text: 'Annuler',
+        onClick: () => dismiss(dialog),
+      }),
+      valider,
+    ]),
+  ]);
+
+  const tenter = async () => {
+    if (!email.value.trim() || !pass.value) return;
+    valider.disabled = true;
+    erreur.hidden = true;
+    try {
+      state.remoteSession = await remote.signIn(email.value.trim(), pass.value);
+      await refreshEspace();
+      dismiss(dialog, () => {
+        toast(`Connecté — ${state.remoteSession.email}`);
+        repaint();
+      });
+    } catch (err) {
+      erreur.textContent = err.message;
+      erreur.hidden = false;
+      valider.disabled = false;
+      pass.value = '';
+      pass.focus();
+    }
+  };
+
+  valider.addEventListener('click', tenter);
+  for (const field of [email, pass]) {
+    field.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') { event.preventDefault(); tenter(); }
+    });
+  }
+
+  document.body.append(dialog);
+  dialog.showModal();
+  email.focus();
+}
+
+async function signOutRemote() {
+  remote.signOut();
+  state.remoteSession = null;
+  await refreshEspace();
+  toast('Déconnecté de l’espace.');
+  repaint();
+}
+
+async function publishRemote() {
+  flush();
+  if (!state.remoteSession) return showSignIn();
+
+  const problemes = diagnose(state.quiz).filter((i) => i.level === 'error');
+  if (problemes.length) {
+    return toast(`${problemes.length} problème${problemes.length > 1 ? 's' : ''} à corriger avant de publier.`, 'danger');
+  }
+
+  try {
+    await remote.saveQuiz(state.espace, state.quiz);
+    await refreshEspace();
+    toast(`« ${state.quiz.title} » est en ligne dans l’espace.`);
+    repaint();
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+  return undefined;
+}
+
+async function unpublishRemote() {
+  if (!state.remoteSession) return showSignIn();
+  const titre = state.quiz.title;
+
+  try {
+    await remote.deleteQuiz(state.espace, state.quiz.id);
+    await refreshEspace();
+    toast(`« ${titre} » retiré de l’espace. Ta copie locale est intacte.`);
+    repaint();
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+  return undefined;
 }
 
 function payload() {

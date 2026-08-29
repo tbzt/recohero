@@ -5,6 +5,7 @@
      2. le dépôt   — les fichiers de quizzes/, listés par quizzes/index.json
      3. le local   — les brouillons du backoffice, dans ce navigateur
      4. l'étagère  — les brouillons partagés de quizzes/wip/
+     5. l'espace   — une base partagée, quand une adresse porte ?espace=…
 
    La quatrième est réservée au backoffice, et c'est tout l'intérêt :
    déposer dans quizzes/ veut dire publier, et il n'existait aucun endroit
@@ -22,6 +23,7 @@
 
 import { normalize } from './schema.js';
 import * as store from './store.js';
+import * as remote from './remote.js';
 import { decode, payloadFromHash } from './share.js';
 
 /* Chaque étagère est un dossier et son index. Les deux se lisent pareil :
@@ -75,6 +77,39 @@ export function loadPublished() { return loadShelf('published'); }
    suffire à ouvrir un questionnaire que personne n'a décidé de publier. */
 export function loadShared() { return loadShelf('shared'); }
 
+/* --- L'espace partagé ----------------------------------------------------
+   La cinquième source, et la seule qui parle à un serveur. Elle n'existe
+   que si l'adresse nomme un espace : sans ?espace=…, rien n'est demandé à
+   personne et le kiosque reste exactement ce qu'il était.
+
+   Un espace injoignable — réseau coupé, base fermée, nom inconnu — n'est
+   pas une erreur fatale : on le signale dans la console et on rend une
+   liste vide. Le dépôt et les brouillons locaux continuent de servir. */
+
+let espaceMemo = { name: null, list: null };
+
+export async function loadEspace(espace) {
+  if (!espace || !remote.configured()) return [];
+  if (espaceMemo.name === espace) return espaceMemo.list;
+
+  let list = [];
+  try {
+    list = (await remote.loadSpace(espace))
+      .map((raw) => {
+        try { return { ...normalize(raw), source: 'remote' }; } catch { return null; }
+      })
+      .filter(Boolean);
+  } catch (err) {
+    console.info(`[catalog] espace « ${espace} » injoignable :`, err.message);
+  }
+  espaceMemo = { name: espace, list };
+  return list;
+}
+
+/* Après une écriture, la mémoïsation ment : le prochain chargement doit
+   repartir du serveur. */
+export function forgetEspace() { espaceMemo = { name: null, list: null }; }
+
 export function loadDrafts() {
   return store.allDrafts().map((quiz) => {
     try {
@@ -93,23 +128,43 @@ export async function loadFromHash() {
 }
 
 /* Le catalogue complet vu par le kiosque. Un brouillon dont l'identifiant
-   existe déjà en publié est masqué : le dépôt fait foi une fois publié.
-   L'étagère `shared` est absente de cette liste, et c'est sa raison d'être :
-   partager un questionnaire et le publier redeviennent deux gestes.     */
-export async function loadAll() {
+   existe déjà ailleurs est masqué : la source distante ou le dépôt fait foi
+   une fois publié. L'étagère `shared` est absente de cette liste, et c'est
+   sa raison d'être : partager un questionnaire et le publier redeviennent
+   deux gestes.
+
+   Avec ?espace=…, le kiosque est celui de cet espace et de lui seul :
+   ni les questionnaires du dépôt, ni les brouillons locaux. C'est ce que
+   « chacun son kiosque » veut dire — une médiathèque montre son catalogue,
+   pas le nôtre.
+
+   L'absence des brouillons locaux n'est pas un oubli, c'est la condition
+   pour que la page soit vérifiable : celle qui publie doit voir exactement
+   ce que verra le visiteur, sinon elle ne peut pas relire son propre
+   kiosque avant de le diffuser.                                        */
+export async function loadAll({ espace = null } = {}) {
+  if (espace) return loadEspace(espace);
+
   const [pub, drafts] = [await loadPublished(), loadDrafts()];
   const publishedIds = new Set(pub.map((q) => q.id));
   return [...pub, ...drafts.filter((d) => !publishedIds.has(d.id))];
 }
 
-/* Résolution d'un questionnaire à jouer : lien d'abord, puis identifiant. */
-export async function resolveQuiz({ id = null } = {}) {
+/* Résolution d'un questionnaire à jouer : lien d'abord, puis identifiant.
+   L'espace passe avant le dépôt : si l'adresse en nomme un, c'est son
+   catalogue qu'on consulte. */
+export async function resolveQuiz({ id = null, espace = null } = {}) {
   const fromLink = await loadFromHash();
   if (fromLink) return fromLink;
   if (!id) return null;
 
   const draft = store.getDraft(id);
   if (draft) return { ...normalize(draft), source: 'draft' };
+
+  if (espace) {
+    const found = (await loadEspace(espace)).find((q) => q.id === id);
+    if (found) return found;
+  }
 
   const pub = await loadPublished();
   return pub.find((q) => q.id === id) || null;

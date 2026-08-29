@@ -12,6 +12,7 @@ const KEY = {
   results: PREFIX + 'results',  // [ resultEntry ]     — l'historique de réponses
   session: PREFIX + 'session',  // { [quizId]: { answers, at } } — parcours en cours
   unlock:  PREFIX + 'unlock',   // horodatage du déverrouillage du backoffice
+  remote:  PREFIX + 'remote',   // { email, uid, idToken, refreshToken, expiresAt }
 };
 
 const MAX_RESULTS = 60;
@@ -104,3 +105,12 @@ export function isUnlocked(ttlMs) {
 
 export function setUnlocked() { write(KEY.unlock, Date.now()); }
 export function lock() { write(KEY.unlock, 0); }
+
+/* --- Session de la base partagée ------------------------------------------
+   Le mot de passe n'entre jamais ici : seulement le jeton qu'il a produit,
+   qui expire, et de quoi le renouveler. Effacer les données du site
+   déconnecte — c'est le comportement attendu.                           */
+
+export function getRemote() { return read(KEY.remote, null); }
+export function setRemote(session) { write(KEY.remote, session); }
+export function clearRemote() { write(KEY.remote, null); }
