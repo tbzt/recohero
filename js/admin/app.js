@@ -40,6 +40,7 @@ const state = {
   panel: 'identite',
   reach: null,
   expanded: new Set(),  /* réponses dont le champ image est déplié */
+  folded: new Set(),    /* cartes repliées : questions et profils */
   focused: null,        /* question sous le curseur, pour l'aperçu */
   previewOpen: true,
 };
@@ -50,7 +51,7 @@ boot();
 
 async function boot() {
   for (const id of ['gate', 'gateForm', 'gatePass', 'shell', 'rail', 'panel',
-                    'quizName', 'saveStatus', 'topActions']) {
+                    'quizName', 'saveStatus', 'topActions', 'tabbar']) {
     dom[id] = document.getElementById(id);
   }
 
@@ -92,6 +93,8 @@ async function open() {
   dom.shell.addEventListener('input', onInput);
   dom.shell.addEventListener('change', onChange);
   dom.topActions.addEventListener('click', onClick);
+  dom.tabbar.addEventListener('click', onClick);
+  dom.quizName.addEventListener('click', onClick);
   window.addEventListener('beforeunload', flush);
   dom.shell.addEventListener('focusin', (event) => {
     const bind = event.target.closest('[data-bind]')?.dataset.bind || '';
@@ -104,6 +107,15 @@ async function open() {
     paintPreview();
   });
   window.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      /* Rien ne serait perdu sans ça — l'enregistrement est automatique.
+         Mais le réflexe est trop ancré pour qu'on laisse le navigateur
+         proposer d'enregistrer la page à la place. */
+      event.preventDefault();
+      flush();
+      toast('Enregistré.');
+      return;
+    }
     if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z' || event.shiftKey) return;
     /* Dans un champ de saisie, Ctrl+Z appartient au champ : le navigateur
        y défait la frappe, ce qu'aucune pile de notre côté ne ferait mieux. */
@@ -117,17 +129,48 @@ async function open() {
 /* --- Rendu ------------------------------------------------------------------ */
 
 function renderTopbar() {
-  dom.quizName.textContent = state.quiz ? state.quiz.title : 'Aucun questionnaire ouvert';
+  const label = state.quiz ? state.quiz.title : 'Aucun questionnaire ouvert';
+  dom.quizName.replaceChildren(
+    el('span', { class: 'topbar__doc__emoji', text: state.quiz?.emoji || '✦', 'aria-hidden': 'true' }),
+    el('span', { class: 'topbar__doc__name', text: label }),
+    el('span', { class: 'topbar__doc__caret', text: '▾', 'aria-hidden': 'true' }),
+  );
+  dom.quizName.title = `${label} — changer de questionnaire`;
   /* Le verrou reste actif même sans questionnaire ouvert. */
   for (const button of dom.topActions.querySelectorAll('[data-act="test"], [data-act="panel"]')) {
     button.disabled = !state.quiz;
   }
 }
 
+/* Le diagnostic sait déjà de quelle section vient chaque problème (`where`).
+   L'afficher section par section évite d'avoir à lire la liste entière pour
+   savoir où aller — et c'est la seule information dont une pastille de
+   navigation a besoin. */
+function issuesBySection(issues) {
+  const map = {};
+  for (const issue of issues) {
+    const slot = map[issue.where] || (map[issue.where] = { error: 0, warn: 0 });
+    slot[issue.level === 'error' ? 'error' : 'warn'] += 1;
+  }
+  return map;
+}
+
+function sectionBadge(counts) {
+  if (!counts) return null;
+  const total = counts.error + counts.warn;
+  if (!total) return null;
+  return el('span', {
+    class: 'rail__item__badge badge--' + (counts.error ? 'error' : 'warn'),
+    title: counts.error ? `${counts.error} à corriger` : `${counts.warn} à vérifier`,
+    text: String(total),
+  });
+}
+
 function renderRail() {
   const drafts = store.allDrafts();
   const draftIds = new Set(drafts.map((q) => q.id));
   const issues = state.quiz ? diagnose(state.quiz) : [];
+  const bySection = issuesBySection(issues);
 
   /* replaceChildren() convertit tout non-noeud en texte : une branche
      éteinte s'afficherait littéralement « null ». On filtre avant. */
@@ -172,6 +215,7 @@ function renderRail() {
       }, [
         el('span', { class: 'rail__item__emoji', text: panel.emoji }),
         el('span', { class: 'rail__item__label', text: panel.label }),
+        sectionBadge(bySection[panel.id]),
       ]))),
     ]),
 
@@ -196,6 +240,29 @@ function renderRail() {
   ];
 
   dom.rail.replaceChildren(...blocks.filter((node) => node instanceof Node));
+  renderTabbar(bySection);
+}
+
+/* La barre d'onglets ne sert qu'en dessous de 62rem, où le rail passe SOUS
+   le panneau : sans elle, changer de section demanderait de faire défiler
+   toute la surface d'édition pour remonter. Elle est rendue partout et
+   masquée en CSS — une barre construite à la volée au franchissement du
+   seuil arriverait toujours trop tard. */
+function renderTabbar(bySection) {
+  if (!dom.tabbar) return;
+  if (!state.quiz) {
+    dom.tabbar.replaceChildren();
+    return;
+  }
+  dom.tabbar.replaceChildren(...PANELS.map((panel) => el('button', {
+    class: 'tab' + (state.panel === panel.id ? ' is-active' : ''),
+    type: 'button', 'data-act': 'panel', 'data-id': panel.id,
+    'aria-current': state.panel === panel.id ? 'page' : null,
+  }, [
+    el('span', { class: 'tab__emoji', text: panel.emoji, 'aria-hidden': 'true' }),
+    el('span', { class: 'tab__label', text: panel.label }),
+    sectionBadge(bySection[panel.id]),
+  ])));
 }
 
 async function renderPanel() {
@@ -219,7 +286,10 @@ async function renderPanel() {
   }
 
   const panel = PANELS.find((p) => p.id === state.panel) || PANELS[0];
-  const ctx = { reach: state.reach, expanded: state.expanded, previewOpen: state.previewOpen };
+  const ctx = {
+    reach: state.reach, expanded: state.expanded,
+    previewOpen: state.previewOpen, folded: state.folded,
+  };
   if (panel.id === 'publier') ctx.linkSize = (await encode(state.quiz)).length + 40;
 
   dom.panel.replaceChildren(panel.render(state.quiz, ctx));
@@ -638,6 +708,19 @@ function onClick(event) {
       if (result) result.recos = result.recos.filter((c) => c.id !== childId);
     });
 
+    case 'card-fold': {
+      state.folded.has(id) ? state.folded.delete(id) : state.folded.add(id);
+      return renderPanel();
+    }
+    case 'fold-all': {
+      const items = id === 'questions' ? quiz.questions : quiz.results;
+      const allFolded = items.every((item) => state.folded.has(item.id));
+      for (const item of items) {
+        allFolded ? state.folded.delete(item.id) : state.folded.add(item.id);
+      }
+      return renderPanel();
+    }
+    case 'quiz-menu': return openQuizSheet();
     case 'preview-toggle': {
       state.previewOpen = !state.previewOpen;
       return renderPanel();
@@ -700,6 +783,63 @@ function select(id) {
   state.reach = null;
   renderTopbar();
   dom.saveStatus.textContent = draft.updatedAt ? `Enregistré · ${formatDate(draft.updatedAt)}` : '';
+}
+
+/* Le sélecteur de questionnaire du bandeau. Sur grand écran le rail rend
+   déjà ce service ; sur mobile il est passé sous le panneau, et sans cette
+   feuille il faudrait faire défiler tout l'écran d'édition pour changer de
+   questionnaire.                                                        */
+/* Fermer une boîte de dialogue.
+
+   L'évènement `close` d'un <dialog> est le chemin naturel pour faire le
+   ménage, mais y accrocher le COMPORTEMENT est fragile : il n'a pas été
+   observé dans tous les environnements où ce code tourne, et une action
+   qui ne se produit jamais ne laisse aucune trace pour le dire. On agit
+   donc explicitement, et l'écouteur `close` ne garde que le ramassage des
+   fermetures qu'on ne provoque pas nous-mêmes — Échap, clic sur le fond. */
+function dismiss(dialog, then) {
+  dialog.close();
+  dialog.remove();
+  if (then) then();
+}
+
+function openQuizSheet() {
+  const drafts = store.allDrafts();
+
+  const ligne = (quiz, act, badge) => el('button', {
+    class: 'sheet__row' + (state.quiz?.id === quiz.id ? ' is-active' : ''),
+    type: 'button', 'data-act': act, 'data-id': quiz.id,
+  }, [
+    el('span', { class: 'sheet__emoji', text: quiz.emoji || '✦' }),
+    el('span', { class: 'sheet__label', text: quiz.title }),
+    badge && el('span', { class: 'pill', text: badge }),
+  ]);
+
+  const dialog = el('dialog', { class: 'modal sheet' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Questionnaires' }),
+      drafts.length
+        ? el('div', { class: 'sheet__list' }, drafts.map((q) => ligne(q, 'select')))
+        : el('p', { class: 'panel__hint', text: 'Aucun brouillon dans ce navigateur.' }),
+      state.published.length > 0 && el('div', {}, [
+        el('span', { class: 'field__label', text: 'Publiés au dépôt' }),
+        el('div', { class: 'sheet__list' }, state.published.map((q) => ligne(q, 'edit-published', 'copier'))),
+      ]),
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', 'data-sheet': 'close', text: 'Fermer' }),
+      el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'new-quiz', text: '+ Nouveau' }),
+    ]),
+  ]);
+
+  dialog.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-act], [data-sheet]')) return;
+    const action = event.target.closest('[data-act]');
+    dismiss(dialog, () => { if (action) onClick(event); });
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
 /* --- Diffusion --------------------------------------------------------------------- */
@@ -843,24 +983,34 @@ async function importFile(file) {
 }
 
 function importPaste() {
+  const area = el('textarea', {
+    class: 'textarea input--mono', rows: '10', placeholder: '{ "title": … }',
+    'aria-label': 'JSON du questionnaire',
+  });
+
   const dialog = el('dialog', { class: 'modal' }, [
-    el('form', { method: 'dialog' }, [
-      el('div', { class: 'modal__body stack' }, [
-        el('h2', { text: 'Coller un questionnaire' }),
-        el('p', { class: 'panel__hint', text: 'Colle le JSON complet d’un questionnaire RecoHero.' }),
-        el('textarea', { class: 'textarea input--mono', rows: '10', placeholder: '{ "title": … }', id: 'pasteArea' }),
-      ]),
-      el('div', { class: 'modal__actions' }, [
-        el('button', { class: 'btn btn--ghost', value: 'cancel', text: 'Annuler' }),
-        el('button', { class: 'btn btn--primary', value: 'ok', text: 'Importer' }),
-      ]),
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Coller un questionnaire' }),
+      el('p', { class: 'panel__hint', text: 'Colle le JSON complet d’un questionnaire RecoHero.' }),
+      area,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', {
+        class: 'btn btn--ghost', type: 'button', text: 'Annuler',
+        onClick: () => dismiss(dialog),
+      }),
+      el('button', {
+        class: 'btn btn--primary', type: 'button', text: 'Importer',
+        onClick: () => {
+          const text = area.value.trim();
+          dismiss(dialog, () => { if (text) adopt(text, 'le presse-papier'); });
+        },
+      }),
     ]),
   ]);
+
+  dialog.addEventListener('close', () => dialog.remove());
   document.body.append(dialog);
-  dialog.addEventListener('close', () => {
-    const text = dialog.querySelector('#pasteArea').value.trim();
-    if (dialog.returnValue === 'ok' && text) adopt(text, 'le presse-papier');
-    dialog.remove();
-  });
   dialog.showModal();
+  area.focus();
 }

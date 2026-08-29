@@ -39,7 +39,7 @@
         <span class="brand__mark">✦</span>
         <span>RecoHero</span>
       </a>
-      <span class="topbar__doc" id="quizName"></span>
+      <button class="topbar__doc" id="quizName" type="button" data-act="quiz-menu"></button>
       <span class="topbar__spacer"></span>
       <span class="status" id="saveStatus"></span>
       <span class="topbar__actions" id="topActions">
@@ -49,6 +49,11 @@
       </span>
     </div>
   </header>
+
+  <!-- La barre d'onglets ne s'affiche qu'en dessous de 62rem, où le rail
+       passe sous le panneau. Elle est dans le flux, pas dans le rail : elle
+       doit rester en tête quand celui-ci descend. -->
+  <nav class="tabbar" id="tabbar" aria-label="Sections du questionnaire"></nav>
 
   <div class="page">
     <div class="admin-shell" id="shell" hidden>

@@ -33,7 +33,66 @@
 }
 @media (max-width: 62rem) {
   .admin-shell { grid-template-columns: 1fr; }
+  /* Le panneau d'abord. Le rail — liste des questionnaires, diagnostic —
+     est de la consultation ; l'édition est ce pour quoi on est venu, et
+     elle ne doit pas se mériter au prix de trois écrans de défilement. */
+  .rail { order: 2; }
+  .panel, .admin-shell > div { order: 1; }
 }
+
+/* --- Barre d'onglets (petits écrans seulement) -------------------------------
+   Elle remplace le bloc « Sections » du rail, devenu hors d'atteinte une
+   fois celui-ci passé sous le panneau. */
+.tabbar { display: none; }
+
+@media (max-width: 62rem) {
+  .tabbar {
+    position: sticky;
+    top: 60px;
+    z-index: var(--z-sticky);
+    display: flex;
+    gap: var(--s-1);
+    padding: var(--s-2) var(--s-4);
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: color-mix(in oklab, var(--bg) 92%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    scroll-snap-type: x proximity;
+  }
+  .tabbar::-webkit-scrollbar { display: none; }
+  .tabbar:empty { display: none; }
+  /* Le rail garde ses autres blocs, mais plus la navigation de section :
+     elle ferait doublon avec les onglets, à un écran de distance. */
+  .rail > div:has(.rail__item[data-act="panel"]) { display: none; }
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: none;
+  min-height: var(--tap);
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: var(--t-sm);
+  white-space: nowrap;
+  scroll-snap-align: start;
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+.tab.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: var(--fw-medium);
+}
+.tab.is-active .rail__item__badge { color: var(--accent-ink); border-color: currentColor; }
+.tab__emoji { font-size: var(--t-base); line-height: 1; }
 /* Les deux colonnes sont des items de grille : leur minimum implicite est
    `auto`, c'est-à-dire la largeur du plus long contenu insécable qu'elles
    portent — un titre de questionnaire, par exemple. Sans ce min-width,
@@ -53,19 +112,41 @@
 
 /* Le nom du questionnaire en cours, dans la barre du haut. */
 .topbar__doc {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
   flex: 1;
   min-width: 0;
+  max-width: 22rem;
+  padding: var(--s-1) var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
   font-family: var(--font-display);
   font-size: var(--t-base);
   color: var(--ink);
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+.topbar__doc:hover { background: var(--surface-2); border-color: var(--line); }
+.topbar__doc__emoji { flex: none; }
+.topbar__doc__name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.topbar__doc__caret { flex: none; color: var(--ink-faint); font-size: var(--t-xs); }
+
 @media (max-width: 48rem) {
   .topbar__actions .btn span { display: none; }
-  .topbar__doc { display: none; }
   .status { display: none; }
+}
+/* Sous 34rem la marque cède la place : le nom du questionnaire en cours
+   est l'information utile, pas celle du produit qu'on a sous les yeux. */
+@media (max-width: 34rem) {
+  .topbar .brand span:not(.brand__mark) { display: none; }
 }
 
 /* Items de grille : leur minimum implicite est `auto`, donc la taille de
@@ -137,6 +218,21 @@
   font-size: 11px;
   color: var(--ink-faint);
 }
+/* Une pastille de section dit combien de problèmes s'y trouvent, et
+   lequel des deux niveaux domine. Le nombre seul suffit ; la couleur
+   dit s'il faut y aller maintenant ou plus tard. */
+.badge--error, .badge--warn {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 4px;
+  border-radius: var(--r-full);
+  border: 1px solid currentColor;
+  font-weight: var(--fw-bold);
+}
+.badge--error { color: var(--danger); }
+.badge--warn { color: var(--warning); }
 
 /* --- Diagnostic --------------------------------------------------------------
    Un questionnaire n'est jamais « invalide » : il est « pas encore prêt »,
@@ -264,6 +360,40 @@
 }
 .editor-card__tools { display: flex; gap: 2px; flex: none; }
 .editor-card__body { padding: var(--s-4); }
+
+/* Une carte repliée n'a pas de corps dans le DOM : dix questions dépliées
+   font plusieurs milliers de nœuds, et c'est aussi ce qui rendait le
+   glisser-déposer impraticable — on tirait un bloc de deux mille pixels. */
+.editor-card__fold {
+  flex: none;
+  width: 22px;
+  min-height: var(--tap-sm);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: var(--t-xs);
+  line-height: 1;
+  border-radius: var(--r-sm);
+  transition: color var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out);
+}
+.editor-card__fold:hover { color: var(--ink); background: var(--bg-sunk); }
+.editor-card.is-folded .editor-card__head { border-bottom: none; }
+.editor-card.is-folded { background: var(--surface-2); }
+
+.editor-card__summary {
+  flex: none;
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14rem;
+}
+@media (max-width: 46rem) {
+  .editor-card__summary { display: none; }
+}
 
 /* --- Réponses et pesées --------------------------------------------------------- */
 .opts { display: grid; gap: var(--s-2); margin-top: var(--s-3); }
@@ -559,6 +689,37 @@
   overflow-x: auto;
   white-space: pre;
 }
+.sheet { max-width: min(28rem, calc(100vw - var(--s-5))); }
+.sheet__list { display: grid; gap: 2px; }
+.sheet__row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: left;
+  color: var(--ink);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.sheet__row:hover { background: var(--surface-2); }
+.sheet__row.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-deep);
+}
+.sheet__emoji { flex: none; font-size: var(--t-md); }
+.sheet__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .danger-zone {
   margin-top: var(--s-7);
   padding: var(--s-4);

@@ -20,6 +20,33 @@ const grip = (title) => el('span', {
   class: 'grip', title: `Glisser pour déplacer — ${title}`, 'aria-hidden': 'true', text: '⠿',
 });
 
+/* Une carte repliée doit rester lisible : sans résumé, une liste de dix
+   questions pliées n'est qu'une liste de titres, et on la déplie une par
+   une pour retrouver la bonne. */
+const fold = (id, folded, what) => el('button', {
+  class: 'editor-card__fold', type: 'button',
+  'data-act': 'card-fold', 'data-id': id,
+  'aria-expanded': String(!folded),
+  title: folded ? `Déplier ${what}` : `Replier ${what}`,
+  text: folded ? '▸' : '▾',
+});
+
+/* Une seule commande, dont le libellé dit ce qu'elle va faire : si tout
+   est déjà plié, elle déplie. Deux boutons pour ça seraient un de trop. */
+const foldAll = (kind, items, ctx) => {
+  if (items.length < 2) return null;
+  const allFolded = items.every((item) => ctx.folded?.has(item.id));
+  return el('button', {
+    class: 'btn btn--ghost btn--sm', type: 'button',
+    'data-act': 'fold-all', 'data-id': kind,
+    text: allFolded ? '▾ Tout déplier' : '▸ Tout replier',
+  });
+};
+
+const summary = (parts) => el('span', {
+  class: 'editor-card__summary', text: parts.filter(Boolean).join(' · '),
+});
+
 const field = (label, control, hint) => el('label', { class: 'field' }, [
   el('span', { class: 'field__label', text: label }),
   control,
@@ -165,6 +192,7 @@ export function axes(quiz) {
 export function questions(quiz, ctx = {}) {
   return el('section', { class: 'panel' }, [
     head('Questions', "Une question par écran. Les points de chaque réponse se règlent à droite, un compteur par axe.", [
+      foldAll('questions', quiz.questions, ctx),
       el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'q-add', text: '+ Question' }),
     ]),
 
@@ -193,11 +221,24 @@ export function questions(quiz, ctx = {}) {
 }
 
 function questionCard(quiz, question, index, ctx = {}) {
-  return el('article', { class: 'editor-card' }, [
+  const folded = ctx.folded?.has(question.id);
+  /* Les axes que cette question alimente réellement : c'est ce qui permet
+     de repérer une question au milieu d'une liste repliée. */
+  const fed = quiz.axes.filter((axis) =>
+    question.options.some((o) => (o.scores[axis.id] || 0) > 0));
+
+  return el('article', { class: 'editor-card' + (folded ? ' is-folded' : '') }, [
     el('header', { class: 'editor-card__head' }, [
       grip(`question ${index + 1}`),
+      fold(question.id, folded, 'la question'),
       el('span', { class: 'editor-card__index', text: String(index + 1) }),
       el('span', { class: 'editor-card__label', text: question.text || 'Question sans texte' }),
+      folded && summary([
+        `${question.options.length} réponse${question.options.length > 1 ? 's' : ''}`,
+        question.type === 'multiple' ? 'choix multiple' : null,
+        question.image ? '🖼' : null,
+        fed.map((a) => a.glyph).join('') || 'aucun point',
+      ]),
       el('span', { class: 'editor-card__tools' }, [
         el('button', {
           class: 'btn btn--icon btn--quiet' + (question.image ? ' is-on' : ''),
@@ -212,7 +253,7 @@ function questionCard(quiz, question, index, ctx = {}) {
         tool('q-del', question.id, 'Supprimer la question', '✕'),
       ]),
     ]),
-    el('div', { class: 'editor-card__body stack' }, [
+    !folded && el('div', { class: 'editor-card__body stack' }, [
       (ctx.expanded?.has(question.id) || question.image) && imageField(
         'Image de la question', `question:${question.id}:image`, question.image, 'cover',
         'Affichée au-dessus de l’énoncé, pleine largeur.',
@@ -288,6 +329,7 @@ function questionCard(quiz, question, index, ctx = {}) {
 export function resultats(quiz, ctx = {}) {
   return el('section', { class: 'panel' }, [
     head('Profils de sortie', "Ce que le répondant obtient à la fin. Les règles sont examinées de haut en bas : la première qui matche gagne, et « par défaut » passe toujours en dernier.", [
+      foldAll('results', quiz.results, ctx),
       el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'res-add', text: '+ Profil' }),
     ]),
     quiz.results.length
@@ -301,6 +343,7 @@ export function resultats(quiz, ctx = {}) {
 }
 
 function resultCard(quiz, result, index, ctx) {
+  const folded = ctx.folded?.has(result.id);
   /* Un profil « par défaut » est un filet : qu'il n'attrape jamais rien
      est le cas nominal, pas un défaut. On ne le signale donc que pour
      les règles qui prétendent, elles, se déclencher. */
@@ -310,11 +353,23 @@ function resultCard(quiz, result, index, ctx) {
   const needsAxis = result.rule.mode === 'dominant' || result.rule.mode === 'range';
   const needsRange = result.rule.mode === 'range' || result.rule.mode === 'total';
 
-  return el('article', { class: 'editor-card' }, [
+  const axis = quiz.axes.find((a) => a.id === result.rule.axis);
+  const condition =
+    result.rule.mode === 'dominant' ? `${axis?.glyph || '?'} dominant` :
+    result.rule.mode === 'range' ? `${axis?.glyph || '?'} ${result.rule.min}–${result.rule.max}` :
+    result.rule.mode === 'total' ? `total ${result.rule.min}–${result.rule.max}` :
+    'par défaut';
+
+  return el('article', { class: 'editor-card' + (folded ? ' is-folded' : '') }, [
     el('header', { class: 'editor-card__head' }, [
       grip(`profil ${index + 1}`),
+      fold(result.id, folded, 'le profil'),
       el('span', { class: 'editor-card__index', text: String(index + 1) }),
       el('span', { class: 'editor-card__label', text: result.title || 'Profil sans titre' }),
+      folded && summary([
+        condition,
+        `${result.recos.length} reco${result.recos.length > 1 ? 's' : ''}`,
+      ]),
       unreachable && el('span', {
         class: 'pill pill--warn', text: 'jamais atteint',
         title: 'Aucune combinaison de réponses ne mène à ce profil.',
@@ -326,7 +381,7 @@ function resultCard(quiz, result, index, ctx) {
         tool('res-del', result.id, 'Supprimer le profil', '✕'),
       ]),
     ]),
-    el('div', { class: 'editor-card__body stack' }, [
+    !folded && el('div', { class: 'editor-card__body stack' }, [
       el('div', { class: 'grid-2' }, [
         field('Emoji', input(`result:${result.id}:emoji`, result.emoji,
           { maxlength: '4', style: 'font-size:1.3rem;text-align:center' })),
