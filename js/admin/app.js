@@ -1027,7 +1027,12 @@ function inviter() {
         info.textContent = 'Création du compte…';
         info.hidden = false;
         cible = await remote.creerCompte(adresse);
-        await remote.envoyerCourrielMotDePasse(adresse);
+        /* Ramener la personne dans le bon espace après qu'elle a choisi
+           son mot de passe : le nom de l'espace ne peut pas entrer dans
+           le texte du courriel, mais il peut entrer dans le lien. */
+        const retour = new URL('admin.html', location.href);
+        retour.searchParams.set('espace', state.espace);
+        await remote.envoyerCourrielMotDePasse(adresse, retour.toString());
       }
       await remote.ajouterMembre(state.espace, cible);
       await refreshEspace();

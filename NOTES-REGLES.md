@@ -106,3 +106,44 @@ doit être refusé, et le dialogue doit nommer qui a modifié et quand.
 
 Si le second passe, la règle n'est pas active — et le bandeau rouge de la
 carte Espace l'aura déjà dit.
+
+---
+
+## Le courriel d'invitation
+
+### Ce qu'on ne peut pas y mettre
+
+Le modèle de Firebase n'accepte **que quatre variables** : `%LINK%`, `%EMAIL%`,
+`%APP_NAME%` et `%DISPLAY_NAME%`. Aucune variable de notre cru — le nom de
+l'espace ne peut donc pas figurer dans le texte.
+
+`%APP_NAME%` vient du **nom public** du projet (Paramètres du projet → Nom
+public). Le changer est le seul moyen de faire apparaître un nom lisible dans
+le courriel.
+
+Pour ramener la personne au bon espace après qu'elle a choisi son mot de
+passe, RecoHero passe une adresse de retour (`continueUrl`) dans le lien. Elle
+n'est acceptée que si le domaine figure dans **Authentication → Settings →
+Domaines autorisés**. Sinon la demande est refaite sans, et l'invitation part
+quand même.
+
+### ⚠️ Le domaine du lien d'action
+
+Ne pas personnaliser « l'URL d'action » vers un domaine qui ne sert pas le
+gestionnaire Firebase. Le lien du courriel pointerait alors vers une page qui
+n'existe pas, et **personne ne pourrait choisir son mot de passe**.
+
+Le piège est qu'un domaine parqué répond `200` sur n'importe quel chemin : la
+console n'a aucun moyen de le refuser, et rien ne paraîtra cassé jusqu'à ce
+qu'une vraie personne clique.
+
+Vérifier avant de basculer :
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' 'https://VOTRE-DOMAINE/__/auth/action?mode=verifyEmail&oobCode=x'
+curl -s 'https://VOTRE-DOMAINE/__/auth/action' | head -c 200
+```
+
+Un `200` ne suffit pas : il faut que le contenu soit le gestionnaire Firebase,
+pas une page de parking. En cas de doute, garder le domaine par défaut
+`<projet>.firebaseapp.com`, qui sert le gestionnaire.

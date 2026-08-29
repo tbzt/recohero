@@ -54,6 +54,8 @@ const MESSAGES = {
   TOO_MANY_ATTEMPTS_TRY_LATER: 'Trop de tentatives. Réessaie dans quelques minutes.',
   INVALID_EMAIL: 'Cette adresse n’est pas une adresse e-mail.',
   EMAIL_EXISTS: 'Cette adresse a déjà un compte.',
+  UNAUTHORIZED_DOMAIN: 'Ce domaine n’est pas autorisé dans le projet Firebase.',
+  INVALID_CONTINUE_URI: 'Adresse de retour invalide.',
   WEAK_PASSWORD: 'Mot de passe trop court : six caractères au minimum.',
   MISSING_PASSWORD: 'Mot de passe manquant.',
   CREDENTIAL_TOO_OLD_LOGIN_AGAIN: 'Session trop ancienne. Reconnecte-toi avant de changer ton mot de passe.',
@@ -175,8 +177,27 @@ export async function creerCompte(email) {
   return data.localId;
 }
 
-export async function envoyerCourrielMotDePasse(email) {
-  await identite(OOB, { requestType: 'PASSWORD_RESET', email });
+/* Le modèle de courriel de Firebase n'accepte aucune variable de notre
+   cru : seulement %LINK%, %EMAIL%, %APP_NAME% et %DISPLAY_NAME%. Le nom
+   de l'espace ne peut donc pas figurer dans le texte.
+
+   Ce qu'on peut faire, c'est ramener la personne au bon endroit une fois
+   son mot de passe choisi : `continueUrl` voyage dans le lien d'action et
+   Firebase propose de la rediriger dessus. Le domaine doit figurer dans
+   les domaines autorisés du projet ; s'il n'y est pas, la demande est
+   refusée en bloc — on la refait alors sans, plutôt que de laisser une
+   commodité empêcher l'invitation elle-même. */
+export async function envoyerCourrielMotDePasse(email, continueUrl = null) {
+  const base = { requestType: 'PASSWORD_RESET', email };
+  if (!continueUrl) return identite(OOB, base);
+
+  try {
+    return await identite(OOB, { ...base, continueUrl });
+  } catch (err) {
+    if (err.code !== 'UNAUTHORIZED_DOMAIN' && err.code !== 'INVALID_CONTINUE_URI') throw err;
+    console.info('[remote] domaine non autorisé pour le retour : courriel envoyé sans redirection.');
+    return identite(OOB, base);
+  }
 }
 
 /* Changer son propre mot de passe. Firebase renvoie de nouveaux jetons :
