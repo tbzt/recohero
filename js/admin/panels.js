@@ -472,9 +472,10 @@ export function publier(quiz, ctx = {}) {
         el('span', { class: 'publish-step__num', text: '2' }),
         el('div', {}, [
           el('h3', { text: 'Par le dépôt — permanent' }),
-          el('p', { text: 'Télécharge le fichier, dépose-le dans quizzes/ du dépôt, puis ajoute son nom à quizzes/index.json. Le questionnaire apparaît alors au kiosque pour tout le monde.' }),
+          el('p', { text: 'Télécharge le fichier et dépose-le dans quizzes/ du dépôt. Le questionnaire apparaît alors au kiosque pour tout le monde, dès que l’index est reconstruit.' }),
           el('code', { class: 'code', text: `quizzes/${file}` }),
-          el('code', { class: 'code', text: `// quizzes/index.json\n[\n  "${file}"\n]` }),
+          el('p', { class: 'panel__hint', text: 'Pour le passer à quelqu’un sans le publier, dépose-le plutôt dans le sous-dossier des brouillons : il apparaîtra dans le backoffice, sous « Brouillons du dépôt », et jamais au kiosque. Les fichiers y restent lisibles de qui connaît l’adresse — c’est une étagère discrète, pas un coffre.' }),
+          el('code', { class: 'code', text: `quizzes/wip/${file}` }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
             el('button', {
               class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'export',

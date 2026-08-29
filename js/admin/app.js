@@ -13,7 +13,7 @@ import {
 import { reachability } from '../core/scoring.js';
 import { bindSortables } from '../core/sortable.js';
 import { questionView } from '../core/views.js';
-import { loadPublished } from '../core/catalog.js';
+import { loadPublished, loadShared } from '../core/catalog.js';
 import * as store from '../core/store.js';
 import { linkFor, encode } from '../core/share.js';
 import {
@@ -37,6 +37,7 @@ const RESHAPE = /^(rule:[^:]+:mode|question:[^:]+:type|axis:[^:]+:(glyph|color)|
 const state = {
   quiz: null,
   published: [],
+  shared: [],           /* les brouillons partagés de quizzes/wip/ */
   panel: 'identite',
   reach: null,
   expanded: new Set(),  /* réponses dont le champ image est déplié */
@@ -81,7 +82,7 @@ async function open() {
   dom.gate.hidden = true;
   dom.shell.hidden = false;
 
-  state.published = await loadPublished();
+  [state.published, state.shared] = await Promise.all([loadPublished(), loadShared()]);
   const drafts = store.allDrafts();
   if (drafts.length) select(drafts[0].id);
 
@@ -202,6 +203,23 @@ function renderRail() {
           class: 'btn btn--icon btn--quiet', type: 'button',
           'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-published', 'data-id': quiz.id,
           title: draftIds.has(quiz.id) ? 'Copie locale déjà ouverte' : 'Modifier (crée une copie locale)',
+          text: draftIds.has(quiz.id) ? '●' : '✎',
+        }),
+      ]))),
+    ]),
+
+    /* L'étagère de brouillons. Déposer dans quizzes/ veut dire publier ;
+       ce dossier-ci est le seul endroit du dépôt où deux personnes peuvent
+       se passer un questionnaire que le kiosque ne montre pas encore. */
+    state.shared.length > 0 && el('div', {}, [
+      el('div', { class: 'rail__head' }, [el('h2', { text: 'Brouillons du dépôt' })]),
+      el('div', { class: 'rail__list' }, state.shared.map((quiz) => el('div', { class: 'rail__item' }, [
+        el('span', { class: 'rail__item__emoji', text: quiz.emoji || '✦' }),
+        el('span', { class: 'rail__item__label', text: quiz.title }),
+        el('button', {
+          class: 'btn btn--icon btn--quiet', type: 'button',
+          'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-shared', 'data-id': quiz.id,
+          title: draftIds.has(quiz.id) ? 'Copie locale déjà ouverte' : 'Reprendre (crée une copie locale)',
           text: draftIds.has(quiz.id) ? '●' : '✎',
         }),
       ]))),
@@ -595,20 +613,28 @@ function onClick(event) {
       state.panel = PANELS.some((p) => p.id === id) ? id : 'identite';
       return (renderRail(), renderPanel());
     }
+    /* Reprendre une copie du dépôt. Trois portes, une seule mécanique :
+       seuls changent l'étagère où l'on va chercher et le sort de
+       l'identifiant. Le garder, c'est pouvoir réécraser le fichier
+       d'origine ; en changer, c'est fabriquer une variante.          */
     case 'edit-published':
-    case 'fork-published': {
-      const source = state.published.find((q) => q.id === id);
+    case 'fork-published':
+    case 'edit-shared': {
+      const shelf = act === 'edit-shared' ? state.shared : state.published;
+      const source = shelf.find((q) => q.id === id);
       if (!source) return undefined;
-      const copyQuiz = structuredClone({ ...source, source: undefined });
+      const copyQuiz = structuredClone({ ...source, source: undefined, file: undefined });
       if (act === 'fork-published') {
         copyQuiz.id = uid('quiz');
         copyQuiz.title = `${source.title} (copie)`;
       }
       store.saveDraft(copyQuiz);
       select(copyQuiz.id);
-      toast(act === 'edit-published'
-        ? 'Copie locale ouverte. Le kiosque montre encore la version du dépôt.'
-        : 'Copie créée.');
+      toast({
+        'edit-published': 'Copie locale ouverte. Le kiosque montre encore la version du dépôt.',
+        'fork-published': 'Copie créée.',
+        'edit-shared': 'Brouillon repris. Réexporte-le vers quizzes/wip/ quand tu auras fini.',
+      }[act]);
       return structural();
     }
     case 'delete-quiz': {
@@ -932,7 +958,7 @@ async function showEmbed() {
       toast(await copy(code) ? 'Code d’intégration copié.' : 'Copie impossible.', '');
       return;
     }
-    dialog.close();
+    dismiss(dialog);
   });
   dialog.addEventListener('close', () => dialog.remove());
   document.body.append(dialog);

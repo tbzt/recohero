@@ -40,14 +40,36 @@ jobs:
           echo "Index reconstruit :"
           cat quizzes/index.json
 
-      - name: Committer si le fichier a changé
+      # L'étagère des brouillons partagés. Le `-maxdepth 1` de l'étape
+      # précédente ne descend pas ici : rien de ce dossier n'entre jamais
+      # dans quizzes/index.json, donc rien n'atteint le kiosque. C'est
+      # exactement ce qu'on lui demande — partager n'est pas publier.
+      - name: Reconstruire quizzes/wip/index.json
         run: |
-          if git diff --quiet -- quizzes/index.json; then
+          if [ ! -d quizzes/wip ]; then
+            echo "Pas d'étagère de brouillons, rien à faire."
+            exit 0
+          fi
+          find quizzes/wip -maxdepth 1 -name '*.json' ! -name 'index.json' -printf '%f\n' \
+            | LC_ALL=C sort \
+            | jq -R . | jq -s . > quizzes/wip/index.json.new
+          mv quizzes/wip/index.json.new quizzes/wip/index.json
+          echo "Index des brouillons reconstruit :"
+          cat quizzes/wip/index.json
+
+      - name: Committer si un index a changé
+        run: |
+          # `git add` refuse un chemin qui n'existe pas : l'étagère est
+          # facultative, on ne l'ajoute que si elle est là.
+          INDEXES='quizzes/index.json'
+          [ -f quizzes/wip/index.json ] && INDEXES="$INDEXES quizzes/wip/index.json"
+
+          if git diff --quiet -- $INDEXES; then
             echo "Index déjà à jour, rien à committer."
             exit 0
           fi
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add quizzes/index.json
+          git add -- $INDEXES
           git commit -m 'Réindexer les questionnaires [skip ci]'
           git push
