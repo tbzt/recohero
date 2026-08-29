@@ -75,7 +75,7 @@ Chaque champ accepte trois formes :
 | Forme | Exemple | Quand |
 |---|---|---|
 | Adresse web | `https://…/affiche.jpg` | l'image est déjà en ligne quelque part |
-| Chemin du dépôt | `img/affiche.jpg` | vous déposez vos images à côté du questionnaire |
+| Chemin relatif | `img/affiche.jpg` | vous maîtrisez le site qui sert la page |
 | Fichier intégré | *bouton « ↑ Fichier »* | rien à héberger, l'image voyage avec le questionnaire |
 
 Un fichier choisi sur le disque est **réduit puis ré-encodé** (1000 px pour une
@@ -84,10 +84,16 @@ produire) et intégré au questionnaire. Le backoffice affiche son poids et le
 signale en orange au-delà de 120 Ko.
 
 Le compromis à connaître : une image intégrée survit à tout — au partage par
-lien, à une coupure réseau, à la disparition du site source — mais elle pèse
-dans le lien de partage. Une dizaine d'images intégrées le fait passer de
-3 500 à plusieurs dizaines de milliers de caractères. Pour un questionnaire
-richement illustré, préférez le dossier `quizzes/img/` du dépôt.
+lien, à une coupure réseau, à la disparition du site source — mais elle pèse.
+Une dizaine d'images intégrées fait passer un lien de partage de 3 500 à
+plusieurs dizaines de milliers de caractères.
+
+**Le chemin relatif se résout contre l'adresse de la page, pas contre le
+questionnaire.** Si vous publiez dans un espace partagé sur le site de
+quelqu'un d'autre, `img/affiche.jpg` ira chercher le fichier chez lui, où il
+n'est pas. Dans ce cas, il n'y a que deux formes utilisables : l'adresse web
+complète, ou le fichier intégré. Le chemin relatif est réservé à qui déploie
+son propre site.
 
 Toute image est passée au filtre : seules les trois formes ci-dessus sont
 acceptées. Une adresse `javascript:`, un `data:text/html` ou une URL en `//`
@@ -110,7 +116,7 @@ carte se télécharge en PNG.
 Deux limites à connaître. Une image de profil hébergée sur un **autre domaine**
 ne peut pas être dessinée dans la carte (le navigateur interdirait alors
 l'export) : la carte retombe sur l'emoji, sans rien casser. Les images
-intégrées et celles du dépôt, elles, s'affichent. Et si un profil a un titre
+intégrées et celles du même site, elles, s'affichent. Et si un profil a un titre
 très long, la carte **retire des recommandations** plutôt que de laisser le
 texte mordre sur la signature.
 
@@ -118,7 +124,7 @@ texte mordre sur la signature.
 
 ## Diffuser un questionnaire
 
-Quatre voies, et elles ne servent pas à la même chose.
+Trois voies, et elles ne servent pas à la même chose.
 
 ### Par lien — immédiat, rien à déployer
 
@@ -131,64 +137,16 @@ douze recommandations, **sans images intégrées**. C'est long pour une URL, mai
 tous les navigateurs et toutes les messageries l'acceptent. Le panneau
 « Diffuser » affiche la longueur exacte en direct.
 
-### Par le dépôt — permanent, visible au kiosque
+### Par un espace partagé — permanent, à plusieurs
 
-1. Backoffice → **Diffuser** → télécharger le `.json`
-2. Déposer le fichier dans `quizzes/`
-3. Commit, push. GitHub Pages fait le reste.
+Le lien va d'une personne à une personne, et il fige le questionnaire au
+moment où on le copie. Pour qu'une équipe — une médiathèque, par exemple —
+publie durablement et à plusieurs, RecoHero sait parler à une **base
+partagée** : une Realtime Database Firebase, en REST pur, sans SDK ni étape de
+build.
 
-`quizzes/index.json` n'est pas à écrire : l'action
-[Indexer les questionnaires](.github/workflows/index-quizzes.yml) le
-reconstruit à partir du dossier à chaque poussée. C'était l'étape la plus
-fragile de la publication — une faute de frappe ne produisait aucune erreur,
-le questionnaire n'apparaissait simplement pas.
-
-Pour **modifier** un questionnaire déjà publié : le backoffice le liste sous
-« Publiés au dépôt », le bouton ✎ en fait une copie locale éditable. Une fois
-satisfait, réexportez et écrasez le fichier. Tant que vous n'avez pas poussé,
-le kiosque continue de montrer la version du dépôt — c'est voulu : ce que
-voient les autres ne change que quand vous le décidez.
-
-#### Partager sans publier
-
-Déposer dans `quizzes/` **veut dire publier**. Pour passer un questionnaire
-inachevé à quelqu'un, il y a une seconde étagère : `quizzes/wip/`.
-
-```
-quizzes/
-├── index.json                  ← reconstruit, sert le kiosque
-├── quel-roman-pour-cet-ete.json
-└── wip/
-    ├── index.json              ← reconstruit aussi, ne sert que le backoffice
-    └── mon-brouillon.json
-```
-
-Le backoffice les liste sous « **Brouillons du dépôt** », avec un ✎ qui en
-fait une copie locale **en conservant l'identifiant** — c'est ce qui permet de
-réécraser le fichier d'origine plutôt que d'accumuler des variantes. Le
-kiosque ne les voit jamais, et `quiz.html?q=…` ne les ouvre pas non plus.
-
-Le mécanisme est le sous-dossier lui-même : l'action d'indexation ne descend
-pas dedans (`find -maxdepth 1`), donc rien de ce qui s'y trouve n'entre dans
-`quizzes/index.json`. Elle en construit un second, séparé.
-
-> **Discret n'est pas privé.** Ces fichiers restent servis par l'hébergeur :
-> qui connaît l'adresse les lit. L'étagère décide de ce qui est *montré*, pas
-> de ce qui est accessible — et sans serveur, il ne peut pas en être
-> autrement. Une étagère que le navigateur sait lire est une étagère
-> publique. Pour un brouillon qui doit vraiment le rester, passez-vous le
-> `.json` par un canal privé et importez-le : il ne touche jamais le site.
-
-Ça ne permet pas d'éditer **à deux en même temps** : deux personnes sur le
-même fichier, c'est un conflit git, et il n'y a rien pour l'arbitrer. Chacun
-son tour, en revanche, fonctionne.
-
-### Par un espace partagé — à plusieurs, sans toucher au dépôt
-
-Les trois autres voies supposent que l'auteur a accès au dépôt. Pour qu'une
-équipe — une médiathèque, par exemple — publie sans git, RecoHero sait parler
-à une **base partagée** : une Realtime Database Firebase, en REST pur, sans
-SDK ni étape de build.
+Rien de tout cela ne demande git. C'est le point : les gens à qui ce projet
+sert n'ont pas de dépôt, et n'en auront pas.
 
 Un **espace** est une équipe et son catalogue. Il se nomme dans l'adresse :
 

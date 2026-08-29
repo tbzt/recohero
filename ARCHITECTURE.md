@@ -85,10 +85,10 @@ permet à un questionnaire de changer d'identité en une ligne.
 ### Lire un questionnaire
 
 ```
-quizzes/index.json ─┐
-quizzes/*.json      ├─► catalog.loadAll() ─► schema.normalize() ─► en mémoire
-store.allDrafts()   │
-#k=… (URL)         ─┘
+espaces/…/quizzes   ─┐   (base partagée, si ?espace=…)
+quizzes/*.json       ├─► catalog.loadAll() ─► schema.normalize() ─► en mémoire
+store.allDrafts()    │
+#k=… (URL)          ─┘
 ```
 
 `normalize()` est le poste-frontière. **Tout** questionnaire venant de
@@ -274,33 +274,21 @@ parcours et l'historique cessent d'exister sans un mot.
 
 ---
 
-## Les deux étagères du dépôt
+## Ce que le dépôt sert encore
 
-`quizzes/` sert le kiosque ; `quizzes/wip/` sert le backoffice, et lui seul.
-La séparation ne tient pas à un drapeau dans les fichiers mais à la **forme du
-dossier** : l'action d'indexation balaie `quizzes` avec `find -maxdepth 1`,
-donc elle ne descend pas dans le sous-dossier et rien de ce qui s'y trouve
-n'entre dans `quizzes/index.json`. Elle en construit un second, à côté.
+Un seul fichier de questionnaire, `quizzes/quel-roman-pour-cet-ete.json`, et
+son index. C'est **l'exemple**, et rien d'autre : il donne à voir ce que le
+format permet, et il fait que le kiosque n'est pas vide au premier abord.
 
-C'est délibérément le mécanisme le plus bête possible. Une convention de nom
-de fichier, un champ `draft: true`, une liste d'exclusion : chacun aurait
-demandé qu'on s'en souvienne quelque part. La profondeur du dossier, elle, se
-vérifie d'un coup d'œil et ne peut pas dériver.
+Le dépôt a longtemps été un canal de publication — on déposait un `.json`, une
+action d'indexation reconstruisait la liste, le questionnaire paraissait au
+kiosque. Les espaces partagés ont rendu ce chemin caduc : il demandait un
+accès git que les gens à qui ce projet s'adresse n'ont pas. Publier ne passe
+plus par le dépôt, et rien ne régénère plus `quizzes/index.json` — il est
+écrit à la main, une fois, parce qu'il ne contient qu'une ligne.
 
-`catalog.js` lit les deux par la même fonction, et n'expose la seconde qu'à
-travers `loadShared()`. `loadAll()` — le catalogue du kiosque — ne l'appelle
-pas, et `resolveQuiz()` non plus : un identifiant deviné n'ouvre pas un
-brouillon. Ce dernier point est une mesure de propreté, **pas une frontière de
-sécurité**. Les fichiers restent servis par l'hébergeur ; sans serveur, une
-étagère que le navigateur sait lire est une étagère publique. Ce qui se décide
-ici, c'est ce qui est *montré*.
-
-Ce que ça ne donne pas : l'édition simultanée. Deux personnes sur le même
-fichier restent un conflit git, que rien n'arbitre. Le besoin réel — se passer
-un questionnaire inachevé sans le publier — est couvert ; le besoin théorique
-ne l'est pas, et une base externe serait le seul chemin (voir plus bas).
-
----
+`loadPublished()` reste dans `catalog.js` pour lire cet exemple. Ce n'est plus
+une voie de publication ; c'est la vitrine.
 
 ## L'espace partagé
 
@@ -379,7 +367,27 @@ entrer des données de visiteurs dans un projet qui n'en collecte aucune.
 paragraphes (une ligne vide en sépare deux) et rien d'autre. Une dépendance
 de plus pour un gain que personne n'a demandé.
 
-**Un système de comptes.** Demandé explicitement comme hors périmètre.
+**Publier par le dépôt.** A existé, et a été retiré. On déposait un `.json`
+dans `quizzes/`, une action GitHub reconstruisait l'index, le questionnaire
+paraissait au kiosque. Le chemin fonctionnait mais s'adressait à des gens qui
+ont un accès git — or ceux à qui ce projet sert, une médiathèque par exemple,
+n'en ont pas et n'en auront pas. Les espaces couvrent le besoin sans cette
+condition. Laisser les deux aurait fait deux canaux concurrents pour une même
+chose, et c'est pire qu'un seul.
+
+**Une étagère de brouillons partagés dans le dépôt.** `quizzes/wip/` a vécu
+une demi-journée. L'idée était de se passer un questionnaire inachevé sans le
+publier, en s'appuyant sur le fait que l'action d'indexation ne descendait pas
+dans les sous-dossiers. Elle tombe avec le reste du chemin git, et pour la
+même raison. L'argument qui la sauvait — un filet de sauvegarde versionné,
+puisque la base gratuite n'a aucune restauration — était faible : une
+sauvegarde qui demande qu'on y pense n'en est pas une, et celle-ci n'a jamais
+servi une seule fois. C'est l'export JSON qui porte désormais ce rôle, et il
+ne le portera vraiment que si l'import sait **remplacer** au lieu de dupliquer.
+
+**Un système de comptes** *pour répondre*. Hors périmètre, et ça n'a pas
+bougé : répondre à un questionnaire ne demande jamais rien. Seul l'auteur qui
+publie dans un espace partagé s'authentifie.
 
 **Une étape de build.** Le jour où il en faut une, la promesse « ça tourne
 depuis une clé USB » est morte.

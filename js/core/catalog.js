@@ -1,24 +1,17 @@
 /* ==========================================================================
    catalog.js — d'où viennent les questionnaires.
    Quatre sources, dans cet ordre de priorité :
-     1. le lien    — un questionnaire porté par le fragment d'URL (#k=…)
-     2. le dépôt   — les fichiers de quizzes/, listés par quizzes/index.json
-     3. le local   — les brouillons du backoffice, dans ce navigateur
-     4. l'étagère  — les brouillons partagés de quizzes/wip/
-     5. l'espace   — une base partagée, quand une adresse porte ?espace=…
+     1. le lien   — un questionnaire porté par le fragment d'URL (#k=…)
+     2. l'espace  — une base partagée, quand l'adresse porte ?espace=…
+     3. le local  — les brouillons du backoffice, dans ce navigateur
+     4. l'exemple — quizzes/, servi par le dépôt
 
-   La quatrième est réservée au backoffice, et c'est tout l'intérêt :
-   déposer dans quizzes/ veut dire publier, et il n'existait aucun endroit
-   du dépôt où deux personnes puissent se passer un questionnaire inachevé.
-   Le sous-dossier en est un parce que le workflow d'indexation ne descend
-   pas dedans (`find -maxdepth 1`) : rien de ce qui s'y trouve n'atteint
-   quizzes/index.json, donc jamais le kiosque.
-
-   Ce n'est pas une cachette pour autant. Les fichiers restent servis par
-   l'hébergeur, donc lisibles de qui va les chercher : l'étagère décide de
-   ce qui est *montré*, pas de ce qui est accessible. Sans serveur, il ne
-   peut pas en être autrement — une étagère que le navigateur sait lire est
-   une étagère publique.
+   La quatrième n'est plus une voie de publication. Le dépôt a longtemps
+   servi de canal — on y déposait un .json, une action reconstruisait
+   l'index — mais ce chemin demandait un accès git que les gens à qui ce
+   projet s'adresse n'ont pas. Les espaces l'ont remplacé. Il ne reste au
+   dépôt qu'un questionnaire d'exemple, pour que le kiosque ne soit pas
+   vide au premier abord.
    ========================================================================== */
 
 import { normalize } from './schema.js';
@@ -26,21 +19,18 @@ import * as store from './store.js';
 import * as remote from './remote.js';
 import { decode, payloadFromHash } from './share.js';
 
-/* Chaque étagère est un dossier et son index. Les deux se lisent pareil :
-   une seule fonction, deux appels.                                      */
-const SHELVES = {
-  published: 'quizzes/',
-  shared:    'quizzes/wip/',
-};
+const FOLDER = 'quizzes/';
 
-const memo = { published: null, shared: null }; // l'index ne bouge pas pendant une visite
+let published = null; // l'index ne bouge pas pendant une visite
 
-async function loadShelf(source) {
-  if (memo[source]) return memo[source];
-  const folder = SHELVES[source];
+/* Le questionnaire d'exemple, servi en fichiers statiques. Rien ne
+   régénère plus quizzes/index.json : il est écrit à la main, une fois,
+   parce qu'il ne contient qu'une ligne.                                */
+export async function loadPublished() {
+  if (published) return published;
 
   try {
-    const response = await fetch(`${folder}index.json`, { cache: 'no-cache' });
+    const response = await fetch(`${FOLDER}index.json`, { cache: 'no-cache' });
     if (!response.ok) throw new Error(`index.json : HTTP ${response.status}`);
     const list = await response.json();
     if (!Array.isArray(list)) throw new Error('index.json doit contenir un tableau.');
@@ -49,33 +39,26 @@ async function loadShelf(source) {
       const file = typeof entry === 'string' ? entry : entry.file;
       if (!file) return null;
       try {
-        const res = await fetch(`${folder}${file}`, { cache: 'no-cache' });
+        const res = await fetch(`${FOLDER}${file}`, { cache: 'no-cache' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const quiz = normalize(await res.json());
-        return { ...quiz, source, file };
+        return { ...quiz, source: 'published', file };
       } catch (err) {
-        console.warn(`[catalog] questionnaire ignoré (${folder}${file}) :`, err.message);
+        console.warn(`[catalog] questionnaire ignoré (${FOLDER}${file}) :`, err.message);
         return null;
       }
     }));
 
-    memo[source] = loaded.filter(Boolean);
+    published = loaded.filter(Boolean);
   } catch (err) {
     /* Pas d'index, ou ouvert en file:// — ce n'est pas une erreur fatale :
-       les brouillons locaux et les liens continuent de fonctionner. Une
-       étagère de brouillons absente est même le cas ordinaire.        */
-    console.info(`[catalog] étagère « ${source} » vide :`, err.message);
-    memo[source] = [];
+       les liens, les brouillons locaux et les espaces continuent de
+       fonctionner.                                                     */
+    console.info('[catalog] aucun questionnaire d’exemple :', err.message);
+    published = [];
   }
-  return memo[source];
+  return published;
 }
-
-export function loadPublished() { return loadShelf('published'); }
-
-/* Les brouillons partagés du dépôt. Le kiosque ne les voit jamais — ni par
-   loadAll(), ni par resolveQuiz() : un identifiant deviné ne doit pas
-   suffire à ouvrir un questionnaire que personne n'a décidé de publier. */
-export function loadShared() { return loadShelf('shared'); }
 
 /* --- L'espace partagé ----------------------------------------------------
    La cinquième source, et la seule qui parle à un serveur. Elle n'existe
