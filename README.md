@@ -339,7 +339,21 @@ en rouge s'il faut corriger, en orange s'il faut vérifier.
 
 ## Le backoffice
 
-Il s'ouvre sur une phrase d'accès. **Elle n'est pas publiée ici** — seule son
+Il a deux portes, et l'adresse décide laquelle s'ouvre.
+
+| Adresse | Porte | Ce qu'elle garde |
+|---|---|---|
+| `admin.html` | une **phrase d'accès** | des brouillons qui ne quittent pas ce navigateur |
+| `admin.html?espace=<nom>` | un **compte** — adresse et mot de passe | le droit de publier pour toute une équipe |
+
+Demander une phrase partagée *puis* un compte serait deux barrières dont la
+première est décorative. Pire : ce serait apprendre à une équipe qu'un secret
+d'équipe protège quelque chose. Sur un espace, le compte **est** la porte. Se
+déconnecter y ramène.
+
+### La phrase d'accès, hors espace
+
+**Elle n'est pas publiée ici** — seule son
 empreinte SHA-256 figure dans le code, dans la constante `PASS_SHA256` en tête
 de [`js/admin/app.js`](js/admin/app.js). Gardez la vôtre dans un gestionnaire
 de mots de passe : ce dépôt ne la contient nulle part.
@@ -354,6 +368,9 @@ lui-même depuis la console, sans jamais connaître la phrase. Une empreinte
 imprenable n'y changerait rien. Ce que le backoffice ouvre, de toute façon,
 c'est le stockage de celui qui l'ouvre : il n'atteint ni vos questionnaires,
 ni la publication, ni les réponses de qui que ce soit.
+
+Rien de tout cela ne s'applique à un espace : là, ce sont les règles de la
+base qui décident, et elles ne croient personne sur parole.
 
 Pour poser la vôtre, remplacez la constante par son empreinte :
 
