@@ -191,6 +191,35 @@ redéclare ces media queries.
 
 ---
 
+## Les profils, et le double consentement
+
+Prénom, photo et fonction d'agents d'une structure publique, sur un site
+public : ce sont des données personnelles. Deux règles en découlent, et elles
+sont **structurelles, pas déclaratives**.
+
+**La séparation est la protection.** Deux branches, pas un drapeau.
+`espaces/<e>/profils` est lisible des seuls membres : l'équipe se reconnaît
+entre elle, et un message de conflit peut nommer quelqu'un sans l'exposer.
+`espaces/<e>/vitrines` est lisible de tous — et ne contient que ce que la
+personne a demandé d'y mettre.
+
+Choisir de ne pas se montrer n'écrit donc pas `public: false` quelque part :
+**la donnée n'est pas publiée du tout**. Décocher efface la vitrine. Il n'y a
+rien à filtrer côté client, parce qu'il n'y a rien à lire. Un drapeau que le
+JavaScript doit honorer n'est pas une protection — c'est une politesse.
+
+**Deux consentements, et il en faut deux.** La personne publie sa vitrine
+(son choix, une fois) ; le questionnaire la crédite (un choix par
+questionnaire, `auteurs` dans le modèle). L'un sans l'autre n'affiche rien.
+L'auteur d'un questionnaire ne peut donc pas exposer un collègue, et un
+collègue qui s'est rendu public n'apparaît pas sur tout ce que l'équipe
+produit.
+
+L'éditeur le dit à l'endroit où ça compte — sur la ligne de la personne, au
+moment de cocher, pas dans une note en bas de page.
+
+---
+
 ## Le garde-fou contre l'écrasement
 
 Deux personnes ouvrent le même questionnaire d'un espace. La seconde à publier

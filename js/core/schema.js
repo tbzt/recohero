@@ -247,6 +247,13 @@ export function normalize(raw) {
        0 veut dire « jamais publié ». Voir ARCHITECTURE.md. */
     rev: Number.isFinite(+raw.rev) && +raw.rev > 0 ? Math.floor(+raw.rev) : 0,
     updatedBy: String(raw.updatedBy || ''),
+
+    /* Qui est crédité sur CE questionnaire. Le second des deux
+       consentements : la personne doit avoir publié sa vitrine, et le
+       questionnaire doit la nommer. L'un sans l'autre n'affiche rien. */
+    auteurs: (Array.isArray(raw.auteurs) ? raw.auteurs : [])
+      .filter((u) => typeof u === 'string' && u)
+      .slice(0, 12),
   };
 }
 

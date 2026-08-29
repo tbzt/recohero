@@ -6,6 +6,7 @@
    ========================================================================== */
 
 import { resolveQuiz } from './core/catalog.js';
+import { vitrines as chargerVitrines } from './core/remote.js';
 import { tally, resolve, ceilings } from './core/scoring.js';
 import { RECO_TYPES, slugify } from './core/schema.js';
 import { questionView } from './core/views.js';
@@ -33,6 +34,10 @@ const dom = {
 };
 
 const state = {
+  /* Les vitrines : ce que chaque auteur a choisi de rendre public. Vide
+     par défaut — un crédit sans vitrine n'affiche rien, et c'est le
+     comportement voulu, pas une panne. */
+  vitrines: {},
   quiz: null,
   step: -1,        // -1 = couverture, n = résultat
   answers: {},
@@ -51,6 +56,7 @@ async function boot() {
     if (!quiz.questions.length) return fail('Ce questionnaire n’a pas encore de question.', quiz.title);
 
     state.quiz = quiz;
+    if (espace && quiz.auteurs?.length) state.vitrines = await chargerVitrines(espace);
     document.title = `${quiz.title} — RecoHero`;
     applyAccent(quiz.accent);
     dom.title.textContent = quiz.title;
@@ -175,6 +181,7 @@ function renderCover() {
         class: 'btn btn--ghost', type: 'button', 'data-act': 'restart', text: 'Repartir de zéro',
       }),
     ]),
+    signature(quiz),
     el('p', {
       class: 'cover__meta',
       text: `${quiz.questions.length} question${quiz.questions.length > 1 ? 's' : ''} · `
@@ -182,6 +189,28 @@ function renderCover() {
           + `${quiz.results.length > 1 ? 's' : ''}`,
     }),
     isTest && el('p', { class: 'cover__meta' }, [el('span', { class: 'pill pill--warn', text: 'Mode test — rien n’est enregistré' })]),
+  ]);
+}
+
+/* Les auteurs crédités, et seulement ceux qui ont choisi d'être nommés.
+   Un crédit sans vitrine ne produit rien : la donnée publique n'existe
+   pas, il n'y a donc rien à filtrer côté client — c'est la base qui n'a
+   jamais eu ce nom.                                                     */
+function signature(quiz) {
+  const nommes = (quiz.auteurs || [])
+    .map((uid) => state.vitrines[uid])
+    .filter(Boolean);
+  if (!nommes.length) return null;
+
+  return el('div', { class: 'signature' }, [
+    el('span', { class: 'signature__intro', text: nommes.length > 1 ? 'Un questionnaire de' : 'Un questionnaire de' }),
+    ...nommes.map((v) => el('span', { class: 'signature__auteur' }, [
+      v.image && el('img', { class: 'signature__photo', src: v.image, alt: '', loading: 'lazy' }),
+      el('span', {}, [
+        el('span', { class: 'signature__nom', text: v.nom }),
+        v.poste && el('span', { class: 'signature__poste', text: v.poste }),
+      ]),
+    ])),
   ]);
 }
 

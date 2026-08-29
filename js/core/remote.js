@@ -215,6 +215,61 @@ export async function changerMotDePasse(motDePasse) {
   });
 }
 
+/* --- Profils ----------------------------------------------------------------
+   Deux branches, et la séparation EST la protection.
+
+   `profils` est lisible des seuls membres : l'équipe se reconnaît entre
+   elle, et un refus de publication peut nommer quelqu'un sans exposer son
+   identité au monde.
+
+   `vitrines` est lisible de tous. Choisir de ne pas se montrer ne pose pas
+   un drapeau que le client devrait honorer : la donnée n'y est simplement
+   pas écrite. Un prénom, une photo et une fonction d'agent d'une structure
+   publique, sur un site public, ne se confient pas à la bonne volonté
+   d'un bout de JavaScript.                                              */
+
+export async function monProfil(espace, uid) {
+  const data = await call(branche(espace, 'profils', `/${encodeURIComponent(uid)}`)).catch(() => null);
+  return data || null;
+}
+
+export async function profilsEquipe(espace) {
+  return (await call(branche(espace, 'profils')).catch(() => null)) || {};
+}
+
+export async function enregistrerProfil(espace, uid, profil) {
+  return call(branche(espace, 'profils', `/${encodeURIComponent(uid)}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(profil),
+  });
+}
+
+/* Publier sa vitrine, ou la retirer. Retirer efface la branche : après
+   coup, il ne reste rien à lire, pas même un drapeau à faux. */
+export async function publierVitrine(espace, uid, vitrine) {
+  const url = branche(espace, 'vitrines', `/${encodeURIComponent(uid)}`);
+  if (!vitrine) return call(url, { method: 'DELETE' });
+  return call(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(vitrine),
+  });
+}
+
+/* Les vitrines se lisent sans compte : c'est le parcours public qui les
+   affiche. On passe donc par un fetch nu, sans jeton. */
+export async function vitrines(espace) {
+  if (!espace) return {};
+  try {
+    const response = await fetch(branche(espace, 'vitrines'));
+    if (!response.ok) return {};
+    return (await response.json()) || {};
+  } catch {
+    return {};
+  }
+}
+
 /* --- Membres ---------------------------------------------------------------
    La liste qui donne le droit de publier. Lisible des seuls membres, et
    modifiable par eux — sauf pour un gérant, que les règles protègent :

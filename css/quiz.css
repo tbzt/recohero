@@ -140,6 +140,30 @@
   color: var(--ink-muted);
 }
 .cover__axis .glyph { font-size: var(--t-md); }
+/* La signature des auteurs. Discrète : elle nomme, elle ne se met pas en
+   avant devant le questionnaire lui-même. */
+.signature {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2) var(--s-4);
+  margin-bottom: var(--s-5);
+  font-size: var(--t-sm);
+  color: var(--ink-muted);
+}
+.signature__intro { font-style: italic; }
+.signature__auteur { display: inline-flex; align-items: center; gap: var(--s-2); }
+.signature__photo {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.signature__nom { display: block; color: var(--ink); font-weight: var(--fw-medium); }
+.signature__poste { display: block; font-size: var(--t-xs); color: var(--ink-faint); }
+
 .cover__meta {
   font-size: var(--t-sm);
   color: var(--ink-faint);

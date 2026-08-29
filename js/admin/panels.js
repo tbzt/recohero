@@ -121,7 +121,7 @@ const head = (title, hint, actions = []) => el('div', {}, [
 
 /* --- 1. Identité ----------------------------------------------------------- */
 
-export function identite(quiz) {
+export function identite(quiz, ctx = {}) {
   return el('section', { class: 'panel' }, [
     head('Identité', "Ce que le répondant voit avant de commencer. Le titre et l’emoji servent aussi de vignette au kiosque."),
     el('div', { class: 'card stack' }, [
@@ -133,6 +133,7 @@ export function identite(quiz) {
         'Affichée en italique sous le titre.'),
       field('Introduction', textarea('q:intro', quiz.intro, { rows: '5', placeholder: 'Deux ou trois phrases pour poser le ton.' }),
         'Une ligne vide sépare deux paragraphes. Rien d’autre n’est interprété.'),
+      crediterBloc(quiz, ctx),
       imageField('Image de couverture', 'q:image', quiz.image, 'cover',
         'Affichée sur l’écran de départ et sur la vignette du kiosque. Facultative.'),
       field('Couleur', el('div', { class: 'swatches' }, [
@@ -471,8 +472,16 @@ function equipeBloc(ctx) {
 
     el('div', { class: 'sheet__list' }, ctx.membres.map((m) => el('div', { class: 'sheet__row' }, [
       el('span', { class: 'sheet__emoji', text: m.gerant ? '🔑' : '👤' }),
-      el('span', { class: 'sheet__label input--mono', style: 'font-size:var(--t-xs)',
-        text: m.uid + (m.uid === moi ? '  — toi' : '') }),
+      el('span', { class: 'sheet__label' }, (() => {
+        const p = ctx.profils?.[m.uid];
+        const nom = p && [p.prenom, p.nom].filter(Boolean).join(' ');
+        return [
+          el('span', { text: (nom || m.uid) + (m.uid === moi ? ' — toi' : '') , style: nom ? '' : 'font-family:var(--font-mono);font-size:var(--t-xs)' }),
+          p?.poste && el('span', { class: 'field__hint', style: { display: 'block' }, text: p.poste }),
+          !p && el('span', { class: 'field__hint', style: { display: 'block' }, text: 'sans profil' }),
+          ctx.vitrines?.[m.uid] && el('span', { class: 'pill pill--accent', style: { marginLeft: 'var(--s-2)' }, title: 'Cette personne a choisi d’être nommée publiquement.', text: 'public' }),
+        ];
+      })()),
       m.gerant && el('span', { class: 'pill', title: 'Un gérant ne peut être retiré que depuis la console.', text: 'gérant' }),
       !m.gerant && m.uid !== moi && el('button', {
         class: 'btn btn--icon btn--quiet', type: 'button',
@@ -485,9 +494,40 @@ function equipeBloc(ctx) {
       'Inviter crée le compte et envoie un courriel : la personne choisit son mot de passe elle-même, RecoHero ne le voit jamais. Retirer un membre lui ôte le droit de publier, sans supprimer son compte.' }),
 
     el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
+      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'mon-profil', text: '👤 Mon profil' }),
       el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'copier-uid', text: '⧉ Copier mon identifiant' }),
       el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'mon-mot-de-passe', text: '🔒 Changer mon mot de passe' }),
     ]),
+  ]);
+}
+
+/* Créditer. Le second des deux consentements : cocher ici ne suffit pas,
+   il faut aussi que la personne ait publié sa vitrine. On le dit ligne par
+   ligne plutôt qu'une fois en bas — c'est au moment de cocher qu'on a
+   besoin de le savoir. */
+function crediterBloc(quiz, ctx) {
+  if (!ctx.espace || !ctx.membres?.length) return null;
+  const credites = new Set(quiz.auteurs || []);
+
+  return el('div', { class: 'field' }, [
+    el('span', { class: 'field__label', text: 'Créditer sur ce questionnaire' }),
+    el('div', { class: 'sheet__list' }, ctx.membres.map((m) => {
+      const profil = ctx.profils?.[m.uid];
+      const vitrine = ctx.vitrines?.[m.uid];
+      const nom = (profil && [profil.prenom, profil.nom].filter(Boolean).join(' ')) || null;
+      const coche = credites.has(m.uid);
+
+      return el('label', { class: 'sheet__row' + (coche ? ' is-active' : '') }, [
+        el('input', { type: 'checkbox', 'data-act': 'crediter', 'data-id': m.uid, ...(coche ? { checked: true } : {}) }),
+        el('span', { class: 'sheet__label' }, [
+          el('span', { text: nom || m.uid, style: nom ? '' : 'font-family:var(--font-mono);font-size:var(--t-xs)' }),
+          !vitrine && el('span', { class: 'field__hint', style: { display: 'block' }, text:
+            coche ? 'crédité, mais rien ne s’affichera : cette personne n’a pas choisi d’être nommée publiquement'
+                  : 'n’a pas choisi d’être nommée publiquement' }),
+        ]),
+      ]);
+    })),
+    el('span', { class: 'field__hint', text: 'Un nom ne s’affiche que si la personne l’a autorisé de son côté ET que ce questionnaire la crédite. Toi seul ne suffis pas.' }),
   ]);
 }
 

@@ -39,6 +39,7 @@ function slim(quiz) {
     ...quiz,
     updatedAt: undefined,
     image: quiz.image || undefined,
+    auteurs: quiz.auteurs?.length ? quiz.auteurs : undefined,
     questions: quiz.questions.map((q) => ({
       ...q,
       hint: q.hint || undefined,

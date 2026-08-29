@@ -43,6 +43,8 @@ const state = {
   espace: null,         /* le nom de l'espace partagé, s'il y en a un */
   guardActive: null,    /* la règle anti-écrasement répond-elle ? null = pas su */
   membres: [],          /* l'équipe de l'espace, lisible des seuls membres */
+  profils: {},          /* leurs profils, lisibles de l'équipe seule */
+  vitrines: {},         /* ce que chacun a choisi de rendre public */
   remote: [],           /* les questionnaires de cet espace */
   remoteSession: null,  /* { email, uid } une fois connecté */
   panel: 'identite',
@@ -402,6 +404,8 @@ async function renderPanel() {
     ctx.remoteSession = state.remoteSession;
     ctx.guardActive = state.guardActive;
     ctx.membres = state.membres;
+    ctx.profils = state.profils;
+    ctx.vitrines = state.vitrines;
     ctx.inEspace = state.remote.some((q) => q.id === state.quiz.id);
   }
 
@@ -678,7 +682,10 @@ const refreshDiag = debounce(() => { renderRail(); scheduleReach(); }, 600);
 
 function onClick(event) {
   const trigger = event.target.closest('[data-act]');
-  if (!trigger || trigger.tagName === 'INPUT') return;
+  /* Les champs sont pilotés par data-bind, pas par data-act — sauf la case
+     à cocher des crédits, dont le clic EST l'action. */
+  if (!trigger) return;
+  if (trigger.tagName === 'INPUT' && trigger.dataset.act !== 'crediter') return;
   const { act, id } = trigger.dataset;
   const [ownerId, childId] = (id || '').split('|');
   const quiz = state.quiz;
@@ -841,6 +848,14 @@ function onClick(event) {
       return renderPanel();
     }
     case 'quiz-menu': return openQuizSheet();
+    case 'crediter': {
+      const liste = new Set(quiz.auteurs || []);
+      liste.has(id) ? liste.delete(id) : liste.add(id);
+      remember('Crédits modifiés');
+      quiz.auteurs = [...liste];
+      return structural();
+    }
+    case 'mon-profil':       return monProfil();
     case 'inviter':          return inviter();
     case 'membre-retirer':   return retirerMembre(id);
     case 'copier-uid':       return copierUid();
@@ -973,11 +988,113 @@ function openQuizSheet() {
   dialog.showModal();
 }
 
+/* Nommer quelqu'un de l'équipe. Le profil est lisible des seuls membres,
+   ce qui suffit ici : dire « Camille » à un collègue n'expose personne au
+   public. Faute de profil, l'identifiant tronqué — dit comme tel plutôt
+   que déguisé en nom.                                                   */
+function nommer(uid) {
+  const p = state.profils?.[uid];
+  if (!p) return `un compte sans profil (${uid.slice(0, 8)}…)`;
+  return [p.prenom, p.nom].filter(Boolean).join(' ') || `un compte (${uid.slice(0, 8)}…)`;
+}
+
 /* --- L'équipe -------------------------------------------------------------- */
 
 async function copierUid() {
   const ok = await copy(state.remoteSession?.uid || '');
   toast(ok ? 'Ton identifiant est copié.' : 'Copie impossible.', ok ? '' : 'danger');
+}
+
+/* Mon profil. Deux consentements distincts, et l'interface doit rendre la
+   distinction évidente : renseigner son profil le montre à l'ÉQUIPE ;
+   cocher la case le montre au MONDE. Le second n'est jamais présélectionné,
+   et le décocher efface la vitrine plutôt que d'y poser un drapeau. */
+function monProfil() {
+  const uid = state.remoteSession?.uid;
+  if (!uid) return;
+  const actuel = state.profils?.[uid] || {};
+  const enVitrine = Boolean(state.vitrines?.[uid]);
+
+  const prenom = el('input', { class: 'input', value: actuel.prenom || '', placeholder: 'Camille' });
+  const nom = el('input', { class: 'input', value: actuel.nom || '', placeholder: 'Ndiaye' });
+  const poste = el('input', { class: 'input', value: actuel.poste || '', placeholder: 'Responsable du secteur adulte' });
+  const photo = el('input', { class: 'input input--mono', value: actuel.image || '', placeholder: 'https://… (facultatif)' });
+  const publier = el('input', { type: 'checkbox' });
+  publier.checked = enVitrine;
+
+  const erreur = el('p', { class: 'alerte', hidden: true });
+  const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Enregistrer' });
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Mon profil' }),
+      el('p', { class: 'panel__hint', text: 'Renseigné, ton profil te nomme auprès de ton équipe — dans les messages de conflit, par exemple. Il n’est visible que des membres de cet espace.' }),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Prénom' }), prenom]),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Nom' }), nom]),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Fonction' }), poste]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'field__label', text: 'Photo' }), photo,
+        el('span', { class: 'field__hint', text: 'Adresse d’une image. Facultative, et publique si tu coches ci-dessous.' }),
+      ]),
+
+      el('div', { class: 'card', style: { background: 'var(--surface-2)' } }, [
+        el('label', { class: 'row', style: { alignItems: 'flex-start', gap: 'var(--s-3)' } }, [
+          publier,
+          el('span', {}, [
+            el('strong', { text: 'Afficher mon nom publiquement' }),
+            el('span', { class: 'field__hint', style: { display: 'block' }, text:
+              'Décoché, rien de toi n’est lisible hors de l’équipe — la donnée n’est pas seulement masquée, elle n’est pas publiée. Coché, ton nom, ta fonction et ta photo deviennent visibles de tout visiteur, sur les questionnaires qui te créditent.' }),
+          ]),
+        ]),
+      ]),
+
+      el('p', { class: 'field__hint', text: 'Être crédité demande les deux : que tu coches ici, et que le questionnaire te nomme. L’un sans l’autre n’affiche rien.' }),
+      erreur,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler', onClick: () => dismiss(dialog) }),
+      valider,
+    ]),
+  ]);
+
+  valider.addEventListener('click', async () => {
+    if (!prenom.value.trim()) {
+      erreur.textContent = 'Le prénom est nécessaire — c’est lui qui te nomme auprès de l’équipe.';
+      erreur.hidden = false;
+      return;
+    }
+    valider.disabled = true;
+    try {
+      const profil = {
+        prenom: prenom.value.trim(),
+        nom: nom.value.trim(),
+        poste: poste.value.trim(),
+        image: photo.value.trim(),
+      };
+      await remote.enregistrerProfil(state.espace, uid, profil);
+      /* La vitrine ne reprend que ce que la personne a saisi, et n'existe
+         que si elle l'a demandé. Décocher efface. */
+      await remote.publierVitrine(state.espace, uid, publier.checked ? {
+        nom: [profil.prenom, profil.nom].filter(Boolean).join(' '),
+        poste: profil.poste || undefined,
+        image: profil.image || undefined,
+      } : null);
+      await refreshEspace();
+      dismiss(dialog, () => {
+        toast(publier.checked ? 'Profil enregistré et affiché publiquement.' : 'Profil enregistré, visible de l’équipe seule.');
+        repaint();
+      });
+    } catch (err) {
+      erreur.textContent = err.message;
+      erreur.hidden = false;
+      valider.disabled = false;
+    }
+  });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  prenom.focus();
 }
 
 /* Inviter : créer le compte, faire envoyer le courriel, inscrire la
@@ -1245,6 +1362,10 @@ async function refreshEspace() {
   state.membres = state.remoteSession
     ? await remote.membres(state.espace).catch(() => [])
     : [];
+  [state.profils, state.vitrines] = await Promise.all([
+    state.remoteSession ? remote.profilsEquipe(state.espace).catch(() => ({})) : {},
+    remote.vitrines(state.espace),
+  ]);
   await verifierGardeFou();
 }
 
@@ -1368,7 +1489,7 @@ async function resoudreConflit(distant) {
   const qui = distant.updatedBy
     ? (distant.updatedBy === state.remoteSession?.uid
         ? 'toi, depuis un autre onglet ou un autre appareil'
-        : `un autre compte (${distant.updatedBy.slice(0, 8)}…)`)
+        : nommer(distant.updatedBy))
     : 'un compte inconnu';
 
   const dialog = el('dialog', { class: 'modal' }, [
