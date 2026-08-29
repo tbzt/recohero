@@ -13,7 +13,7 @@ import {
 import { reachability } from '../core/scoring.js';
 import { bindSortables } from '../core/sortable.js';
 import { questionView } from '../core/views.js';
-import { loadPublished, loadShared, loadEspace, forgetEspace } from '../core/catalog.js';
+import { loadPublished, loadEspace, forgetEspace } from '../core/catalog.js';
 import * as remote from '../core/remote.js';
 import * as store from '../core/store.js';
 import { linkFor, encode } from '../core/share.js';
@@ -40,7 +40,6 @@ const RESHAPE = /^(rule:[^:]+:mode|question:[^:]+:type|axis:[^:]+:(glyph|color)|
 const state = {
   quiz: null,
   published: [],
-  shared: [],           /* les brouillons partagés de quizzes/wip/ */
   espace: null,         /* le nom de l'espace partagé, s'il y en a un */
   remote: [],           /* les questionnaires de cet espace */
   remoteSession: null,  /* { email, uid } une fois connecté */
@@ -90,8 +89,8 @@ async function open() {
 
   state.espace = new URLSearchParams(location.search).get('espace');
   state.remoteSession = remote.session();
-  [state.published, state.shared, state.remote] = await Promise.all([
-    loadPublished(), loadShared(), loadEspace(state.espace),
+  [state.published, state.remote] = await Promise.all([
+    loadPublished(), loadEspace(state.espace),
   ]);
   const drafts = store.allDrafts();
   if (drafts.length) select(drafts[0].id);
@@ -205,31 +204,19 @@ function renderRail() {
     ]),
 
     state.published.length > 0 && el('div', {}, [
-      el('div', { class: 'rail__head' }, [el('h2', { text: 'Publiés au dépôt' })]),
+      el('div', { class: 'rail__head' }, [el('h2', { text: 'Au kiosque' })]),
       el('div', { class: 'rail__list' }, state.published.map((quiz) => el('div', { class: 'rail__item' }, [
         el('span', { class: 'rail__item__emoji', text: quiz.emoji || '✦' }),
         el('span', { class: 'rail__item__label', text: quiz.title }),
         el('button', {
           class: 'btn btn--icon btn--quiet', type: 'button',
-          'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-published', 'data-id': quiz.id,
-          title: draftIds.has(quiz.id) ? 'Copie locale déjà ouverte' : 'Modifier (crée une copie locale)',
-          text: draftIds.has(quiz.id) ? '●' : '✎',
+          'data-act': 'export-one', 'data-id': quiz.id,
+          title: 'Exporter en JSON', text: '↓',
         }),
-      ]))),
-    ]),
-
-    /* L'étagère de brouillons. Déposer dans quizzes/ veut dire publier ;
-       ce dossier-ci est le seul endroit du dépôt où deux personnes peuvent
-       se passer un questionnaire que le kiosque ne montre pas encore. */
-    state.shared.length > 0 && el('div', {}, [
-      el('div', { class: 'rail__head' }, [el('h2', { text: 'Brouillons du dépôt' })]),
-      el('div', { class: 'rail__list' }, state.shared.map((quiz) => el('div', { class: 'rail__item' }, [
-        el('span', { class: 'rail__item__emoji', text: quiz.emoji || '✦' }),
-        el('span', { class: 'rail__item__label', text: quiz.title }),
         el('button', {
           class: 'btn btn--icon btn--quiet', type: 'button',
-          'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-shared', 'data-id': quiz.id,
-          title: draftIds.has(quiz.id) ? 'Copie locale déjà ouverte' : 'Reprendre (crée une copie locale)',
+          'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-published', 'data-id': quiz.id,
+          title: draftIds.has(quiz.id) ? 'Copie locale déjà ouverte' : 'Reprendre une copie',
           text: draftIds.has(quiz.id) ? '●' : '✎',
         }),
       ]))),
@@ -240,6 +227,11 @@ function renderRail() {
       el('div', { class: 'rail__list' }, state.remote.map((quiz) => el('div', { class: 'rail__item' }, [
         el('span', { class: 'rail__item__emoji', text: quiz.emoji || '✦' }),
         el('span', { class: 'rail__item__label', text: quiz.title }),
+        el('button', {
+          class: 'btn btn--icon btn--quiet', type: 'button',
+          'data-act': 'export-one', 'data-id': quiz.id,
+          title: 'Exporter en JSON', text: '↓',
+        }),
         el('button', {
           class: 'btn btn--icon btn--quiet', type: 'button',
           'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-remote', 'data-id': quiz.id,
@@ -339,6 +331,7 @@ async function renderPanel() {
   if (panel.id === 'publier') {
     ctx.linkSize = (await encode(state.quiz)).length + 40;
     ctx.espace = state.espace;
+    ctx.remoteCount = state.remote.length;
     ctx.remoteSession = state.remoteSession;
     ctx.inEspace = state.remote.some((q) => q.id === state.quiz.id);
   }
@@ -646,15 +639,13 @@ function onClick(event) {
       state.panel = PANELS.some((p) => p.id === id) ? id : 'identite';
       return (renderRail(), renderPanel());
     }
-    /* Reprendre une copie du dépôt. Trois portes, une seule mécanique :
-       seuls changent l'étagère où l'on va chercher et le sort de
-       l'identifiant. Le garder, c'est pouvoir réécraser le fichier
-       d'origine ; en changer, c'est fabriquer une variante.          */
+    /* Reprendre une copie. Une seule mécanique, deux étagères : le
+       kiosque et l'espace. Garder l'identifiant, c'est pouvoir réécraser
+       l'original ; en changer, c'est fabriquer une variante.          */
     case 'edit-published':
     case 'fork-published':
-    case 'edit-shared':
     case 'edit-remote': {
-      const shelf = { 'edit-shared': state.shared, 'edit-remote': state.remote }[act] || state.published;
+      const shelf = act === 'edit-remote' ? state.remote : state.published;
       const source = shelf.find((q) => q.id === id);
       if (!source) return undefined;
       const copyQuiz = structuredClone({ ...source, source: undefined, file: undefined });
@@ -665,9 +656,8 @@ function onClick(event) {
       store.saveDraft(copyQuiz);
       select(copyQuiz.id);
       toast({
-        'edit-published': 'Copie locale ouverte. Le kiosque montre encore la version du dépôt.',
+        'edit-published': 'Copie locale ouverte. Le kiosque montre encore l’original.',
         'fork-published': 'Copie créée.',
-        'edit-shared': 'Brouillon repris. Réexporte-le vers quizzes/wip/ quand tu auras fini.',
         'edit-remote': 'Copie locale ouverte. L’espace montre encore la version publiée.',
       }[act]);
       return structural();
@@ -782,6 +772,9 @@ function onClick(event) {
       return renderPanel();
     }
     case 'quiz-menu': return openQuizSheet();
+    case 'export-espace': return exportEspace();
+    case 'export-drafts': return exportDrafts();
+    case 'export-one':    return exportOne(id);
     case 'preview-toggle': {
       state.previewOpen = !state.previewOpen;
       return renderPanel();
@@ -887,7 +880,7 @@ function openQuizSheet() {
         ? el('div', { class: 'sheet__list' }, drafts.map((q) => ligne(q, 'select')))
         : el('p', { class: 'panel__hint', text: 'Aucun brouillon dans ce navigateur.' }),
       state.published.length > 0 && el('div', {}, [
-        el('span', { class: 'field__label', text: 'Publiés au dépôt' }),
+        el('span', { class: 'field__label', text: 'Au kiosque' }),
         el('div', { class: 'sheet__list' }, state.published.map((q) => ligne(q, 'edit-published', 'copier'))),
       ]),
     ]),
@@ -935,10 +928,18 @@ async function copyLink() {
 
 async function embedSnippet() {
   flush();
-  const published = state.published.some((q) => q.id === state.quiz.id);
-  const url = published
-    ? new URL(`quiz.html?q=${encodeURIComponent(state.quiz.id)}&embed=1`, location.href).toString()
-    : await linkFor(state.quiz, 'quiz.html?embed=1');
+  /* Deux formes. Si le questionnaire est servi quelque part — au kiosque
+     ou dans un espace — l'adresse courte le DÉSIGNE, et l'intégration
+     suivra ses mises à jour. Sinon le lien en emporte une copie figée. */
+  const auKiosque = state.published.some((q) => q.id === state.quiz.id);
+  const dansLEspace = state.remote.some((q) => q.id === state.quiz.id);
+  const suivi = auKiosque || dansLEspace;
+
+  const court = new URL(`quiz.html?q=${encodeURIComponent(state.quiz.id)}`, location.href);
+  if (dansLEspace) court.searchParams.set('espace', state.espace);
+  court.searchParams.set('embed', '1');
+
+  const url = suivi ? court.toString() : await linkFor(state.quiz, 'quiz.html?embed=1');
 
   const code = `<iframe
   src="${url}"
@@ -958,7 +959,7 @@ window.addEventListener('message', function (event) {
 });
 <\/script>`;
 
-  return { code, published };
+  return { code, published: suivi };
 }
 
 async function showEmbed() {
@@ -975,8 +976,8 @@ async function showEmbed() {
     el('div', { class: 'modal__body stack' }, [
       el('h2', { text: 'Intégrer dans un autre site' }),
       el('p', { class: 'panel__hint', text: published
-        ? 'Ce questionnaire est dans le dépôt : le code ci-dessous le suit. Ce que tu pousseras plus tard s’affichera dans l’intégration sans y retoucher.'
-        : 'Ce questionnaire n’est pas encore dans le dépôt : le code ci-dessous en emporte une copie figée. Le modifier ici ne changera rien à ce qui est déjà collé ailleurs.' }),
+        ? 'Ce questionnaire est servi en ligne : le code ci-dessous le désigne, et suivra ses mises à jour sans qu’on y retouche.'
+        : 'Ce questionnaire n’est publié nulle part : le code ci-dessous en emporte une copie figée. Le modifier ici ne changera rien à ce qui est déjà collé ailleurs.' }),
       local && el('p', {}, [el('span', {
         class: 'pill pill--warn',
         text: `Adresse locale (${location.host || 'file://'}) — ce code ne marchera que sur cette machine.`,
@@ -1120,9 +1121,83 @@ async function unpublishRemote() {
   return undefined;
 }
 
-function payload() {
-  const { source, ...clean } = state.quiz;
+function payload(quiz = state.quiz) {
+  const { source, file, ...clean } = quiz;
   return JSON.stringify(clean, null, 2);
+}
+
+/* --- Sauvegarde et restauration -------------------------------------------
+   L'export d'un questionnaire sert à passer un modèle à quelqu'un. L'export
+   d'un catalogue entier sert à autre chose : c'est la SEULE sauvegarde d'un
+   espace, la base gratuite n'ayant aucune restauration.
+
+   D'où l'enveloppe qui se décrit elle-même — dans six mois, un fichier nu
+   ne dirait plus d'où il vient — et surtout d'où l'import qui sait
+   remplacer. Un import qui ne sait que dupliquer rend la restauration
+   impossible : on obtiendrait douze doublons au lieu des douze originaux,
+   et la sauvegarde n'en serait pas une.                                  */
+
+function bundle(quizzes, espace = null) {
+  return JSON.stringify({
+    recohero: 1,
+    espace,
+    exporteLe: new Date().toISOString(),
+    quizzes: quizzes.map((q) => { const { source, file, ...clean } = q; return clean; }),
+  }, null, 2);
+}
+
+function horodatage() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function exportEspace() {
+  if (!state.remote.length) return toast('Cet espace est vide.', 'danger');
+  download(`recohero-${slugify(state.espace, 'espace')}-${horodatage()}.json`,
+           bundle(state.remote, state.espace));
+  toast(`${state.remote.length} questionnaire(s) exporté(s).`);
+}
+
+function exportDrafts() {
+  flush();
+  const drafts = store.allDrafts();
+  if (!drafts.length) return toast('Aucun brouillon à exporter.', 'danger');
+  download(`recohero-brouillons-${horodatage()}.json`, bundle(drafts));
+  toast(`${drafts.length} brouillon(s) exporté(s).`);
+}
+
+function exportOne(id) {
+  const source = state.remote.find((q) => q.id === id) || state.published.find((q) => q.id === id);
+  if (!source) return undefined;
+  download(`${slugify(source.title, source.id)}.json`, payload(source));
+  return toast(`« ${source.title} » exporté.`);
+}
+
+/* Que faire des questionnaires déjà présents en local. Posée UNE fois pour
+   tout un fichier : douze questions successives pour une restauration
+   seraient une punition, pas une sécurité. */
+function askCollision(count) {
+  return new Promise((resolve) => {
+    const dialog = el('dialog', { class: 'modal' }, [
+      el('div', { class: 'modal__body stack' }, [
+        el('h2', { text: count > 1 ? `${count} questionnaires existent déjà` : 'Ce questionnaire existe déjà' }),
+        el('p', { text: count > 1
+          ? `Ce fichier contient ${count} questionnaires que tu as déjà en brouillon, sous le même identifiant.`
+          : 'Tu as déjà un brouillon portant le même identifiant.' }),
+        el('p', { class: 'panel__hint', text: 'Remplacer écrase ta copie locale — c’est ce qu’il faut pour restaurer une sauvegarde. Créer une variante garde les deux, avec un identifiant neuf.' }),
+      ]),
+      el('div', { class: 'modal__actions' }, [
+        el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler',
+          onClick: () => dismiss(dialog, () => resolve(null)) }),
+        el('button', { class: 'btn btn--ghost', type: 'button', text: 'Créer une variante',
+          onClick: () => dismiss(dialog, () => resolve('variante')) }),
+        el('button', { class: 'btn btn--primary', type: 'button', text: 'Remplacer ma copie',
+          onClick: () => dismiss(dialog, () => resolve('remplacer')) }),
+      ]),
+    ]);
+    dialog.addEventListener('close', () => dialog.remove());
+    document.body.append(dialog);
+    dialog.showModal();
+  });
 }
 
 function exportJson() {
@@ -1135,24 +1210,61 @@ async function copyJson() {
   toast(await copy(payload()) ? 'JSON copié.' : 'Copie impossible.');
 }
 
-function adopt(raw, label) {
-  let quiz;
+/* Accepte les deux formes : un questionnaire seul — ce que deux créateurs
+   s'échangent — ou une enveloppe de catalogue, ce qu'on restaure. */
+async function adopt(raw, label) {
+  let data;
   try {
-    quiz = normalize(typeof raw === 'string' ? JSON.parse(raw) : raw);
+    data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch (err) {
+    return toast(`Import refusé : fichier illisible (${err.message}).`, 'danger');
+  }
+
+  const brut = Array.isArray(data?.quizzes) ? data.quizzes
+             : Array.isArray(data) ? data
+             : [data];
+  if (!brut.length) return toast('Import refusé : ce fichier ne contient aucun questionnaire.', 'danger');
+
+  let entrants;
+  try {
+    entrants = brut.map((q) => normalize(q));
   } catch (err) {
     return toast(`Import refusé : ${err.message}`, 'danger');
   }
-  if (store.getDraft(quiz.id)) {
-    quiz.id = uid('quiz');
-    quiz.title = `${quiz.title} (importé)`;
+
+  const collisions = entrants.filter((q) => store.getDraft(q.id));
+  let choix = 'remplacer';
+  if (collisions.length) {
+    choix = await askCollision(collisions.length);
+    if (!choix) return toast('Import annulé.');
   }
-  store.saveDraft(quiz);
-  select(quiz.id);
+
+  /* Écrire l'état courant AVANT d'importer, puis lâcher le questionnaire
+     en mémoire. Sans ça, le seul qui ne se restaure jamais est celui qu'on
+     a sous les yeux : la sauvegarde différée le réécrirait par-dessus sa
+     propre restauration, et le compte des remplacements mentirait. */
+  flush();
+  state.quiz = null;
+
+  for (const quiz of entrants) {
+    if (choix === 'variante' && store.getDraft(quiz.id)) {
+      quiz.id = uid('quiz');
+      quiz.title = `${quiz.title} (variante)`;
+    }
+    store.saveDraft(quiz);
+  }
+
+  select(entrants[0].id);
   state.panel = 'identite';
   flush();
   renderRail();
   renderPanel();
-  toast(`« ${quiz.title} » importé${label ? ` depuis ${label}` : ''}.`);
+
+  const source = label ? ` depuis ${label}` : '';
+  const remplaces = choix === 'remplacer' ? collisions.length : 0;
+  return toast(entrants.length > 1
+    ? `${entrants.length} questionnaires importés${source}${remplaces ? `, dont ${remplaces} remplacé(s)` : ''}.`
+    : `« ${entrants[0].title} » importé${source}${remplaces ? ' — copie locale remplacée' : ''}.`);
 }
 
 async function importFile(file) {

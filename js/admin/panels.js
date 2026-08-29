@@ -468,6 +468,15 @@ function espaceCard(ctx) {
                 el('span', { class: 'pill', text: ctx.remoteSession.email }),
                 el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'remote-signout', text: 'Se déconnecter' }),
               ]),
+              /* Le seul filet de cet espace : la base gratuite n'offre
+                 aucune restauration. Le bouton est donc au même niveau que
+                 « Publier », pas relégué en bas de page. */
+              el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-4)' }, text:
+                'Cet espace n’a pas de corbeille ni de restauration : une suppression y est définitive. L’export du catalogue est la seule sauvegarde possible — un fichier daté, réimportable tel quel.' }),
+              el('div', { class: 'row', style: { marginTop: 'var(--s-2)' } }, [
+                el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'export-espace', text: '↓ Exporter tout l’espace' }),
+                ctx.remoteCount ? el('span', { class: 'pill', text: `${ctx.remoteCount} questionnaire${ctx.remoteCount > 1 ? 's' : ''}` }) : null,
+              ]),
             ])
           : el('div', {}, [
               el('p', { text: 'Connecte-toi pour publier dans cet espace. C’est le seul moment où un mot de passe est demandé — les visiteurs qui répondent n’ont besoin de rien.' }),
@@ -484,7 +493,7 @@ export function publier(quiz, ctx = {}) {
   const file = `${slugify(quiz.title, quiz.id)}.json`;
 
   return el('section', { class: 'panel' }, [
-    head('Diffuser', "Un lien, qui ne demande rien à personne ; le dépôt, pour que le questionnaire figure au kiosque ; l'espace partagé, pour publier à plusieurs sans toucher au dépôt."),
+    head('Diffuser', "Un lien, qui ne demande rien à personne ; un espace partagé, pour publier à plusieurs ; un fichier, pour se passer un modèle de la main à la main."),
 
     espaceCard(ctx),
 
@@ -503,35 +512,34 @@ export function publier(quiz, ctx = {}) {
         ]),
       ]),
 
+      /* Le fichier est ce qui circule entre auteurs : un lien se répond,
+         un fichier se reprend et se modifie. C'est la seule voie qui
+         transporte un questionnaire ÉDITABLE d'une personne à l'autre. */
       el('div', { class: 'publish-step' }, [
         el('span', { class: 'publish-step__num', text: '2' }),
         el('div', {}, [
-          el('h3', { text: 'Par le dépôt — permanent' }),
-          el('p', { text: 'Télécharge le fichier et dépose-le dans quizzes/ du dépôt. Le questionnaire apparaît alors au kiosque pour tout le monde, dès que l’index est reconstruit.' }),
-          el('code', { class: 'code', text: `quizzes/${file}` }),
-          el('p', { class: 'panel__hint', text: 'Pour le passer à quelqu’un sans le publier, dépose-le plutôt dans le sous-dossier des brouillons : il apparaîtra dans le backoffice, sous « Brouillons du dépôt », et jamais au kiosque. Les fichiers y restent lisibles de qui connaît l’adresse — c’est une étagère discrète, pas un coffre.' }),
-          el('code', { class: 'code', text: `quizzes/wip/${file}` }),
+          el('h3', { text: 'Par fichier — pour se passer un modèle' }),
+          el('p', { text: 'Le fichier JSON contient tout : questions, axes, profils, recommandations, images intégrées. Qui le reçoit l’ouvre dans son propre backoffice et le modifie à sa guise. C’est la voie pour partir du questionnaire de quelqu’un d’autre plutôt que de la page blanche.' }),
+          el('code', { class: 'code', text: file }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
             el('button', {
               class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'export',
-              title: file, text: '↓ Télécharger le fichier',
+              title: file, text: '↓ Exporter le fichier',
             }),
             el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'copy-json', text: '⧉ Copier le JSON' }),
           ]),
-        ]),
-      ]),
-
-      el('div', { class: 'publish-step' }, [
-        el('span', { class: 'publish-step__num', text: '3' }),
-        el('div', {}, [
-          el('h3', { text: 'Reprendre un questionnaire existant' }),
-          el('p', { text: 'Colle ici le JSON d’un questionnaire (ou dépose son fichier) pour l’ouvrir dans l’éditeur en tant que nouveau brouillon.' }),
-          el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
+          el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-4)' }, text: 'Dans l’autre sens — reprendre le modèle de quelqu’un :' }),
+          el('div', { class: 'row', style: { marginTop: 'var(--s-2)' } }, [
             el('label', { class: 'btn btn--ghost btn--sm' }, [
               '↑ Importer un fichier',
               el('input', { type: 'file', accept: '.json,application/json', 'data-act': 'import-file', style: 'display:none' }),
             ]),
             el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'import-paste', text: '⌨ Coller du JSON' }),
+          ]),
+          el('p', { class: 'field__hint', text: 'Un fichier peut contenir un questionnaire ou un catalogue entier. Si l’import trouve des identifiants déjà présents, il demande une fois s’il faut remplacer tes copies — c’est ce qui permet de restaurer une sauvegarde — ou en faire des variantes.' }),
+          el('div', { class: 'row', style: { marginTop: 'var(--s-4)' } }, [
+            el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'export-drafts', text: '↓ Exporter tous mes brouillons' }),
+            el('span', { class: 'field__hint', text: 'Les brouillons ne vivent que dans ce navigateur.' }),
           ]),
         ]),
       ]),
@@ -540,7 +548,7 @@ export function publier(quiz, ctx = {}) {
     el('div', { class: 'danger-zone' }, [
       el('h3', { text: 'Supprimer ce questionnaire' }),
       el('p', { class: 'panel__hint', style: { marginBottom: 'var(--s-3)' }, text:
-        'Le brouillon est effacé de ce navigateur. Un fichier déjà déposé dans le dépôt n’est pas touché.' }),
+        'Le brouillon est effacé de ce navigateur. Un fichier déjà exporté, un lien déjà envoyé et une version déjà publiée dans un espace ne sont pas touchés.' }),
       el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-act': 'delete-quiz', text: 'Supprimer définitivement' }),
     ]),
   ]);
