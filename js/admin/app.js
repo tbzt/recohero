@@ -276,6 +276,10 @@ function renderTabbar(bySection) {
     class: 'tab' + (state.panel === panel.id ? ' is-active' : ''),
     type: 'button', 'data-act': 'panel', 'data-id': panel.id,
     'aria-current': state.panel === panel.id ? 'page' : null,
+    /* Le nom n'est affiché que sur l'onglet actif ; les autres ne
+       seraient qu'un glyphe pour une synthèse vocale sans ceci. */
+    'aria-label': panel.label,
+    title: panel.label,
   }, [
     el('span', { class: 'tab__emoji', text: panel.emoji, 'aria-hidden': 'true' }),
     el('span', { class: 'tab__label', text: panel.label }),
