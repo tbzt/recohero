@@ -53,7 +53,7 @@ autrement.
 Et à la main, après toute modification des règles, les huit requêtes anonymes :
 
 ```bash
-DB=https://VOTRE-BASE.europe-west1.firebasedatabase.app
+DB=https://recohero-f9cf9-default-rtdb.europe-west1.firebasedatabase.app
 E=maupassant
 curl -s -o /dev/null -w '%{http_code} lecture des questionnaires (200 attendu)\n'  "$DB/espaces/$E/quizzes.json"
 curl -s -o /dev/null -w '%{http_code} écriture anonyme (401)\n'        -X PUT  -d '{"x":1}' "$DB/espaces/$E/quizzes/pirate.json"
@@ -65,4 +65,16 @@ curl -s -o /dev/null -w '%{http_code} création d un espace (401)\n'    -X PUT  
 curl -s -o /dev/null -w '%{http_code} lecture de la racine (401)\n'                       "$DB/.json"
 ```
 
-Une seule doit passer : la première.
+Une seule doit passer : la première. Ces huit-là contrôlent les règles
+d'**accès**, que le garde-fou ne modifie pas — elles doivent donc donner le
+même résultat avant et après. Le compteur, lui, ne se vérifie qu'authentifié :
+c'est l'épreuve à deux onglets ci-dessous.
+
+## Éprouver le compteur
+
+Ouvrir le même questionnaire dans deux onglets du backoffice, publier depuis
+le premier, puis publier depuis le second sans l'avoir rechargé. Le second
+doit être refusé, et le dialogue doit nommer qui a modifié et quand.
+
+Si le second passe, la règle n'est pas active — et le bandeau rouge de la
+carte Espace l'aura déjà dit.
