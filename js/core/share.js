@@ -38,12 +38,14 @@ function slim(quiz) {
   return {
     ...quiz,
     updatedAt: undefined,
+    image: quiz.image || undefined,
     questions: quiz.questions.map((q) => ({
       ...q,
       hint: q.hint || undefined,
       options: q.options.map((o) => ({
         ...o,
         emoji: o.emoji || undefined,
+        image: o.image || undefined,
         scores: Object.fromEntries(Object.entries(o.scores).filter(([, v]) => v !== 0)),
       })),
     })),
@@ -51,12 +53,14 @@ function slim(quiz) {
       ...r,
       subtitle: r.subtitle || undefined,
       emoji: r.emoji || undefined,
+      image: r.image || undefined,
       recos: r.recos.map((c) => ({
         ...c,
         creator: c.creator || undefined,
         year: c.year || undefined,
         note: c.note || undefined,
         link: c.link || undefined,
+        image: c.image || undefined,
       })),
     })),
   };

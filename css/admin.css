@@ -34,6 +34,12 @@
 @media (max-width: 62rem) {
   .admin-shell { grid-template-columns: 1fr; }
 }
+/* Les deux colonnes sont des items de grille : leur minimum implicite est
+   `auto`, c'est-à-dire la largeur du plus long contenu insécable qu'elles
+   portent — un titre de questionnaire, par exemple. Sans ce min-width,
+   c'est la PAGE entière qui devient scrollable, pas le rail. */
+.admin-shell > * { min-width: 0; }
+.rail__list, .rail__item, .diag, .diag__item { min-width: 0; }
 
 .status {
   font-size: var(--t-xs);
@@ -271,7 +277,10 @@
   border-radius: var(--r-sm);
   background: var(--surface-2);
 }
-@media (max-width: 46rem) {
+/* Au-delà de quatre axes la rangée de pesées ne tient plus sur la ligne :
+   elle passe dessous, sur toute la largeur. Le seuil est en em pour
+   suivre la taille de texte, pas la taille d'écran. */
+@media (max-width: 62rem) {
   .opt { grid-template-columns: 3.2rem 1fr auto; }
   .opt .scoreset { grid-column: 1 / -1; justify-content: flex-start; }
 }
@@ -311,6 +320,50 @@
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 .scorechip.is-set { border-color: var(--axis); background: color-mix(in oklab, var(--axis) 10%, var(--surface)); }
+
+/* --- Champ image -------------------------------------------------------------------
+   Trois provenances possibles (adresse, chemin du dépôt, fichier intégré),
+   un seul composant. L'aperçu est carré et recadre : les couvertures de
+   livres, les affiches et les pochettes n'ont pas le même format.       */
+.imagefield__row {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: var(--s-3);
+  align-items: start;
+}
+.imagefield__preview {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.imagefield__preview img { width: 100%; height: 100%; object-fit: cover; }
+.imagefield__preview.is-empty { border-style: dashed; opacity: 0.55; font-size: var(--t-lg); }
+.imagefield__controls { display: grid; gap: var(--s-2); min-width: 0; }
+.imagefield__controls .input { min-height: var(--tap-sm); }
+
+/* --- Réponse : la ligne, et son tiroir à image -------------------------------------- */
+.opt-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.opt-wrap .opt { border: none; border-radius: 0; background: transparent; }
+.opt-wrap.is-open { border-color: var(--accent-line); }
+.opt__detail {
+  padding: var(--s-3);
+  border-top: 1px dashed var(--line-strong);
+  background: var(--surface);
+}
+.btn--icon.is-on {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
 
 /* --- Axes ------------------------------------------------------------------------ */
 .axis-row {
@@ -377,6 +430,7 @@
   border-top: 1px solid var(--line);
 }
 .publish-step:first-of-type { border-top: none; padding-top: 0; }
+.publish-step > * { min-width: 0; }
 .publish-step__num {
   display: grid;
   place-items: center;

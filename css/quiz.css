@@ -85,6 +85,15 @@
   line-height: 1;
   margin-bottom: var(--s-4);
 }
+.cover__image {
+  width: 100%;
+  max-width: 30rem;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  margin: 0 auto var(--s-5);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+}
 .cover__title {
   font-size: clamp(var(--t-2xl), 6vw, var(--t-4xl));
   margin-bottom: var(--s-3);
@@ -221,6 +230,16 @@
   .option__key { display: none; }
 }
 .option__emoji { flex: none; font-size: var(--t-lg); line-height: 1; }
+.option__thumb {
+  flex: none;
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+/* Une réponse illustrée mérite plus d'air qu'une réponse en texte seul. */
+.option:has(.option__thumb) { min-height: 74px; }
 .option__text { flex: 1; min-width: 0; }
 
 .navrow {
@@ -239,6 +258,15 @@
   text-transform: uppercase;
   color: var(--ink-faint);
   margin-bottom: var(--s-3);
+}
+.result__image {
+  width: 100%;
+  aspect-ratio: 21 / 9;
+  object-fit: cover;
+  margin-bottom: var(--s-5);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+  animation: pop var(--dur-slow) var(--ease-out) both;
 }
 .result__emoji {
   font-size: var(--t-4xl);
@@ -357,6 +385,14 @@
   background: var(--accent-soft);
   font-size: var(--t-lg);
 }
+.reco__cover {
+  width: 56px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-1);
+}
 .reco__title {
   font-family: var(--font-display);
   font-size: var(--t-md);
@@ -391,4 +427,17 @@
   font-size: var(--t-xs);
   color: var(--ink-faint);
   word-break: break-word;
+}
+
+/* --- Aperçu de la carte de résultat ----------------------------------------
+   Le canvas fait 1080×1350 : on le laisse se réduire à la largeur du
+   dialogue, la définition exportée ne change pas pour autant.          */
+.cardview { max-width: min(27rem, calc(100vw - var(--s-6))); }
+.cardview .modal__body { padding: var(--s-3); }
+.cardview__canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
 }

@@ -27,8 +27,15 @@ modules ES. Ça tourne sur GitHub Pages comme sur une clé USB.
 Trois briques, et c'est tout.
 
 **Les axes** sont les signes qu'on compte : `★` les étoiles, `●` les ronds,
-`▲` les triangles. Vous les nommez, vous leur donnez une couleur, vous en
-mettez deux ou huit.
+`▲` les triangles. Vous les nommez, vous leur donnez une couleur, et **vous en
+mettez autant que vous voulez** — deux, six, dix. Seize glyphes sont proposés
+(`★ ● ▲ ■ ◆ ♥ ♠ ♣ ♦ ✿ ☀ ☾ ✚ ✱ ❖ ▼`), tous servis par les polices système des
+trois plateformes, mais le champ est libre : n'importe quel caractère ou
+emoji fait l'affaire.
+
+Au-delà de quatre axes, l'éditeur fait passer la rangée de pesées sous la
+ligne de réponse plutôt que de la comprimer ; la carte de résultat rétrécit
+ses glyphes au-delà de six et en affiche huit au maximum.
 
 **Les questions** proposent des réponses, et chaque réponse distribue des
 points aux axes. Une réponse peut donner 2 étoiles, ou 1 étoile et 1 rond, ou
@@ -48,7 +55,61 @@ L'ordre dans l'éditeur *est* la priorité. Les « par défaut » passent toujou
 en dernier, quelle que soit leur place.
 
 Chaque profil porte ses recommandations : type d'œuvre, titre, auteur, année,
-une phrase de justification, un lien facultatif.
+une phrase de justification, un lien facultatif, et une couverture.
+
+---
+
+## Les images
+
+Quatre emplacements acceptent une image : la **couverture** du questionnaire
+(écran de départ et vignette du kiosque), l'**illustration** d'un profil
+(bandeau au-dessus du résultat), la **couverture d'une œuvre** recommandée, et
+l'**image d'une réponse** (pour les questions du type « choisissez votre
+paysage » — le champ se déplie depuis l'icône 🖼 de la ligne).
+
+Chaque champ accepte trois formes :
+
+| Forme | Exemple | Quand |
+|---|---|---|
+| Adresse web | `https://…/affiche.jpg` | l'image est déjà en ligne quelque part |
+| Chemin du dépôt | `img/affiche.jpg` | vous déposez vos images à côté du questionnaire |
+| Fichier intégré | *bouton « ↑ Fichier »* | rien à héberger, l'image voyage avec le questionnaire |
+
+Un fichier choisi sur le disque est **réduit puis ré-encodé** (1000 px pour une
+couverture, 420 px pour une vignette, en WebP quand le navigateur sait le
+produire) et intégré au questionnaire. Le backoffice affiche son poids et le
+signale en orange au-delà de 120 Ko.
+
+Le compromis à connaître : une image intégrée survit à tout — au partage par
+lien, à une coupure réseau, à la disparition du site source — mais elle pèse
+dans le lien de partage. Une dizaine d'images intégrées le fait passer de
+3 500 à plusieurs dizaines de milliers de caractères. Pour un questionnaire
+richement illustré, préférez le dossier `quizzes/img/` du dépôt.
+
+Toute image est passée au filtre : seules les trois formes ci-dessus sont
+acceptées. Une adresse `javascript:`, un `data:text/html` ou une URL en `//`
+sont silencieusement effacés à la lecture du questionnaire.
+
+---
+
+## La carte de résultat
+
+À la fin du parcours, le bouton **« 🖼 Ma carte de résultat »** compose une
+affiche 1080 × 1350 (format portrait 4:5, celui des stories) : le titre du
+questionnaire, l'illustration ou l'emoji du profil, son nom, sa devise, la
+feuille de score avec les glyphes, et jusqu'à trois recommandations.
+
+Ce n'est pas une capture d'écran : c'est un visuel dessiné pour être partagé,
+sans aucune bibliothèque — le canvas du navigateur suffit. Sur mobile, le
+partage natif prend le relais quand il accepte les fichiers ; ailleurs, la
+carte se télécharge en PNG.
+
+Deux limites à connaître. Une image de profil hébergée sur un **autre domaine**
+ne peut pas être dessinée dans la carte (le navigateur interdirait alors
+l'export) : la carte retombe sur l'emoji, sans rien casser. Les images
+intégrées et celles du dépôt, elles, s'affichent. Et si un profil a un titre
+très long, la carte **retire des recommandations** plutôt que de laisser le
+texte mordre sur la signature.
 
 ---
 
@@ -63,8 +124,9 @@ gzippé dans le fragment d'URL. Vous l'envoyez, la personne répond. Aucun
 serveur n'est impliqué, et le fragment ne part jamais chez l'hébergeur.
 
 Compter environ 3 500 caractères pour un questionnaire de huit questions avec
-douze recommandations. C'est long pour une URL, mais tous les navigateurs et
-toutes les messageries l'acceptent.
+douze recommandations, **sans images intégrées**. C'est long pour une URL, mais
+tous les navigateurs et toutes les messageries l'acceptent. Le panneau
+« Diffuser » affiche la longueur exacte en direct.
 
 ### Par le dépôt — permanent, visible au kiosque
 
@@ -157,8 +219,13 @@ leur seuil : `color-mix()` (Chrome 111, Firefox 113, Safari 16.2),
 `CompressionStream` pour les liens de partage (Chrome 80, Firefox 113,
 Safari 16.4), `structuredClone`, `<dialog>`.
 
-Sans `CompressionStream`, les liens de partage restent lisibles mais
-deviennent nettement plus longs. Tout le reste fonctionne.
+S'y ajoutent, pour les fonctions récentes : `createImageBitmap` et l'encodage
+WebP du canvas pour intégrer une image depuis un fichier ; `navigator.share`
+avec fichiers pour envoyer la carte de résultat depuis un mobile.
+
+Aucune n'est indispensable. Sans `CompressionStream`, les liens de partage
+restent lisibles mais deviennent nettement plus longs. Sans partage natif de
+fichier, la carte se télécharge. Tout le reste fonctionne.
 
 Thèmes clair et sombre suivent le système. `prefers-reduced-motion` est
 respecté — il est traité une seule fois, au niveau des tokens de durée.

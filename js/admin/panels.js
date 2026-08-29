@@ -5,9 +5,9 @@
    qui écoute, applique et redessine.
    ========================================================================== */
 
-import { RECO_TYPES, GLYPHS, ACCENTS, RULE_MODES, slugify } from '../core/schema.js';
+import { RECO_TYPES, GLYPHS, ACCENTS, RULE_MODES, slugify, imageWeight } from '../core/schema.js';
 import { ceilings } from '../core/scoring.js';
-import { el } from '../core/ui.js';
+import { el, formatBytes } from '../core/ui.js';
 
 const tool = (act, id, label, glyph, extra = {}) => el('button', {
   class: 'btn btn--icon btn--quiet', type: 'button',
@@ -37,6 +37,46 @@ const select = (bind, value, options, props = {}) => {
   return node;
 };
 
+/* Un champ image accepte trois formes : une adresse http(s), un chemin
+   relatif du dépôt, ou un fichier du disque que l'on réduit et intègre.
+   `kind` choisit l'agressivité de la réduction (cf. IMAGE_LIMITS).      */
+const imageField = (label, bind, value, kind = 'cover', hint = '') => {
+  const weight = imageWeight(value);
+  return el('div', { class: 'field imagefield' }, [
+    el('span', { class: 'field__label', text: label }),
+    el('div', { class: 'imagefield__row' }, [
+      el('span', { class: 'imagefield__preview' + (value ? '' : ' is-empty') },
+        [value ? el('img', { src: value, alt: '', loading: 'lazy' }) : el('span', { text: '🖼' })]),
+      el('div', { class: 'imagefield__controls' }, [
+        input(bind, value, {
+          class: 'input input--mono',
+          placeholder: 'https://…  ou  img/affiche.jpg',
+          'aria-label': `${label} — adresse`,
+        }),
+        el('div', { class: 'row' }, [
+          el('label', { class: 'btn btn--ghost btn--sm' }, [
+            '↑ Fichier',
+            el('input', {
+              type: 'file', accept: 'image/*', style: 'display:none',
+              'data-act': 'image-file', 'data-id': bind, 'data-kind': kind,
+            }),
+          ]),
+          value && el('button', {
+            class: 'btn btn--quiet btn--sm', type: 'button',
+            'data-act': 'image-clear', 'data-id': bind, text: 'Retirer',
+          }),
+          weight > 0 && el('span', {
+            class: 'pill' + (weight > 120000 ? ' pill--warn' : ''),
+            title: 'Image intégrée au questionnaire : elle pèse dans le lien de partage.',
+            text: `intégrée · ${formatBytes(weight)}`,
+          }),
+        ]),
+      ]),
+    ]),
+    hint && el('span', { class: 'field__hint', text: hint }),
+  ]);
+};
+
 const head = (title, hint, actions = []) => el('div', {}, [
   el('div', { class: 'panel__head' }, [
     el('h1', { text: title }),
@@ -60,6 +100,8 @@ export function identite(quiz) {
         'Affichée en italique sous le titre.'),
       field('Introduction', textarea('q:intro', quiz.intro, { rows: '5', placeholder: 'Deux ou trois phrases pour poser le ton.' }),
         'Une ligne vide sépare deux paragraphes. Rien d’autre n’est interprété.'),
+      imageField('Image de couverture', 'q:image', quiz.image, 'cover',
+        'Affichée sur l’écran de départ et sur la vignette du kiosque. Facultative.'),
       field('Couleur', el('div', { class: 'swatches' }, [
         ...ACCENTS.map((hex) => el('button', {
           class: 'swatch' + (hex.toLowerCase() === quiz.accent.toLowerCase() ? ' is-active' : ''),
@@ -113,13 +155,13 @@ export function axes(quiz) {
 
 /* --- 3. Questions ------------------------------------------------------------ */
 
-export function questions(quiz) {
+export function questions(quiz, ctx = {}) {
   return el('section', { class: 'panel' }, [
     head('Questions', "Une question par écran. Les points de chaque réponse se règlent à droite, un compteur par axe.", [
       el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'q-add', text: '+ Question' }),
     ]),
     quiz.questions.length
-      ? el('div', { class: 'editor-list' }, quiz.questions.map((q, i) => questionCard(quiz, q, i)))
+      ? el('div', { class: 'editor-list' }, quiz.questions.map((q, i) => questionCard(quiz, q, i, ctx)))
       : el('div', { class: 'empty' }, [
           el('div', { class: 'empty__icon', text: '❓' }),
           el('p', { text: 'Aucune question pour l’instant.' }),
@@ -127,7 +169,7 @@ export function questions(quiz) {
   ]);
 }
 
-function questionCard(quiz, question, index) {
+function questionCard(quiz, question, index, ctx = {}) {
   return el('article', { class: 'editor-card' }, [
     el('header', { class: 'editor-card__head' }, [
       el('span', { class: 'editor-card__index', text: String(index + 1) }),
@@ -153,28 +195,47 @@ function questionCard(quiz, question, index) {
 
       el('div', {}, [
         el('span', { class: 'field__label', text: `Réponses (${question.options.length})` }),
-        el('div', { class: 'opts' }, question.options.map((option, j) => el('div', { class: 'opt' }, [
-          el('input', {
-            class: 'input', 'data-bind': `option:${question.id}:${option.id}:emoji`,
-            value: option.emoji, maxlength: '4', placeholder: '🙂',
-            style: 'text-align:center', 'aria-label': 'Emoji',
-          }),
-          input(`option:${question.id}:${option.id}:text`, option.text,
-            { placeholder: `Réponse ${j + 1}`, 'aria-label': `Réponse ${j + 1}` }),
-          el('span', { class: 'scoreset' }, quiz.axes.map((axis) => el('span', {
-            class: 'scorechip' + ((option.scores[axis.id] || 0) !== 0 ? ' is-set' : ''),
-            style: { '--axis': axis.color }, title: axis.label,
-          }, [
-            el('span', { class: 'scorechip__glyph', text: axis.glyph }),
-            el('input', {
-              class: 'scorechip__input', type: 'number', min: '-9', max: '9', step: '1',
-              'data-bind': `score:${question.id}:${option.id}:${axis.id}`,
-              value: String(option.scores[axis.id] || 0),
-              'aria-label': `Points ${axis.label} pour la réponse ${j + 1}`,
-            }),
-          ]))),
-          tool('opt-del', `${question.id}|${option.id}`, 'Supprimer la réponse', '✕'),
-        ]))),
+        el('div', { class: 'opts' }, question.options.map((option, j) => {
+          /* Le champ image d'une réponse se déplie : la ligne est déjà
+             dense, et la plupart des questionnaires n'illustrent rien. */
+          const open = ctx.expanded?.has(option.id) || Boolean(option.image);
+          return el('div', { class: 'opt-wrap' + (open ? ' is-open' : '') }, [
+            el('div', { class: 'opt' }, [
+              el('input', {
+                class: 'input', 'data-bind': `option:${question.id}:${option.id}:emoji`,
+                value: option.emoji, maxlength: '4', placeholder: '🙂',
+                style: 'text-align:center', 'aria-label': 'Emoji',
+              }),
+              input(`option:${question.id}:${option.id}:text`, option.text,
+                { placeholder: `Réponse ${j + 1}`, 'aria-label': `Réponse ${j + 1}` }),
+              el('span', { class: 'scoreset' }, quiz.axes.map((axis) => el('span', {
+                class: 'scorechip' + ((option.scores[axis.id] || 0) !== 0 ? ' is-set' : ''),
+                style: { '--axis': axis.color }, title: axis.label,
+              }, [
+                el('span', { class: 'scorechip__glyph', text: axis.glyph }),
+                el('input', {
+                  class: 'scorechip__input', type: 'number', min: '-9', max: '9', step: '1',
+                  'data-bind': `score:${question.id}:${option.id}:${axis.id}`,
+                  value: String(option.scores[axis.id] || 0),
+                  'aria-label': `Points ${axis.label} pour la réponse ${j + 1}`,
+                }),
+              ]))),
+              el('span', { class: 'editor-card__tools' }, [
+                el('button', {
+                  class: 'btn btn--icon btn--quiet' + (option.image ? ' is-on' : ''),
+                  type: 'button', 'data-act': 'opt-image', 'data-id': option.id,
+                  title: option.image ? 'Cette réponse a une image' : 'Illustrer cette réponse',
+                  'aria-expanded': String(open), text: option.image ? '🖼' : '🖼',
+                }),
+                tool('opt-del', `${question.id}|${option.id}`, 'Supprimer la réponse', '✕'),
+              ]),
+            ]),
+            open && el('div', { class: 'opt__detail' }, [
+              imageField('Image de la réponse',
+                `option:${question.id}:${option.id}:image`, option.image, 'thumb'),
+            ]),
+          ]);
+        })),
         el('div', { class: 'row', style: { marginTop: 'var(--s-2)' } }, [
           el('button', {
             class: 'btn btn--ghost btn--sm', type: 'button',
@@ -238,6 +299,8 @@ function resultCard(quiz, result, index, ctx) {
         { placeholder: 'Vous aimez que ça finisse mal, mais au soleil.' })),
       field('Texte', textarea(`result:${result.id}:text`, result.text,
         { rows: '3', placeholder: 'Le portrait, en deux phrases.' })),
+      imageField('Illustration du profil', `result:${result.id}:image`, result.image, 'cover',
+        'Bandeau au-dessus du résultat. Facultative.'),
 
       el('div', {}, [
         el('span', { class: 'field__label', text: 'Condition de déclenchement' }),
@@ -274,6 +337,7 @@ function resultCard(quiz, result, index, ctx) {
           ]),
           input(`reco:${result.id}:${reco.id}:note`, reco.note, { placeholder: 'Pourquoi celle-là ? (une phrase)', 'aria-label': 'Note' }),
           input(`reco:${result.id}:${reco.id}:link`, reco.link, { placeholder: 'https://… (facultatif)', 'aria-label': 'Lien', type: 'url' }),
+          imageField('Couverture', `reco:${result.id}:${reco.id}:image`, reco.image, 'thumb'),
         ]))),
         el('div', { class: 'row', style: { marginTop: 'var(--s-2)' } }, [
           el('button', {
@@ -316,7 +380,10 @@ export function publier(quiz, ctx = {}) {
           el('code', { class: 'code', text: `quizzes/${file}` }),
           el('code', { class: 'code', text: `// quizzes/index.json\n[\n  "${file}"\n]` }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
-            el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'export', text: `↓ ${file}` }),
+            el('button', {
+              class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'export',
+              title: file, text: '↓ Télécharger le fichier',
+            }),
             el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'copy-json', text: '⧉ Copier le JSON' }),
           ]),
         ]),

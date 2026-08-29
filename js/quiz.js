@@ -7,10 +7,11 @@
 
 import { resolveQuiz } from './core/catalog.js';
 import { tally, resolve, ceilings } from './core/scoring.js';
-import { RECO_TYPES } from './core/schema.js';
+import { RECO_TYPES, slugify } from './core/schema.js';
 import * as store from './core/store.js';
 import { linkFor } from './core/share.js';
-import { el, paragraphs, escapeHtml, applyAccent, toast, copy } from './core/ui.js';
+import { renderResultCard, toBlob } from './core/card.js';
+import { el, paragraphs, escapeHtml, applyAccent, toast, copy, downloadBlob } from './core/ui.js';
 
 const params = new URLSearchParams(location.search);
 const isTest = params.has('test');
@@ -135,7 +136,9 @@ function renderCover() {
   const resumable = Object.keys(state.answers).length > 0;
 
   return el('section', { class: 'cover' }, [
-    el('div', { class: 'cover__emoji', text: quiz.emoji || '✦' }),
+    quiz.image
+      ? el('img', { class: 'cover__image', src: quiz.image, alt: '' })
+      : el('div', { class: 'cover__emoji', text: quiz.emoji || '✦' }),
     el('h1', { class: 'cover__title', text: quiz.title }),
     quiz.tagline && el('p', { class: 'cover__tagline', text: quiz.tagline }),
     quiz.intro && el('div', { class: 'cover__intro', html: paragraphs(quiz.intro) }),
@@ -190,6 +193,7 @@ function renderQuestion(question, index) {
         'aria-checked': multiple ? null : String(chosen.has(option.id)),
       }, [
         el('span', { class: 'option__key', text: i < 9 ? String(i + 1) : '·', 'aria-hidden': 'true' }),
+        option.image && el('img', { class: 'option__thumb', src: option.image, alt: '', loading: 'lazy' }),
         option.emoji && el('span', { class: 'option__emoji', text: option.emoji, 'aria-hidden': 'true' }),
         el('span', { class: 'option__text', text: option.text }),
       ]))),
@@ -245,6 +249,7 @@ function renderResult() {
   const node = el('section', { class: 'result' }, [
     el('div', { class: 'result__banner' }, [
       el('p', { class: 'result__kicker', text: quiz.title }),
+      profile.image && el('img', { class: 'result__image', src: profile.image, alt: '' }),
       el('div', { class: 'result__emoji', text: profile.emoji || quiz.emoji || '✦' }),
       el('h1', { class: 'result__title', text: profile.title }),
       profile.subtitle && el('p', { class: 'result__subtitle', text: profile.subtitle }),
@@ -274,8 +279,9 @@ function renderResult() {
     profile.recos.length ? recosNode : null,
 
     el('div', { class: 'result__actions' }, [
-      el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'restart', text: '↺ Refaire' }),
+      el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'card', text: '🖼 Ma carte de résultat' }),
       el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'share', text: '⤴ Partager ce questionnaire' }),
+      el('button', { class: 'btn btn--quiet', type: 'button', 'data-act': 'restart', text: '↺ Refaire' }),
       el('a', { class: 'btn btn--quiet', href: 'index.html', text: 'Retour au kiosque' }),
     ]),
   ]);
@@ -294,7 +300,9 @@ function renderReco(reco, index) {
     : escapeHtml(reco.title);
 
   return el('article', { class: 'reco', style: { animationDelay: `${index * 70}ms` } }, [
-    el('div', { class: 'reco__icon', text: type.icon, title: type.label, 'aria-hidden': 'true' }),
+    reco.image
+      ? el('img', { class: 'reco__cover', src: reco.image, alt: '', loading: 'lazy' })
+      : el('div', { class: 'reco__icon', text: type.icon, title: type.label, 'aria-hidden': 'true' }),
     el('div', {}, [
       el('h3', { class: 'reco__title', html: title }),
       meta && el('p', { class: 'reco__creator', text: meta }),
@@ -316,6 +324,7 @@ function onStageClick(event) {
     case 'back':    return go(state.step - 1);
     case 'next':    return advance();
     case 'share':   return shareQuiz();
+    case 'card':    return showCard();
     case 'pick':    return pick(trigger);
     default:        return undefined;
   }
@@ -393,6 +402,60 @@ async function shareQuiz() {
   }
   const ok = await copy(url);
   toast(ok ? 'Lien copié.' : 'Copie impossible.', ok ? '' : 'danger');
+}
+
+/* La carte de résultat : on la montre avant de l'enregistrer. Sur mobile
+   le partage natif prend le relais quand il accepte des fichiers ; sinon
+   on retombe sur un téléchargement, qui marche partout.                */
+async function showCard() {
+  const scores = tally(state.quiz, state.answers);
+  const profile = resolve(state.quiz, scores);
+  if (!profile) return;
+
+  let canvas;
+  let blob;
+  try {
+    canvas = await renderResultCard(state.quiz, profile, scores);
+    blob = await toBlob(canvas);
+  } catch (err) {
+    return toast(`Carte impossible à produire : ${err.message}`, 'danger');
+  }
+
+  const filename = `recohero-${slugify(profile.title, 'resultat')}.png`;
+  const file = new File([blob], filename, { type: 'image/png' });
+  const canShareFile = Boolean(navigator.canShare?.({ files: [file] }));
+
+  canvas.className = 'cardview__canvas';
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', `Carte de résultat : ${profile.title}`);
+
+  const dialog = el('dialog', { class: 'modal cardview' }, [
+    el('div', { class: 'modal__body' }, [canvas]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', 'data-card': 'close', text: 'Fermer' }),
+      canShareFile && el('button', { class: 'btn btn--ghost', type: 'button', 'data-card': 'send', text: '⤴ Partager' }),
+      el('button', { class: 'btn btn--primary', type: 'button', 'data-card': 'save', text: '↓ Enregistrer' }),
+    ]),
+  ]);
+
+  dialog.addEventListener('click', async (event) => {
+    const action = event.target.closest('[data-card]')?.dataset.card;
+    if (!action) return;
+    if (action === 'save') {
+      downloadBlob(filename, blob);
+      toast('Carte enregistrée.');
+    }
+    if (action === 'send') {
+      try {
+        await navigator.share({ files: [file], title: profile.title, text: state.quiz.title });
+      } catch { /* partage annulé : rien à signaler */ }
+      return;
+    }
+    dialog.close();
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
 function onKey(event) {

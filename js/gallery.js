@@ -60,6 +60,7 @@ function card(quiz) {
     href: `quiz.html?q=${encodeURIComponent(quiz.id)}`,
     style: { '--card-accent': quiz.accent },
   }, [
+    quiz.image && el('img', { class: 'quiz-card__cover', src: quiz.image, alt: '', loading: 'lazy' }),
     el('div', { class: 'quiz-card__top' }, [
       el('span', { class: 'quiz-card__emoji', text: quiz.emoji || '✦', 'aria-hidden': 'true' }),
       el('div', {}, [

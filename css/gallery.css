@@ -72,6 +72,12 @@
   border-color: var(--card-accent);
   box-shadow: var(--shadow-2);
 }
+.quiz-card__cover {
+  width: calc(100% + var(--s-5) * 2);
+  margin: calc(var(--s-5) * -1) calc(var(--s-5) * -1) 0;
+  aspect-ratio: 16 / 7;
+  object-fit: cover;
+}
 .quiz-card__top {
   display: flex;
   align-items: flex-start;

@@ -8,13 +8,16 @@
 import { PANELS } from './panels.js';
 import {
   makeQuiz, makeAxis, makeQuestion, makeOption, makeResult, makeReco,
-  normalize, diagnose, uid, slugify,
+  normalize, diagnose, uid, slugify, safeImage, imageWeight,
 } from '../core/schema.js';
 import { reachability } from '../core/scoring.js';
 import { loadPublished } from '../core/catalog.js';
 import * as store from '../core/store.js';
 import { linkFor, encode } from '../core/share.js';
-import { el, toast, copy, download, applyAccent, debounce, formatDate } from '../core/ui.js';
+import {
+  el, toast, copy, download, applyAccent, debounce, formatDate,
+  imageFromFile, formatBytes, IMAGE_LIMITS,
+} from '../core/ui.js';
 
 /* --- La porte -------------------------------------------------------------
    SHA-256 de la phrase d'accès. Elle n'est PAS un mécanisme de sécurité :
@@ -27,13 +30,14 @@ const PASS_SHA256 = '7afa3390516c3b831bde7acb98a061db9c626524677f643a9f55083c1bc
 const UNLOCK_TTL = 12 * 60 * 60 * 1000;
 
 /* Ces liaisons changent la forme du panneau : il faut le redessiner. */
-const RESHAPE = /^(rule:[^:]+:mode|question:[^:]+:type|axis:[^:]+:(glyph|color)|q:accent)$/;
+const RESHAPE = /^(rule:[^:]+:mode|question:[^:]+:type|axis:[^:]+:(glyph|color)|q:accent|.+:image)$/;
 
 const state = {
   quiz: null,
   published: [],
   panel: 'identite',
   reach: null,
+  expanded: new Set(),  /* réponses dont le champ image est déplié */
 };
 
 const dom = {};
@@ -192,7 +196,7 @@ async function renderPanel() {
   }
 
   const panel = PANELS.find((p) => p.id === state.panel) || PANELS[0];
-  const ctx = { reach: state.reach };
+  const ctx = { reach: state.reach, expanded: state.expanded };
   if (panel.id === 'publier') ctx.linkSize = (await encode(state.quiz)).length + 40;
 
   dom.panel.replaceChildren(panel.render(state.quiz, ctx));
@@ -320,8 +324,15 @@ function onChange(event) {
     renderPanel();
     return;
   }
-  const file = event.target.closest('[data-act="import-file"]');
-  if (file && file.files?.[0]) importFile(file.files[0]);
+  const imported = event.target.closest('[data-act="import-file"]');
+  if (imported && imported.files?.[0]) return importFile(imported.files[0]);
+
+  const picture = event.target.closest('[data-act="image-file"]');
+  if (picture && picture.files?.[0]) {
+    attachImage(picture.dataset.id, picture.dataset.kind, picture.files[0]);
+    picture.value = '';  /* rechoisir le même fichier doit re-déclencher */
+  }
+  return undefined;
 }
 
 /* Les retouches qui ne méritent pas un redessin complet : elles gardent
@@ -497,6 +508,15 @@ function onClick(event) {
       return structural();
     }
 
+    case 'opt-image': {
+      state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
+      return renderPanel();
+    }
+    case 'image-clear': {
+      apply(id, '');
+      state.expanded.delete(id.split(':').at(-2));
+      return structural();
+    }
     case 'lock': {
       flush();
       store.lock();
@@ -509,6 +529,27 @@ function onClick(event) {
     case 'copy-json': return copyJson();
     case 'import-paste': return importPaste();
     default: return undefined;
+  }
+}
+
+/* Un fichier du disque devient une image intégrée au questionnaire :
+   réduite, ré-encodée, puis revalidée par safeImage() — on ne fait pas
+   davantage confiance à ce que produit le canvas qu'au reste.          */
+async function attachImage(bind, kind, file) {
+  try {
+    const { dataUri, width, height } = await imageFromFile(
+      file, IMAGE_LIMITS[kind] || IMAGE_LIMITS.cover,
+    );
+    const clean = safeImage(dataUri);
+    if (!clean) throw new Error('encodage non pris en charge par ce navigateur');
+
+    apply(bind, clean);
+    flush();
+    renderRail();
+    renderPanel();
+    toast(`Image intégrée · ${width}×${height} · ${formatBytes(imageWeight(clean))}`);
+  } catch (err) {
+    toast(`Image refusée : ${err.message}`, 'danger');
   }
 }
 

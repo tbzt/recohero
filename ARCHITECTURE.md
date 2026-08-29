@@ -31,7 +31,7 @@ placés sous lui.
                       └───────────────┴───────────────┘
                                       │
    noyau                         js/core/
-                    catalog · schema · scoring · share · store · ui
+              catalog · schema · scoring · share · store · ui · card
 ```
 
 | Module | Responsabilité | Ne fait jamais |
@@ -41,7 +41,8 @@ placés sous lui.
 | `core/scoring.js` | Le comptage, la résolution du profil, la joignabilité. Fonctions **pures**. | lire le DOM, écrire du stockage |
 | `core/share.js` | Encodage / décodage d'un questionnaire dans une URL. | valider le contenu |
 | `core/catalog.js` | D'où viennent les questionnaires : lien, dépôt, brouillons. | modifier un questionnaire |
-| `core/ui.js` | Les gestes d'interface : construire un nœud, notifier, copier, thème. | connaître le métier |
+| `core/card.js` | Dessiner la carte de résultat sur un canvas. | lire le DOM de la page |
+| `core/ui.js` | Les gestes d'interface : nœud, notification, copie, thème, réduction d'image. | connaître le métier |
 
 ---
 
@@ -61,7 +62,15 @@ la délégation sur un attribut `data-act` (une action) ou `data-bind` (une
 liaison de champ), posée une seule fois par zone. Le rendu peut alors
 remplacer tout un panneau sans fuite de gestionnaire.
 
-**3. Aucune couleur en dur hors de `css/foundation.css`.**
+**3. Aucune image n'entre sans passer par `safeImage()`.**
+Un champ image accepte trois formes et trois seulement : `http(s)://…`, un
+chemin relatif du dépôt, ou un `data:image/…;base64,…`. Tout le reste — au
+premier chef `javascript:` et `data:text/html` — est effacé. Le filtre vit
+dans `schema.js` et s'applique à la lecture (`normalize`) **comme** à
+l'écriture depuis un fichier : on ne fait pas davantage confiance à ce que
+produit notre propre canvas qu'à un JSON reçu par lien.
+
+**4. Aucune couleur en dur hors de `css/foundation.css`.**
 Un composant consomme des tokens. Un questionnaire ne redéfinit **qu'une**
 variable, `--accent` ; tout le reste — teinte douce, filet, version profonde,
 couleur du texte posé dessus — en découle par `color-mix()`. C'est ce qui
@@ -142,11 +151,17 @@ redéclare ces media queries.
 
 ### La checklist avant de pousser du CSS
 
-- [ ] Mesuré à **375 px** de large. `documentElement.scrollWidth` ne dépasse
+- [ ] Mesuré à **320 px** et **375 px** de large. `documentElement.scrollWidth` ne dépasse
       pas `clientWidth`. Les items de grille et de flex qui contiennent du
       texte ou un `<input>` portent `min-width: 0` — sans quoi c'est
       l'**ancêtre** qui déborde, pas l'élément fautif, et on cherche au
-      mauvais endroit.
+      mauvais endroit. Ce piège a été payé trois fois sur ce projet : les
+      lignes d'historique, les colonnes du backoffice, et les étapes du
+      panneau « Diffuser ». Il ne se voit qu'avec du contenu long — un
+      questionnaire de test au titre bref ne le déclenche jamais.
+- [ ] Aucun libellé de bouton ne porte de chaîne insécable longue (un nom de
+      fichier, une URL). `white-space: nowrap` la rend plus large que
+      l'écran, et aucun `min-width` ne rattrape ça.
 - [ ] Tout contrôle actionnable fait au moins `--tap` (44 px). Une dérogation
       à `--tap-sm` se justifie en commentaire.
 - [ ] Aucune valeur d'espacement hors de l'échelle base 4.
@@ -158,6 +173,30 @@ redéclare ces media queries.
 - [ ] Aucun état visuel ne dépend d'un `requestAnimationFrame` : il ne
       s'exécute pas dans un onglet en arrière-plan. La valeur au repos doit
       être juste sans JS ; l'animation est un supplément.
+
+---
+
+## La carte de résultat
+
+`core/card.js` compose une affiche 1080 × 1350 sur un canvas. Aucune
+bibliothèque : rasteriser le DOM coûterait une dépendance de plusieurs
+centaines de kilo-octets pour un résultat qu'on ne contrôlerait pas.
+
+Deux contraintes structurent le fichier.
+
+**Le plancher.** La signature est ancrée en bas. Une constante `FLOOR` marque
+la limite au-dessus de laquelle tout doit tenir, et chaque bloc facultatif
+(sous-titre, feuille de score, recommandations) vérifie qu'il a la place
+*avant* de se dessiner. Un profil au titre de trois lignes perd des
+recommandations ; il ne mord jamais sur la signature. Vérifié par
+échantillonnage de pixels, pas par estimation.
+
+**Le canvas teinté.** Dessiner une image d'un autre domaine rend le canvas
+« teinté » et fait échouer `toBlob()` — la carte deviendrait impossible à
+exporter. `isSafeToDraw()` n'accepte donc qu'un `data:` URI ou une image du
+même hébergeur, et la carte retombe sur l'emoji sinon. Cet échec-là est
+silencieux **par choix** : l'auteur n'y peut rien au moment où le répondant
+appuie sur le bouton.
 
 ---
 

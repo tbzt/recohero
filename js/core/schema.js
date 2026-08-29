@@ -20,9 +20,14 @@ export const RECO_TYPES = [
   { id: 'autre',    label: 'Autre',       icon: '✦' },
 ];
 
-/* Les glyphes proposés pour les axes. Tous rendus par les polices
-   système sur les trois plateformes — vérifié avant ajout.              */
-export const GLYPHS = ['★', '●', '▲', '■', '◆', '✿', '☾', '♥', '☀', '⬢'];
+/* Les glyphes proposés pour les axes. Tous pris dans des blocs Unicode
+   servis par les polices système des trois plateformes (Geometric Shapes,
+   Miscellaneous Symbols, Dingbats) — vérifié avant ajout. Le champ reste
+   libre : n'importe quel caractère ou emoji est accepté à la saisie.    */
+export const GLYPHS = [
+  '★', '●', '▲', '■', '◆', '♥', '♠', '♣',
+  '♦', '✿', '☀', '☾', '✚', '✱', '❖', '▼',
+];
 
 /* Palette d'accents retenus : chacun passe le contraste AA sur blanc en
    texte, et supporte du texte blanc en pastille.                        */
@@ -37,6 +42,26 @@ export const RULE_MODES = [
   { id: 'total',    label: 'Palier sur le total', help: "Le profil gagne selon la somme de tous les axes." },
   { id: 'fallback', label: 'Par défaut', help: "Filet de sécurité : gagne si aucune autre règle n'a matché." },
 ];
+
+/* Une image est soit une adresse http(s), soit un chemin relatif du dépôt,
+   soit une image intégrée en data: URI. Tout le reste est rejeté — en
+   particulier `javascript:` et `data:text/html`, qui seraient exécutables
+   si on les laissait arriver dans un attribut src.                       */
+export function safeImage(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  if (/^https?:\/\/[^\s"'<>]+$/i.test(text)) return text;
+  if (/^data:image\/(png|jpe?g|webp|gif|avif);base64,[A-Za-z0-9+/=]+$/i.test(text)) return text;
+  if (/^(?!\/)[\w./-]+\.(png|jpe?g|webp|gif|avif)(\?[\w=&.-]*)?$/i.test(text)) return text;
+  return '';
+}
+
+/* Poids approximatif d'une image intégrée, pour l'afficher à l'auteur. */
+export function imageWeight(value) {
+  if (!String(value || '').startsWith('data:')) return 0;
+  const base64 = value.slice(value.indexOf(',') + 1);
+  return Math.round(base64.length * 0.75);
+}
 
 let counter = 0;
 export function uid(prefix = 'x') {
@@ -70,6 +95,7 @@ export function makeOption(axes = []) {
     id: uid('opt'),
     text: '',
     emoji: '',
+    image: '',
     scores: Object.fromEntries(axes.map((a) => [a.id, 0])),
   };
 }
@@ -85,7 +111,7 @@ export function makeQuestion(axes = []) {
 }
 
 export function makeReco() {
-  return { id: uid('reco'), type: 'livre', title: '', creator: '', year: '', note: '', link: '' };
+  return { id: uid('reco'), type: 'livre', title: '', creator: '', year: '', note: '', link: '', image: '' };
 }
 
 export function makeResult(axes = []) {
@@ -95,6 +121,7 @@ export function makeResult(axes = []) {
     subtitle: '',
     text: '',
     emoji: '',
+    image: '',
     rule: axes.length
       ? { mode: 'dominant', axis: axes[0].id, min: 0, max: 99 }
       : { mode: 'fallback', axis: null, min: 0, max: 99 },
@@ -111,6 +138,7 @@ export function makeQuiz(partial = {}) {
     tagline: '',
     intro: '',
     emoji: '✦',
+    image: '',
     accent: ACCENTS[0],
     axes,
     questions: [makeQuestion(axes)],
@@ -152,6 +180,7 @@ export function normalize(raw) {
           id: String(o.id || uid('opt')),
           text: String(o.text || ''),
           emoji: String(o.emoji || '').slice(0, 8),
+          image: safeImage(o.image),
           scores: Object.fromEntries(
             axes.map((a) => [a.id, clampScore(o.scores?.[a.id])])
           ),
@@ -169,6 +198,7 @@ export function normalize(raw) {
         subtitle: String(r.subtitle || ''),
         text: String(r.text || ''),
         emoji: String(r.emoji || '').slice(0, 8),
+        image: safeImage(r.image),
         rule: {
           mode,
           axis: mode === 'total' || mode === 'fallback' ? null : axis,
@@ -185,6 +215,7 @@ export function normalize(raw) {
             year: String(c.year || ''),
             note: String(c.note || ''),
             link: /^https?:\/\//i.test(c.link || '') ? c.link : '',
+            image: safeImage(c.image),
           })),
       };
     });
@@ -196,6 +227,7 @@ export function normalize(raw) {
     tagline: String(raw.tagline || '').slice(0, 180),
     intro: String(raw.intro || ''),
     emoji: String(raw.emoji || '✦').slice(0, 8),
+    image: safeImage(raw.image),
     accent: /^#[0-9a-f]{3,8}$/i.test(raw.accent || '') ? raw.accent : ACCENTS[0],
     axes,
     questions,

@@ -105,11 +105,58 @@ export async function copy(text) {
   }
 }
 
-export function download(filename, text, mime = 'application/json') {
-  const url = URL.createObjectURL(new Blob([text], { type: mime + ';charset=utf-8' }));
+export function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
   const link = el('a', { href: url, download: filename });
   document.body.append(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function download(filename, text, mime = 'application/json') {
+  downloadBlob(filename, new Blob([text], { type: `${mime};charset=utf-8` }));
+}
+
+/* --- Images ---------------------------------------------------------------
+   Un fichier choisi sur le disque est réduit puis intégré en data: URI.
+   Sans serveur, c'est la seule façon qu'une image survive au partage par
+   lien ; en contrepartie elle pèse dans le questionnaire, d'où la
+   réduction agressive et le poids affiché à l'auteur.                    */
+
+export const IMAGE_LIMITS = {
+  cover:  { max: 1000, quality: 0.72 },  /* couverture de questionnaire, bandeau de profil */
+  thumb:  { max: 420,  quality: 0.72 },  /* vignette de reco, image de réponse */
+};
+
+export async function imageFromFile(file, { max = 800, quality = 0.72 } = {}) {
+  if (!file.type.startsWith('image/')) throw new Error('Ce fichier n’est pas une image.');
+
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close?.();
+
+  /* On garde le plus léger des deux encodages. Un navigateur qui ne sait
+     pas produire de WebP renvoie silencieusement du PNG : le test sur le
+     préfixe évite de le prendre pour du WebP.                          */
+  const webp = canvas.toDataURL('image/webp', quality);
+  const jpeg = canvas.toDataURL('image/jpeg', quality);
+  const usable = webp.startsWith('data:image/webp') && webp.length < jpeg.length ? webp : jpeg;
+  return { dataUri: usable, width, height };
+}
+
+export function formatBytes(bytes) {
+  if (!bytes) return '0 o';
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
