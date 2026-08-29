@@ -42,6 +42,7 @@ const state = {
   published: [],
   espace: null,         /* le nom de l'espace partagé, s'il y en a un */
   guardActive: null,    /* la règle anti-écrasement répond-elle ? null = pas su */
+  membres: [],          /* l'équipe de l'espace, lisible des seuls membres */
   remote: [],           /* les questionnaires de cet espace */
   remoteSession: null,  /* { email, uid } une fois connecté */
   panel: 'identite',
@@ -400,6 +401,7 @@ async function renderPanel() {
     ctx.remoteCount = state.remote.length;
     ctx.remoteSession = state.remoteSession;
     ctx.guardActive = state.guardActive;
+    ctx.membres = state.membres;
     ctx.inEspace = state.remote.some((q) => q.id === state.quiz.id);
   }
 
@@ -839,6 +841,10 @@ function onClick(event) {
       return renderPanel();
     }
     case 'quiz-menu': return openQuizSheet();
+    case 'inviter':          return inviter();
+    case 'membre-retirer':   return retirerMembre(id);
+    case 'copier-uid':       return copierUid();
+    case 'mon-mot-de-passe': return changerMonMotDePasse();
     case 'export-espace': return exportEspace();
     case 'export-drafts': return exportDrafts();
     case 'export-one':    return exportOne(id);
@@ -967,6 +973,152 @@ function openQuizSheet() {
   dialog.showModal();
 }
 
+/* --- L'équipe -------------------------------------------------------------- */
+
+async function copierUid() {
+  const ok = await copy(state.remoteSession?.uid || '');
+  toast(ok ? 'Ton identifiant est copié.' : 'Copie impossible.', ok ? '' : 'danger');
+}
+
+/* Inviter : créer le compte, faire envoyer le courriel, inscrire la
+   personne. Le mot de passe initial est un secret aléatoire jeté sur
+   place — nous ne sommes à aucun moment en possession de ce qui
+   l'authentifie, et c'est elle qui choisira le sien.
+
+   Si l'adresse a déjà un compte, rien côté client ne permet d'en
+   retrouver l'identifiant : on le demande, plutôt que d'échouer. */
+function inviter() {
+  const email = el('input', { class: 'input', type: 'email', placeholder: 'collegue@mediatheque.fr' });
+  const uidChamp = el('input', { class: 'input input--mono', placeholder: 'son identifiant, s’il a déjà un compte' });
+  const info = el('p', { class: 'panel__hint', hidden: true });
+  const erreur = el('p', { class: 'alerte', hidden: true });
+  const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Inviter' });
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: `Inviter dans « ${state.espace} »` }),
+      el('p', { class: 'panel__hint', text: 'La personne reçoit un courriel et choisit son mot de passe elle-même. Tu ne le verras jamais, et RecoHero non plus.' }),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Adresse e-mail' }), email]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'field__label', text: 'Ou son identifiant, si elle a déjà un compte' }),
+        uidChamp,
+        el('span', { class: 'field__hint', text: 'Elle le trouve dans son backoffice, bouton « Copier mon identifiant ».' }),
+      ]),
+      info, erreur,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
+      valider,
+    ]),
+  ]);
+
+  valider.addEventListener('click', async () => {
+    const adresse = email.value.trim();
+    const uidDonne = uidChamp.value.trim();
+    if (!adresse && !uidDonne) return;
+
+    valider.disabled = true;
+    erreur.hidden = true;
+    info.hidden = true;
+
+    try {
+      let cible = uidDonne;
+      if (!cible) {
+        info.textContent = 'Création du compte…';
+        info.hidden = false;
+        cible = await remote.creerCompte(adresse);
+        await remote.envoyerCourrielMotDePasse(adresse);
+      }
+      await remote.ajouterMembre(state.espace, cible);
+      await refreshEspace();
+      dismiss(dialog, () => {
+        toast(uidDonne ? 'Membre ajouté.' : `Invitation envoyée à ${adresse}.`);
+        repaint();
+      });
+    } catch (err) {
+      if (err.code === 'EMAIL_EXISTS') {
+        erreur.textContent = 'Cette adresse a déjà un compte. Demande-lui son identifiant et colle-le dans le second champ — rien ici ne permet de le retrouver.';
+        uidChamp.focus();
+      } else {
+        erreur.textContent = err.message;
+      }
+      erreur.hidden = false;
+      info.hidden = true;
+      valider.disabled = false;
+    }
+  });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  email.focus();
+}
+
+/* Retirer se défait : c'est une ligne dans une liste, pas une suppression
+   de compte. Même règle que partout ailleurs — on agit, on laisse un
+   chemin de retour. */
+async function retirerMembre(uid) {
+  try {
+    await remote.retirerMembre(state.espace, uid);
+    await refreshEspace();
+    repaint();
+    toast('Membre retiré de l’espace.', {
+      action: {
+        label: 'Annuler',
+        onClick: async () => {
+          await remote.ajouterMembre(state.espace, uid);
+          await refreshEspace();
+          repaint();
+          toast('Membre rétabli.');
+        },
+      },
+    });
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+}
+
+function changerMonMotDePasse() {
+  const champ = el('input', { class: 'input', type: 'password', autocomplete: 'new-password' });
+  const erreur = el('p', { class: 'alerte', hidden: true });
+  const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Changer' });
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Changer mon mot de passe' }),
+      el('p', { class: 'panel__hint', text: 'Six caractères au minimum. Il ne transite que vers Firebase, jamais vers ce site — qui n’a pas de serveur pour le recevoir.' }),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Nouveau mot de passe' }), champ]),
+      erreur,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler', onClick: () => dismiss(dialog) }),
+      valider,
+    ]),
+  ]);
+
+  valider.addEventListener('click', async () => {
+    if (champ.value.length < 6) {
+      erreur.textContent = 'Six caractères au minimum.';
+      erreur.hidden = false;
+      return;
+    }
+    valider.disabled = true;
+    try {
+      await remote.changerMotDePasse(champ.value);
+      dismiss(dialog, () => toast('Mot de passe changé.'));
+    } catch (err) {
+      erreur.textContent = err.message;
+      erreur.hidden = false;
+      valider.disabled = false;
+    }
+  });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  champ.focus();
+}
+
 /* --- Diffusion --------------------------------------------------------------------- */
 
 async function testRun() {
@@ -1085,6 +1237,9 @@ function repaint() { flush(); renderRail(); renderPanel(); }
 async function refreshEspace() {
   forgetEspace();
   state.remote = await loadEspace(state.espace);
+  state.membres = state.remoteSession
+    ? await remote.membres(state.espace).catch(() => [])
+    : [];
   await verifierGardeFou();
 }
 

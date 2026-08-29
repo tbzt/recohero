@@ -38,6 +38,19 @@ au compte connecté : personne ne peut signer à la place d'un autre.
 Un questionnaire déjà en ligne sans `rev` — il en existe — n'est pas bloqué :
 la première écriture adopte le compteur.
 
+## Le rang de gérant
+
+Les membres d'un espace s'invitent et se retirent entre eux. Sans exception,
+un seul membre suffirait à verrouiller tout le monde dehors, propriétaire
+compris — et il faudrait la console pour rouvrir.
+
+D'où `espaces/<nom>/gerants/<uid>`. Un compte qui y figure ne peut être retiré
+des membres par personne : la règle le refuse. Cette branche-là n'est
+modifiable que depuis la console, et c'est ce qui la rend fiable.
+
+Un gérant doit figurer **dans les deux listes** : `membres` pour publier,
+`gerants` pour être protégé.
+
 ## Poser la règle
 
 > ⚠️ **Une seule chose se colle dans la console : le contenu du fichier

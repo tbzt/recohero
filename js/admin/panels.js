@@ -454,6 +454,43 @@ function resultCard(quiz, result, index, ctx) {
 /* Le bloc de l'espace partagé. Il n'apparaît que si l'adresse en nomme un :
    sans ?espace=…, le backoffice est exactement ce qu'il était, et rien ne
    parle à un serveur. */
+/* L'équipe de l'espace. Chaque membre peut inviter et retirer — sauf un
+   gérant, que les règles de la base protègent. Sans cette exception, un
+   seul membre suffirait à verrouiller tout le monde dehors, propriétaire
+   compris, et il faudrait la console pour rouvrir.                     */
+function equipeBloc(ctx) {
+  if (!ctx.remoteSession) return null;
+  const moi = ctx.remoteSession.uid;
+
+  return el('div', { style: { marginTop: 'var(--s-5)' } }, [
+    el('div', { class: 'section__head', style: { marginBottom: 'var(--s-3)' } }, [
+      el('h3', { style: 'font-size:var(--t-base)', text: `Équipe — ${ctx.membres.length} membre${ctx.membres.length > 1 ? 's' : ''}` }),
+      el('span', { class: 'section__spacer' }),
+      el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'inviter', text: '+ Inviter' }),
+    ]),
+
+    el('div', { class: 'sheet__list' }, ctx.membres.map((m) => el('div', { class: 'sheet__row' }, [
+      el('span', { class: 'sheet__emoji', text: m.gerant ? '🔑' : '👤' }),
+      el('span', { class: 'sheet__label input--mono', style: 'font-size:var(--t-xs)',
+        text: m.uid + (m.uid === moi ? '  — toi' : '') }),
+      m.gerant && el('span', { class: 'pill', title: 'Un gérant ne peut être retiré que depuis la console.', text: 'gérant' }),
+      !m.gerant && m.uid !== moi && el('button', {
+        class: 'btn btn--icon btn--quiet', type: 'button',
+        'data-act': 'membre-retirer', 'data-id': m.uid,
+        title: 'Retirer de l’espace', text: '✕',
+      }),
+    ]))),
+
+    el('p', { class: 'field__hint', style: { marginTop: 'var(--s-3)' }, text:
+      'Inviter crée le compte et envoie un courriel : la personne choisit son mot de passe elle-même, RecoHero ne le voit jamais. Retirer un membre lui ôte le droit de publier, sans supprimer son compte.' }),
+
+    el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
+      el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'copier-uid', text: '⧉ Copier mon identifiant' }),
+      el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'mon-mot-de-passe', text: '🔒 Changer mon mot de passe' }),
+    ]),
+  ]);
+}
+
 function espaceCard(ctx) {
   if (!ctx.espace) return null;
 
@@ -492,6 +529,11 @@ function espaceCard(ctx) {
               el('div', { class: 'row', style: { marginTop: 'var(--s-2)' } }, [
                 el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'export-espace', text: '↓ Exporter tout l’espace' }),
                 ctx.remoteCount ? el('span', { class: 'pill', text: `${ctx.remoteCount} questionnaire${ctx.remoteCount > 1 ? 's' : ''}` }) : null,
+              ]),
+
+              equipeBloc(ctx),
+
+              el('div', { class: 'row', style: { display: 'none' } }, [
               ]),
             ])
           : el('div', {}, [

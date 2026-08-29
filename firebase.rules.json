@@ -19,6 +19,18 @@
 
         "membres": {
           ".read": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
+
+          ".write": false,
+
+          "$uid": {
+            ".write": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists() && !root.child('espaces').child($espace).child('gerants').child($uid).exists()",
+
+            ".validate": "newData.isBoolean()"
+          }
+        },
+
+        "gerants": {
+          ".read": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
           ".write": false
         }
 

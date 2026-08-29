@@ -28,6 +28,9 @@ const API_KEY = 'AIzaSyBVWe1ZBdh0IU-6_hJoDCY3YroJz2iyBHc';
 
 const SIGN_IN = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`;
 const REFRESH = `https://securetoken.googleapis.com/v1/token?key=${API_KEY}`;
+const SIGN_UP = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`;
+const OOB     = `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${API_KEY}`;
+const UPDATE  = `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${API_KEY}`;
 
 /* Le jeton dure une heure. On le renouvelle un peu avant l'échéance :
    à la seconde près, une requête partie juste avant expirerait en vol. */
@@ -50,6 +53,10 @@ const MESSAGES = {
   USER_DISABLED: 'Ce compte a été désactivé.',
   TOO_MANY_ATTEMPTS_TRY_LATER: 'Trop de tentatives. Réessaie dans quelques minutes.',
   INVALID_EMAIL: 'Cette adresse n’est pas une adresse e-mail.',
+  EMAIL_EXISTS: 'Cette adresse a déjà un compte.',
+  WEAK_PASSWORD: 'Mot de passe trop court : six caractères au minimum.',
+  MISSING_PASSWORD: 'Mot de passe manquant.',
+  CREDENTIAL_TOO_OLD_LOGIN_AGAIN: 'Session trop ancienne. Reconnecte-toi avant de changer ton mot de passe.',
 };
 
 function readable(code) {
@@ -122,6 +129,101 @@ async function token() {
    Un espace = une branche. Les questionnaires d'une médiathèque ne
    croisent jamais ceux d'une autre, et le nom de l'espace vient de
    l'adresse (?espace=…), jamais du code.                              */
+
+/* --- Comptes ---------------------------------------------------------------
+   Inviter quelqu'un, sans serveur et sans jamais voir son mot de passe.
+
+   Le compte est créé avec un secret aléatoire qu'on jette aussitôt : il
+   n'est ni affiché, ni conservé, ni transmis. La personne reçoit ensuite
+   le courriel de réinitialisation de Firebase et choisit le sien. Nous ne
+   sommes à aucun moment en possession de ce qui l'authentifie.
+
+   La création de compte est de toute façon ouverte à qui connaît la clé
+   publique — elle l'était avant cette fonction. Ce qui donne des droits,
+   ce n'est pas d'avoir un compte, c'est de figurer dans les membres de
+   l'espace ; et cette liste-là, les règles la gardent.                  */
+
+async function identite(url, corps) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corps),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    const code = String(data?.error?.message || '').split(' ')[0];
+    const err = new Error(readable(code));
+    err.code = code;
+    throw err;
+  }
+  return data;
+}
+
+function secretJetable() {
+  const octets = crypto.getRandomValues(new Uint8Array(24));
+  return btoa(String.fromCharCode(...octets));
+}
+
+/* Renvoie l'identifiant du compte créé. Lève une erreur portant le code
+   EMAIL_EXISTS si l'adresse en a déjà un — cas courant et pas une panne :
+   l'appelant demandera alors son identifiant à la personne, puisque rien
+   côté client ne permet de le retrouver.                               */
+export async function creerCompte(email) {
+  const data = await identite(SIGN_UP, {
+    email, password: secretJetable(), returnSecureToken: false,
+  });
+  return data.localId;
+}
+
+export async function envoyerCourrielMotDePasse(email) {
+  await identite(OOB, { requestType: 'PASSWORD_RESET', email });
+}
+
+/* Changer son propre mot de passe. Firebase renvoie de nouveaux jetons :
+   les ignorer déconnecterait la personne au renouvellement suivant. */
+export async function changerMotDePasse(motDePasse) {
+  const idToken = await token();
+  if (!idToken) throw new Error('Il faut être connecté.');
+  const data = await identite(UPDATE, { idToken, password: motDePasse, returnSecureToken: true });
+  const saved = store.getRemote();
+  store.setRemote({
+    ...saved,
+    idToken: data.idToken || saved.idToken,
+    refreshToken: data.refreshToken || saved.refreshToken,
+    expiresAt: Date.now() + Number(data.expiresIn || 3600) * 1000,
+  });
+}
+
+/* --- Membres ---------------------------------------------------------------
+   La liste qui donne le droit de publier. Lisible des seuls membres, et
+   modifiable par eux — sauf pour un gérant, que les règles protègent :
+   sans cette exception, un seul membre pourrait verrouiller tout le monde
+   dehors, propriétaire compris.                                         */
+
+function branche(espace, nom, rest = '') {
+  return `${DB}/espaces/${encodeURIComponent(espace)}/${nom}${rest}.json`;
+}
+
+export async function membres(espace) {
+  const [liste, gerants] = await Promise.all([
+    call(branche(espace, 'membres')).catch(() => null),
+    call(branche(espace, 'gerants')).catch(() => null),
+  ]);
+  const proteges = new Set(Object.keys(gerants || {}));
+  return Object.keys(liste || {}).map((uid) => ({ uid, gerant: proteges.has(uid) }));
+}
+
+export async function ajouterMembre(espace, uid) {
+  return call(branche(espace, 'membres', `/${encodeURIComponent(uid)}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: 'true',
+  });
+}
+
+export async function retirerMembre(espace, uid) {
+  return call(branche(espace, 'membres', `/${encodeURIComponent(uid)}`), { method: 'DELETE' });
+}
 
 function path(espace, rest = '') {
   return `${DB}/espaces/${encodeURIComponent(espace)}/quizzes${rest}.json`;
