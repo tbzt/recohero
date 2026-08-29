@@ -234,6 +234,24 @@ appuie sur le bouton.
 
 ---
 
+## Travailler à plusieurs sur ce dossier
+
+Ce dépôt est édité par plusieurs sessions à la fois. Une règle en découle,
+et elle a été payée :
+
+**Jamais `git add -A` ni `git commit -a`.** Committer par chemins explicites,
+et lire `git status` avant. Le 29 août 2026, un `git add -A` a ramassé le
+travail en cours d'une session voisine — une fonctionnalité d'intégration en
+iframe, à moitié écrite — et l'a poussé sous un message de commit qui parlait
+d'autre chose. Rien n'a été perdu, mais l'historique porte désormais un
+commit qui ment sur son contenu.
+
+Le symptôme se voit à ceci : `git diff` montre des lignes supprimées qu'on
+n'a jamais écrites. C'est le signe qu'un `HEAD` contient le travail d'un
+autre. S'arrêter là, ne rien réécrire, et le dire.
+
+---
+
 ## Ce qui n'existe pas, et pourquoi
 
 **Voir les réponses des autres.** Impossible sans serveur, et c'est le choix
