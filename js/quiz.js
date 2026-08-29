@@ -179,6 +179,7 @@ function renderQuestion(question, index) {
       `Question ${index + 1} / ${quiz.questions.length}`,
       multiple && el('span', { class: 'pill', text: 'plusieurs réponses possibles' }),
     ]),
+    question.image && el('img', { class: 'question__image', src: question.image, alt: '' }),
     el('h1', { class: 'question__text', text: question.text }),
     question.hint && el('p', { class: 'question__hint', text: question.hint }),
 

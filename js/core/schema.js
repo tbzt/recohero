@@ -105,6 +105,7 @@ export function makeQuestion(axes = []) {
     id: uid('q'),
     text: '',
     hint: '',
+    image: '',
     type: 'single',
     options: [makeOption(axes), makeOption(axes)],
   };
@@ -173,6 +174,7 @@ export function normalize(raw) {
       id: String(q.id || uid('q')),
       text: String(q.text || ''),
       hint: String(q.hint || ''),
+      image: safeImage(q.image),
       type: q.type === 'multiple' ? 'multiple' : 'single',
       options: (Array.isArray(q.options) ? q.options : [])
         .filter((o) => o && typeof o === 'object')

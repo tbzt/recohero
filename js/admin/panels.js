@@ -175,6 +175,13 @@ function questionCard(quiz, question, index, ctx = {}) {
       el('span', { class: 'editor-card__index', text: String(index + 1) }),
       el('span', { class: 'editor-card__label', text: question.text || 'Question sans texte' }),
       el('span', { class: 'editor-card__tools' }, [
+        el('button', {
+          class: 'btn btn--icon btn--quiet' + (question.image ? ' is-on' : ''),
+          type: 'button', 'data-act': 'opt-image', 'data-id': question.id,
+          title: question.image ? 'Cette question a une image' : 'Illustrer cette question',
+          'aria-expanded': String(ctx.expanded?.has(question.id) || Boolean(question.image)),
+          text: '🖼',
+        }),
         tool('q-up', question.id, 'Monter', '↑', { disabled: index === 0 }),
         tool('q-down', question.id, 'Descendre', '↓', { disabled: index === quiz.questions.length - 1 }),
         tool('q-dup', question.id, 'Dupliquer', '⧉'),
@@ -182,6 +189,10 @@ function questionCard(quiz, question, index, ctx = {}) {
       ]),
     ]),
     el('div', { class: 'editor-card__body stack' }, [
+      (ctx.expanded?.has(question.id) || question.image) && imageField(
+        'Image de la question', `question:${question.id}:image`, question.image, 'cover',
+        'Affichée au-dessus de l’énoncé, pleine largeur.',
+      ),
       field('Question', input(`question:${question.id}:text`, question.text,
         { placeholder: 'Il est 15 h, un dimanche d’août. Tu…' })),
       el('div', { class: 'grid-2' }, [

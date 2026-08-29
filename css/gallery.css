@@ -3,7 +3,7 @@
    ========================================================================== */
 
 .hero {
-  padding-block: var(--s-8) var(--s-7);
+  padding-block: var(--s-8) var(--s-6);
   text-align: center;
 }
 .hero__title {
@@ -13,14 +13,6 @@
 .hero__title em {
   font-style: normal;
   color: var(--accent);
-}
-.hero__tagline {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: clamp(var(--t-md), 2.6vw, var(--t-lg));
-  color: var(--ink-muted);
-  max-width: 34rem;
-  margin-inline: auto;
 }
 
 .section { padding-block: var(--s-5) var(--s-7); }

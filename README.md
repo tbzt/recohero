@@ -61,11 +61,14 @@ une phrase de justification, un lien facultatif, et une couverture.
 
 ## Les images
 
-Quatre emplacements acceptent une image : la **couverture** du questionnaire
-(écran de départ et vignette du kiosque), l'**illustration** d'un profil
-(bandeau au-dessus du résultat), la **couverture d'une œuvre** recommandée, et
-l'**image d'une réponse** (pour les questions du type « choisissez votre
-paysage » — le champ se déplie depuis l'icône 🖼 de la ligne).
+Cinq emplacements acceptent une image : la **couverture** du questionnaire
+(écran de départ et vignette du kiosque), l'**illustration d'une question**
+(bandeau au-dessus de l'énoncé), l'**image d'une réponse** (pour les questions
+du type « choisissez votre paysage »), l'**illustration d'un profil** (bandeau
+au-dessus du résultat), et la **couverture d'une œuvre** recommandée.
+
+Pour les questions et les réponses, le champ se déplie depuis l'icône 🖼 —
+dans l'en-tête de la carte pour une question, sur la ligne pour une réponse.
 
 Chaque champ accepte trois formes :
 

@@ -42,6 +42,7 @@ function slim(quiz) {
     questions: quiz.questions.map((q) => ({
       ...q,
       hint: q.hint || undefined,
+      image: q.image || undefined,
       options: q.options.map((o) => ({
         ...o,
         emoji: o.emoji || undefined,
