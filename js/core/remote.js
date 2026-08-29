@@ -144,13 +144,72 @@ export async function loadSpace(espace) {
   return data ? Object.values(data) : [];
 }
 
+/* --- Le garde-fou contre l'écrasement -------------------------------------
+   Publier envoie `rev + 1`, et la règle de la base exige que ce soit
+   exactement le suivant. Deux personnes parties de la même version ne
+   peuvent donc pas publier l'une après l'autre : la seconde est refusée
+   par la BASE, pas par notre politesse — ce qui protège même d'un défaut
+   de notre côté. Le raisonnement complet est dans NOTES-REGLES.md.      */
+
+export class ConflitError extends Error {
+  constructor(distant) {
+    super('Ce questionnaire a été modifié depuis que tu l’as ouvert.');
+    this.name = 'ConflitError';
+    this.distant = distant;
+  }
+}
+
+async function lireQuiz(espace, id) {
+  const url = `${DB}/espaces/${encodeURIComponent(espace)}/quizzes/${encodeURIComponent(id)}.json`;
+  const response = await fetch(url);
+  return response.ok ? response.json() : null;
+}
+
 export async function saveQuiz(espace, quiz) {
   const { source, file, ...clean } = quiz;
-  return call(path(espace, `/${encodeURIComponent(quiz.id)}`), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...clean, updatedAt: Date.now() }),
-  });
+  const auth = session();
+  const corps = {
+    ...clean,
+    rev: (Number(quiz.rev) || 0) + 1,
+    updatedBy: auth?.uid || '',
+    updatedAt: Date.now(),
+  };
+
+  try {
+    await call(path(espace, `/${encodeURIComponent(quiz.id)}`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corps),
+    });
+    return corps.rev;
+  } catch (err) {
+    /* La base renvoie le même 401 pour « tu n'es pas membre » et pour
+       « ta révision n'est pas la suivante ». On ne devine pas d'après le
+       message : on relit, et c'est la version distante qui tranche. */
+    const distant = await lireQuiz(espace, quiz.id);
+    if (distant && (Number(distant.rev) || 0) !== (Number(quiz.rev) || 0)) {
+      throw new ConflitError(distant);
+    }
+    throw err;
+  }
+}
+
+/* Une règle qu'on croit posée et qui ne l'est pas ne se voit pas. On tente
+   donc une écriture qui DOIT être refusée : réécrire `rev` à sa valeur
+   actuelle. Si elle passe, la règle est absente — et rien n'est abîmé,
+   puisqu'on a réécrit la même valeur.                                   */
+export async function guardActive(espace, quiz) {
+  if (!quiz || !session()) return null;
+  try {
+    await call(path(espace, `/${encodeURIComponent(quiz.id)}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rev: Number(quiz.rev) || 0 }),
+    });
+    return false;   // acceptée : la règle n'est pas en place
+  } catch {
+    return true;    // refusée : la règle fait son travail
+  }
 }
 
 export async function deleteQuiz(espace, id) {

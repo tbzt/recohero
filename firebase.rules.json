@@ -9,7 +9,11 @@
           ".write": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
 
           "$quiz": {
-            ".validate": "newData.hasChildren(['id', 'title'])"
+            ".validate": "newData.hasChildren(['id', 'title', 'rev', 'updatedBy']) && ((!data.exists() || !data.hasChild('rev')) ? newData.child('rev').val() >= 1 : newData.child('rev').val() === data.child('rev').val() + 1)",
+
+            "rev": { ".validate": "newData.isNumber()" },
+
+            "updatedBy": { ".validate": "newData.isString() && newData.val() === auth.uid" }
           }
         },
 

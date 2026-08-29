@@ -468,6 +468,18 @@ function espaceCard(ctx) {
                 el('span', { class: 'pill', text: ctx.remoteSession.email }),
                 el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'remote-signout', text: 'Se déconnecter' }),
               ]),
+              /* Une règle de base de données absente ne se voit nulle
+                 part : l'espace a exactement la même apparence, protégé ou
+                 non. C'est pourquoi ce bandeau existe, et pourquoi il est
+                 en rouge — il annonce que deux personnes peuvent s'effacer
+                 mutuellement sans le savoir. */
+              ctx.guardActive === false && el('p', { class: 'alerte' }, [
+                el('strong', { text: 'Protection contre l’écrasement inactive. ' }),
+                'La base a accepté une écriture qu’elle aurait dû refuser : la règle n’est pas publiée. ',
+                'Deux personnes qui modifient le même questionnaire peuvent s’effacer l’une l’autre. ',
+                'Voir NOTES-REGLES.md pour la poser.',
+              ]),
+
               /* Le seul filet de cet espace : la base gratuite n'offre
                  aucune restauration. Le bouton est donc au même niveau que
                  « Publier », pas relégué en bas de page. */

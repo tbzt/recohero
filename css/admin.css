@@ -537,6 +537,21 @@
   .preview__stage { max-height: 32vh; }
 }
 
+/* --- Alerte ------------------------------------------------------------------
+   Réservée à ce qui est faux sans se voir : une protection qu'on croit en
+   place et qui ne l'est pas. Pas pour une simple mise en garde. */
+.alerte {
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--danger);
+  border-left-width: 4px;
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--danger) 8%, var(--surface));
+  color: var(--ink);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+}
+.alerte strong { color: var(--danger); }
+
 /* --- Poignée de déplacement -----------------------------------------------
    `touch-action: none` est indispensable : sans lui, le navigateur
    interprète le geste comme un défilement et le déplacement ne démarre

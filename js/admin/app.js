@@ -41,6 +41,7 @@ const state = {
   quiz: null,
   published: [],
   espace: null,         /* le nom de l'espace partagé, s'il y en a un */
+  guardActive: null,    /* la règle anti-écrasement répond-elle ? null = pas su */
   remote: [],           /* les questionnaires de cet espace */
   remoteSession: null,  /* { email, uid } une fois connecté */
   panel: 'identite',
@@ -333,6 +334,7 @@ async function renderPanel() {
     ctx.espace = state.espace;
     ctx.remoteCount = state.remote.length;
     ctx.remoteSession = state.remoteSession;
+    ctx.guardActive = state.guardActive;
     ctx.inEspace = state.remote.some((q) => q.id === state.quiz.id);
   }
 
@@ -1018,6 +1020,19 @@ function repaint() { flush(); renderRail(); renderPanel(); }
 async function refreshEspace() {
   forgetEspace();
   state.remote = await loadEspace(state.espace);
+  await verifierGardeFou();
+}
+
+/* Poser une règle de base de données et croire qu'elle est là sont deux
+   choses. On tente donc une écriture qui doit être refusée, et on le dit
+   si elle passe. Sans ça, un espace non protégé ressemble trait pour
+   trait à un espace protégé — jusqu'au jour où deux personnes publient. */
+async function verifierGardeFou() {
+  if (!state.espace || !state.remoteSession || !state.remote.length) return;
+  /* Une fois par session suffit : la réponse ne change pas entre deux
+     publications, et refreshEspace() est appelé après chacune. */
+  if (state.guardActive !== null) return;
+  state.guardActive = await remote.guardActive(state.espace, state.remote[0]);
 }
 
 function showSignIn() {
@@ -1096,14 +1111,79 @@ async function publishRemote() {
   }
 
   try {
-    await remote.saveQuiz(state.espace, state.quiz);
+    state.quiz.rev = await remote.saveQuiz(state.espace, state.quiz);
+    state.quiz.updatedBy = state.remoteSession.uid;
+    flush();
     await refreshEspace();
     toast(`« ${state.quiz.title} » est en ligne dans l’espace.`);
     repaint();
   } catch (err) {
+    if (err.name === 'ConflitError') return resoudreConflit(err.distant);
     toast(err.message, 'danger');
   }
   return undefined;
+}
+
+/* Quelqu'un a publié entre le moment où ce questionnaire a été ouvert et
+   maintenant. On ne choisit pas à la place de l'auteur : on lui dit qui, on
+   lui dit quand, et on lui laisse les deux issues. Écraser reste possible —
+   le garde-fou est là contre l'accident, pas contre la volonté.        */
+async function resoudreConflit(distant) {
+  const quand = distant.updatedAt
+    ? formatDate(distant.updatedAt)
+    : 'à une date inconnue';
+  /* Sans profils de compte, on n'a que l'identifiant technique. Le dire
+     ainsi vaut mieux que de laisser croire à un bug. */
+  const qui = distant.updatedBy
+    ? (distant.updatedBy === state.remoteSession?.uid
+        ? 'toi, depuis un autre onglet ou un autre appareil'
+        : `un autre compte (${distant.updatedBy.slice(0, 8)}…)`)
+    : 'un compte inconnu';
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Publication refusée — la version en ligne a changé' }),
+      el('p', { text: `« ${distant.title} » a été modifié par ${qui}, ${quand}. Publier ta version maintenant effacerait ce travail-là.` }),
+      el('p', { class: 'panel__hint', text: 'Reprendre la version en ligne l’ouvre dans l’éditeur, à côté de la tienne, pour que tu compares avant de décider. Écraser publie ta version telle quelle : l’autre est alors perdue.' }),
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler',
+        onClick: () => dismiss(dialog) }),
+      el('button', { class: 'btn btn--danger', type: 'button', text: 'Écraser quand même',
+        onClick: () => dismiss(dialog, () => forcerPublication(distant)) }),
+      el('button', { class: 'btn btn--primary', type: 'button', text: 'Voir la version en ligne',
+        onClick: () => dismiss(dialog, () => reprendreDistant(distant)) }),
+    ]),
+  ]);
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+/* Écraser, c'est repartir de la révision réelle — pas la contourner. La
+   base accepte alors, puisqu'on lui donne bien le numéro suivant. */
+async function forcerPublication(distant) {
+  state.quiz.rev = Number(distant.rev) || 0;
+  try {
+    state.quiz.rev = await remote.saveQuiz(state.espace, state.quiz);
+    state.quiz.updatedBy = state.remoteSession.uid;
+    flush();
+    await refreshEspace();
+    toast('Ta version a écrasé celle qui était en ligne.');
+    repaint();
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+}
+
+function reprendreDistant(distant) {
+  const copie = normalize({ ...distant, id: uid('quiz'), title: `${distant.title} (version en ligne)` });
+  store.saveDraft(copie);
+  select(copie.id);
+  flush();
+  renderRail();
+  renderPanel();
+  toast('Version en ligne ouverte à côté de la tienne.');
 }
 
 async function unpublishRemote() {

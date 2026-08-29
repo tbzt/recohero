@@ -1,0 +1,68 @@
+# Le garde-fou contre l'écrasement — comment il tient
+
+*Ce fichier n'est pas de la documentation d'usage : il explique la règle de
+base de données, et sert de mode d'emploi pour la poser. Il vit à la racine
+parce que la règle et le code doivent changer ensemble, jamais l'un sans
+l'autre.*
+
+## Le problème
+
+Deux personnes de la médiathèque ouvrent le même questionnaire. La première
+publie, la seconde publie ensuite : le travail de la première disparaît, sans
+que personne le sache. Rien dans RecoHero ne l'empêchait.
+
+## Pourquoi la règle est côté base, et pas côté client
+
+On aurait pu comparer les versions dans le navigateur avant d'écrire. Ça
+n'aurait rien garanti : deux écritures peuvent se croiser entre la lecture et
+l'envoi, un onglet resté ouvert ignore ce qui s'est passé ailleurs, et un
+défaut de notre code annulerait la protection en silence.
+
+La base, elle, arbitre au moment de l'écriture. Elle refuse la seconde
+écriture même si notre code se trompe.
+
+## Le mécanisme
+
+Chaque questionnaire porte un compteur `rev`. Publier envoie `rev + 1`, et la
+règle exige que ce soit exactement le suivant :
+
+    newData.child('rev').val() === data.child('rev').val() + 1
+
+Deux personnes partent de `rev: 5`. La première écrit `6` : accepté. La
+seconde écrit `6` aussi, mais la base est déjà à `6` — il faudrait `7`. Elle
+est refusée. Le refus vient de la base, pas de notre politesse.
+
+`updatedBy` porte l'UID de qui a écrit, et la règle vérifie qu'il correspond
+au compte connecté : personne ne peut signer à la place d'un autre.
+
+Un questionnaire déjà en ligne sans `rev` — il en existe — n'est pas bloqué :
+la première écriture adopte le compteur.
+
+## Poser la règle
+
+Console Firebase → Realtime Database → onglet **Règles** → coller le contenu
+de [`firebase.rules.json`](firebase.rules.json) → **Publier**.
+
+## Vérifier qu'elle est bien là
+
+Le backoffice le fait tout seul : à la connexion à un espace, il tente une
+écriture qui doit être refusée. Si elle passe, un bandeau rouge le dit dans la
+carte Espace. Une règle qu'on croit posée et qui ne l'est pas ne se voit pas
+autrement.
+
+Et à la main, après toute modification des règles, les huit requêtes anonymes :
+
+```bash
+DB=https://VOTRE-BASE.europe-west1.firebasedatabase.app
+E=maupassant
+curl -s -o /dev/null -w '%{http_code} lecture des questionnaires (200 attendu)\n'  "$DB/espaces/$E/quizzes.json"
+curl -s -o /dev/null -w '%{http_code} écriture anonyme (401)\n'        -X PUT  -d '{"x":1}' "$DB/espaces/$E/quizzes/pirate.json"
+curl -s -o /dev/null -w '%{http_code} suppression anonyme (401)\n'     -X DELETE          "$DB/espaces/$E/quizzes/pirate.json"
+curl -s -o /dev/null -w '%{http_code} lecture des membres (401)\n'                        "$DB/espaces/$E/membres.json"
+curl -s -o /dev/null -w '%{http_code} écriture des membres (401)\n'    -X PUT  -d 'true'  "$DB/espaces/$E/membres/pirate.json"
+curl -s -o /dev/null -w '%{http_code} lecture de /espaces (401)\n'                        "$DB/espaces.json"
+curl -s -o /dev/null -w '%{http_code} création d un espace (401)\n'    -X PUT  -d '{}'    "$DB/espaces/pirate.json"
+curl -s -o /dev/null -w '%{http_code} lecture de la racine (401)\n'                       "$DB/.json"
+```
+
+Une seule doit passer : la première.
