@@ -402,12 +402,9 @@ function resultCard(quiz, result, index, ctx) {
       ]),
     ]),
     !folded && el('div', { class: 'editor-card__body stack' }, [
-      el('div', { class: 'grid-2' }, [
-        field('Emoji', input(`result:${result.id}:emoji`, result.emoji,
-          { maxlength: '4', style: 'font-size:1.3rem;text-align:center' })),
-        field('Titre du profil', input(`result:${result.id}:title`, result.title,
-          { placeholder: 'Le solaire mélancolique' })),
-      ]),
+      field('Titre du profil', input(`result:${result.id}:title`, result.title,
+        { placeholder: '🌊 Le solaire mélancolique' }),
+        'Un emoji en tête du titre s’affiche avec lui — pas besoin d’un champ à part.'),
       field('Sous-titre', input(`result:${result.id}:subtitle`, result.subtitle,
         { placeholder: 'Vous aimez que ça finisse mal, mais au soleil.' })),
       field('Texte', textarea(`result:${result.id}:text`, result.text,
@@ -561,9 +558,8 @@ export function publier(quiz, ctx = {}) {
           el('h3', { text: 'Par lien — immédiat' }),
           el('p', { text: 'Le questionnaire entier est compressé dans l’adresse. Rien à déployer, rien à héberger : celui qui reçoit le lien peut répondre tout de suite. Le même lien s’intègre dans une page d’un autre site.' }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
-            el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'copy-link', text: '⧉ Copier le lien' }),
-            el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'test', text: '▷ Tester le parcours' }),
-            el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'embed', text: '⧉ Code d’intégration' }),
+            el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'copy-link', text: 'Copier le lien' }),
+            el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'embed', text: 'Code d’intégration' }),
             ctx.linkSize && el('span', { class: 'pill', text: `${ctx.linkSize} caractères` }),
           ]),
         ]),
@@ -581,22 +577,22 @@ export function publier(quiz, ctx = {}) {
           el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
             el('button', {
               class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'export',
-              title: file, text: '↓ Exporter le fichier',
+              title: file, text: 'Exporter le fichier',
             }),
-            el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'copy-json', text: '⧉ Copier le JSON' }),
+            el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'copy-json', text: 'Copier le JSON' }),
           ]),
           el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-4)' }, text: 'Dans l’autre sens — reprendre le modèle de quelqu’un :' }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-2)' } }, [
             el('label', { class: 'btn btn--ghost btn--sm' }, [
-              '↑ Importer un fichier',
+              'Importer un fichier',
               el('input', { type: 'file', accept: '.json,application/json', 'data-act': 'import-file', style: 'display:none' }),
             ]),
-            el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'import-paste', text: '⌨ Coller du JSON' }),
+            el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'import-paste', text: 'Coller du JSON' }),
           ]),
           el('p', { class: 'field__hint', text: 'Un fichier peut contenir un questionnaire ou un catalogue entier. Si l’import trouve des identifiants déjà présents, il demande une fois s’il faut remplacer tes copies — c’est ce qui permet de restaurer une sauvegarde — ou en faire des variantes.' }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-4)' } }, [
-            el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'export-drafts', text: '↓ Exporter tous mes brouillons' }),
-            ctx.espace && el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'export-espace', text: '↓ Exporter tout l’espace' }),
+            el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'export-drafts', text: 'Exporter tous mes brouillons' }),
+            ctx.espace && el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'export-espace', text: 'Exporter tout l’espace' }),
             ctx.remoteCount ? el('span', { class: 'pill', text: `${ctx.remoteCount} en ligne` }) : null,
           ]),
           el('p', { class: 'field__hint', text: ctx.espace

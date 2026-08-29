@@ -427,12 +427,70 @@ async function renderPanel() {
     ctx.inEspace = state.remote.some((q) => q.id === state.quiz.id);
   }
 
-  dom.panel.replaceChildren(panel.render(state.quiz, ctx));
+  /* L'état du questionnaire, au-dessus de tous les panneaux. Les
+     compteurs vivaient dans « Profils » : une donnée qui décrit le
+     questionnaire entier, rangée dans le panneau qui parle des sorties.
+     On ne cherche pas ce qu'on ignore — et quand rien n'a encore été
+     compté, la ligne le dit plutôt que de disparaître. */
+  dom.panel.replaceChildren(bandeauEtat(ctx), panel.render(state.quiz, ctx));
   applyAccent(state.quiz.accent);
   bindSortables(dom.panel, dropped);
   if (panel.id === 'questions') paintPreview();
 
   if (panel.id === 'resultats') scheduleReach();
+}
+
+function bandeauEtat(ctx) {
+  const quiz = state.quiz;
+  const soucis = diagnose(quiz);
+  const erreurs = soucis.filter((i) => i.level === 'error').length;
+  const enLigne = state.remote.some((q) => q.id === quiz.id);
+  const stats = ctx.stats;
+
+  const item = (valeur, libelle, extra = {}) => el('span', { class: 'etat__item', ...extra }, [
+    el('strong', { class: 'etat__valeur', text: String(valeur) }),
+    el('span', { class: 'etat__libelle', text: libelle }),
+  ]);
+
+  return el('div', { class: 'etat' }, [
+    item(quiz.questions.length, quiz.questions.length > 1 ? 'questions' : 'question'),
+    item(quiz.results.length, quiz.results.length > 1 ? 'profils' : 'profil'),
+    item(quiz.axes.length, quiz.axes.length > 1 ? 'axes' : 'axe'),
+
+    el('span', { class: 'etat__sep' }),
+
+    erreurs
+      ? el('button', {
+          class: 'etat__item etat__item--erreur', type: 'button',
+          'data-act': 'panel', 'data-id': soucis.find((i) => i.level === 'error').where,
+          title: 'Aller au premier problème',
+        }, [
+          el('strong', { class: 'etat__valeur', text: String(erreurs) }),
+          el('span', { class: 'etat__libelle', text: erreurs > 1 ? 'à corriger' : 'à corriger' }),
+        ])
+      : el('span', { class: 'etat__item etat__item--ok' }, [
+          el('strong', { class: 'etat__valeur', text: '✓' }),
+          el('span', { class: 'etat__libelle', text: 'prêt' }),
+        ]),
+
+    state.espace && el('span', {
+      class: 'etat__item ' + (enLigne ? 'etat__item--ok' : ''),
+      title: enLigne ? 'Ce questionnaire est publié dans l’espace.' : 'Ce questionnaire n’est pas encore publié.',
+    }, [
+      el('strong', { class: 'etat__valeur', text: enLigne ? '⇧' : '—' }),
+      el('span', { class: 'etat__libelle', text: enLigne ? 'en ligne' : 'non publié' }),
+    ]),
+
+    /* Le compteur ne se cache pas quand il est à zéro : c'est justement
+       le moment où il faut savoir qu'il existe. */
+    state.espace && enLigne && el('span', {
+      class: 'etat__item',
+      title: 'Parcours terminés depuis la mise en ligne. Un ordre de grandeur : rien n’empêche quelqu’un de le gonfler.',
+    }, [
+      el('strong', { class: 'etat__valeur', text: String(stats?.total || 0) }),
+      el('span', { class: 'etat__libelle', text: (stats?.total || 0) > 1 ? 'parcours terminés' : 'parcours terminé' }),
+    ]),
+  ]);
 }
 
 /* La joignabilité est coûteuse : on la calcule à froid, après le rendu,
@@ -873,6 +931,7 @@ function onClick(event) {
       quiz.auteurs = [...liste];
       return structural();
     }
+    case 'aide':             return afficherRaccourcis();
     case 'compte':           return parametresCompte();
     case 'mon-profil':       return monProfil();
     case 'inviter':          return inviter();
@@ -936,6 +995,33 @@ async function attachImage(bind, kind, file) {
   }
 }
 
+/* Ouvrir un questionnaire ne doit pas donner huit mille pixels d'un coup.
+   On plie donc les listes trop longues — mais « trop longue » ne se compte
+   pas en cartes : une carte de profil, avec ses recommandations et leurs
+   champs image, fait trois fois la hauteur d'une carte de question.
+   Compter les cartes donnait huit questions pliées et quatre profils
+   dépliés à huit mille pixels. On estime donc la matière.
+
+   Les constantes viennent de mesures, pas d'intuitions : ~260 px pour
+   l'ossature d'une question, ~90 par réponse ; ~420 pour un profil, ~300
+   par recommandation. À deux écrans, on plie.                          */
+const PLAFOND_DEPLIE = 1600;
+
+function hauteurEstimee(liste, base, parEnfant, enfants) {
+  return liste.reduce((total, item) => total + base + parEnfant * (item[enfants]?.length || 0), 0);
+}
+
+function plierSiLongue(quiz) {
+  state.folded = new Set();
+  const listes = [
+    [quiz.questions, hauteurEstimee(quiz.questions, 260, 90, 'options')],
+    [quiz.results, hauteurEstimee(quiz.results, 420, 300, 'recos')],
+  ];
+  for (const [liste, hauteur] of listes) {
+    if (hauteur > PLAFOND_DEPLIE) for (const item of liste) state.folded.add(item.id);
+  }
+}
+
 function select(id) {
   flush();
   const draft = store.getDraft(id);
@@ -945,6 +1031,7 @@ function select(id) {
   } catch {
     return toast('Ce brouillon est illisible.', 'danger');
   }
+  plierSiLongue(state.quiz);
   state.reach = null;
   renderTopbar();
   dom.saveStatus.textContent = draft.updatedAt ? `Enregistré · ${formatDate(draft.updatedAt)}` : '';
@@ -1007,6 +1094,47 @@ function openQuizSheet() {
   dialog.showModal();
 }
 
+/* Ce que l'outil sait faire et que personne ne peut deviner. Six
+   fonctions existaient sans qu'aucune ne soit annoncée nulle part — une
+   capacité qu'on ignore n'existe pas. */
+function afficherRaccourcis() {
+  const ligne = (touches, quoi) => el('div', { class: 'sheet__row' }, [
+    el('span', { class: 'raccourci', text: touches }),
+    el('span', { class: 'sheet__label', text: quoi }),
+  ]);
+
+  const dialog = el('dialog', { class: 'modal sheet' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Raccourcis et gestes' }),
+
+      el('span', { class: 'field__label', text: 'Dans le backoffice' }),
+      el('div', { class: 'sheet__list' }, [
+        ligne('Ctrl + Z', 'Annuler le dernier geste de structure — ajout, suppression, déplacement'),
+        ligne('Ctrl + S', 'Forcer l’enregistrement (il est déjà automatique)'),
+        ligne('⠿', 'Glisser pour réordonner : axes, questions, réponses, profils, recommandations'),
+        ligne('Échap', 'Renoncer à un déplacement en cours'),
+        ligne('▾', 'Replier une carte ; « Tout replier » agit sur la liste entière'),
+      ]),
+
+      el('span', { class: 'field__label', style: { marginTop: 'var(--s-4)' }, text: 'Dans le parcours, côté répondant' }),
+      el('div', { class: 'sheet__list' }, [
+        ligne('1 … 9', 'Choisir une réponse'),
+        ligne('← →', 'Question précédente, question suivante'),
+        ligne('Entrée', 'Valider et avancer'),
+        ligne('Balayer', 'Au doigt : passer d’une question à l’autre'),
+      ]),
+
+      el('p', { class: 'field__hint', text: 'Rien de tout cela n’est nécessaire : tout se fait aussi à la souris et au clic.' }),
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--primary', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
+    ]),
+  ]);
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
 /* --- Paramètres du compte ---------------------------------------------------
    Tout ce qui concerne la personne connectée et son équipe, réuni hors du
    questionnaire : qui je suis, mon mot de passe, qui d'autre a accès, et
@@ -1048,8 +1176,8 @@ function parametresCompte() {
       el('div', { class: 'row' }, [
         el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'mon-profil',
           text: monNom ? `👤 ${monNom}` : '👤 Renseigner mon profil' }),
-        el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'mon-mot-de-passe', text: '🔒 Mot de passe' }),
-        el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'copier-uid', text: '⧉ Mon identifiant' }),
+        el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'mon-mot-de-passe', text: 'Mot de passe' }),
+        el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'copier-uid', text: 'Mon identifiant' }),
       ]),
       !monNom && el('p', { class: 'field__hint', text:
         'Sans profil, tes collègues te voient comme un identifiant technique — dans les messages de conflit, par exemple.' }),
@@ -1424,7 +1552,7 @@ async function showEmbed() {
     ]),
     el('div', { class: 'modal__actions' }, [
       el('button', { class: 'btn btn--quiet', type: 'button', 'data-embed': 'close', text: 'Fermer' }),
-      el('button', { class: 'btn btn--primary', type: 'button', 'data-embed': 'copy', text: '⧉ Copier le code' }),
+      el('button', { class: 'btn btn--primary', type: 'button', 'data-embed': 'copy', text: 'Copier le code' }),
     ]),
   ]);
 

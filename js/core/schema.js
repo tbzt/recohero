@@ -121,7 +121,6 @@ export function makeResult(axes = []) {
     title: '',
     subtitle: '',
     text: '',
-    emoji: '',
     image: '',
     rule: axes.length
       ? { mode: 'dominant', axis: axes[0].id, min: 0, max: 99 }
@@ -194,12 +193,22 @@ export function normalize(raw) {
     .map((r) => {
       const mode = RULE_MODES.some((m) => m.id === r.rule?.mode) ? r.rule.mode : 'fallback';
       const axis = axisIds.has(r.rule?.axis) ? r.rule.axis : (axes[0]?.id ?? null);
+      /* Un profil avait un champ emoji distinct de son titre. Deux champs
+         pour une seule idée : l'emoji se met dans le titre, et le titre
+         s'affiche tel qu'il est écrit. Les questionnaires déjà saisis ne
+         perdent rien — l'emoji est replié dans le titre à la lecture,
+         une fois, et le champ disparaît. */
+      const titre = String(r.title || '');
+      const emojiSeul = String(r.emoji || '').slice(0, 8).trim();
+      const titreComplet = emojiSeul && !titre.startsWith(emojiSeul)
+        ? `${emojiSeul} ${titre}`.trim()
+        : titre;
+
       return {
         id: String(r.id || uid('res')),
-        title: String(r.title || ''),
+        title: titreComplet,
         subtitle: String(r.subtitle || ''),
         text: String(r.text || ''),
-        emoji: String(r.emoji || '').slice(0, 8),
         image: safeImage(r.image),
         rule: {
           mode,

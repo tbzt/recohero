@@ -285,6 +285,21 @@
 .option:has(.option__thumb) { min-height: 74px; }
 .option__text { flex: 1; min-width: 0; }
 
+/* La mention des gestes. Elle dit au doigt ce qui vaut au doigt, et au
+   clavier ce qui vaut au clavier : annoncer des touches à quelqu'un qui
+   n'en a pas est pire que se taire. */
+.astuce {
+  margin-bottom: var(--s-4);
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  text-align: center;
+}
+.astuce__tactile { display: none; }
+@media (hover: none) {
+  .astuce__clavier { display: none; }
+  .astuce__tactile { display: inline; }
+}
+
 .navrow {
   display: flex;
   align-items: center;

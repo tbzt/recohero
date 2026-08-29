@@ -227,6 +227,17 @@ function renderQuestion(question, index) {
      verra. Seule la barre de navigation est propre au parcours. */
   const view = questionView(quiz, question, index, { chosen, total: quiz.questions.length });
 
+  /* Les touches et le balayage existent depuis toujours et rien ne les
+     annonçait. Une mention sur la première question seulement : passé ce
+     point, ou bien la personne s'en sert, ou bien elle a choisi de ne pas
+     s'en servir — et la répéter serait du bruit. */
+  if (index === 0) {
+    view.append(el('p', { class: 'astuce' }, [
+      el('span', { class: 'astuce__clavier', text: 'Touches 1 à 9 pour répondre, ← → pour naviguer' }),
+      el('span', { class: 'astuce__tactile', text: 'Balayez pour passer d’une question à l’autre' }),
+    ]));
+  }
+
   view.append(el('div', { class: 'navrow' }, [
     el('button', { class: 'btn btn--quiet', type: 'button', 'data-act': 'back', text: '← Précédent' }),
     el('span', { class: 'navrow__spacer' }),
@@ -258,7 +269,7 @@ function renderResult() {
     if (!isTest && profile) {
       store.addResult({
         quizId: quiz.id, quizTitle: quiz.title, quizEmoji: quiz.emoji,
-        accent: quiz.accent, resultTitle: profile.title, resultEmoji: profile.emoji,
+        accent: quiz.accent, resultTitle: profile.title,
         counts: scores.counts,
         axes: quiz.axes.map((a) => ({ id: a.id, glyph: a.glyph, label: a.label, color: a.color })),
       });
@@ -284,7 +295,6 @@ function renderResult() {
     el('div', { class: 'result__banner' }, [
       el('p', { class: 'result__kicker', text: quiz.title }),
       profile.image && el('img', { class: 'result__image', src: profile.image, alt: '' }),
-      el('div', { class: 'result__emoji', text: profile.emoji || quiz.emoji || '✦' }),
       el('h1', { class: 'result__title', text: profile.title }),
       profile.subtitle && el('p', { class: 'result__subtitle', text: profile.subtitle }),
       profile.text && el('div', { class: 'result__text', html: paragraphs(profile.text) }),

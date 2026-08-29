@@ -107,6 +107,8 @@ function renderHistory() {
     class: 'history__row',
     style: { '--accent': entry.accent || 'var(--accent)' },
   }, [
+    /* Les résultats d'avant la fusion portent encore leur emoji propre :
+       on le sert tant qu'il existe, sinon celui du questionnaire. */
     el('span', { class: 'history__emoji', text: entry.resultEmoji || entry.quizEmoji || '✦' }),
     el('div', { class: 'history__body' }, [
       el('div', { class: 'history__result', text: entry.resultTitle }),

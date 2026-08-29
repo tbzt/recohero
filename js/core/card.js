@@ -150,7 +150,7 @@ export async function renderResultCard(quiz, profile, scores) {
   } else {
     ctx.font = `128px ${SANS}`;
     ctx.fillStyle = INK;
-    ctx.fillText(profile.emoji || quiz.emoji || '✦', PAD, y);
+    ctx.fillText(quiz.emoji || '✦', PAD, y);
     y += 168;
   }
 
