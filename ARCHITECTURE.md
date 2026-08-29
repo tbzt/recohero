@@ -191,6 +191,35 @@ redéclare ces media queries.
 
 ---
 
+## La proximité, et les compteurs
+
+**« Vous n'étiez pas loin de… » n'a de valeur que si c'est vrai.** On mesure
+donc, pour chaque profil écarté, de combien il a été manqué — dans l'unité du
+questionnaire, des points d'axe — et on ne propose le plus proche que si
+l'écart est petit *au regard de ce qui était en jeu* : le seuil suit le
+plafond de l'axe, parce que deux points ne veulent pas dire la même chose sur
+une échelle de 6 et sur une de 40. `proximite()` rend `null` plutôt que
+d'inventer une quasi-réussite. Un filet « par défaut » en est exclu : il
+attrape tout, il ne se rate pas.
+
+**Les compteurs sont anonymes en écriture, et bornés par la règle.** Qui
+répond n'a pas de compte : l'écriture est donc ouverte. Ce qui la tient,
+c'est `newData.val() === data.val() + 1`, et `{".sv": {"increment": 1}}` qui
+fait faire l'addition au serveur — sans lecture préalable, donc sans course
+entre deux répondants simultanés.
+
+À dire franchement, et c'est écrit dans le code : quelqu'un de déterminé peut
+répéter l'appel et gonfler le compte d'une unité à la fois. C'est un ordre de
+grandeur, pas une mesure d'audience. Sans serveur à nous, il ne peut pas en
+être autrement — et pour savoir si un questionnaire a été fait dix fois ou
+trois cents, l'ordre de grandeur suffit.
+
+Rien de personnel n'est écrit : ni qui, ni quand, ni depuis où. Deux nombres.
+Et le mode test ne compte pas — mesurer les essais de l'auteur fausserait la
+seule chose que le compteur sache dire.
+
+---
+
 ## Les profils, et le double consentement
 
 Prénom, photo et fonction d'agents d'une structure publique, sur un site

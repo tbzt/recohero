@@ -215,6 +215,46 @@ export async function changerMotDePasse(motDePasse) {
   });
 }
 
+/* --- Les compteurs ----------------------------------------------------------
+   Qui répond n'a pas de compte : l'écriture est donc ouverte. Ce qui la
+   borne, c'est la règle — chaque écriture doit valoir exactement
+   l'ancienne valeur plus un, et `{".sv": {"increment": 1}}` fait faire
+   l'addition au serveur, sans lecture préalable ni course entre deux
+   répondants simultanés.
+
+   À dire franchement : quelqu'un de déterminé peut répéter l'appel et
+   gonfler le compte d'une unité à la fois. C'est un ordre de grandeur, pas
+   une mesure d'audience. Sans serveur à nous, il ne peut pas en être
+   autrement — et pour savoir si un questionnaire a été fait dix fois ou
+   trois cents, l'ordre de grandeur suffit.
+
+   Rien de personnel n'est écrit : ni qui, ni quand, ni depuis où. Deux
+   nombres, et c'est tout.                                              */
+
+const INCR = { '.sv': { increment: 1 } };
+
+export async function compterParcours(espace, quizId, resultId) {
+  if (!espace || !quizId) return;
+  const url = `${DB}/espaces/${encodeURIComponent(espace)}/stats/${encodeURIComponent(quizId)}.json`;
+  const corps = { total: INCR };
+  if (resultId) corps.profils = { [resultId]: INCR };
+  try {
+    await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corps),
+    });
+  } catch {
+    /* Un compteur qui échoue ne doit rien casser : le répondant a fini son
+       parcours, c'est ce qui compte. */
+  }
+}
+
+export async function stats(espace) {
+  if (!espace) return {};
+  return (await call(branche(espace, 'stats')).catch(() => null)) || {};
+}
+
 /* --- Profils ----------------------------------------------------------------
    Deux branches, et la séparation EST la protection.
 

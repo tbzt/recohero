@@ -330,6 +330,11 @@ function questionCard(quiz, question, index, ctx = {}) {
 export function resultats(quiz, ctx = {}) {
   return el('section', { class: 'panel' }, [
     head('Profils de sortie', "Ce que le répondant obtient à la fin. Les règles sont examinées de haut en bas : la première qui matche gagne, et « par défaut » passe toujours en dernier.", [
+      ctx.stats?.total ? el('span', {
+        class: 'pill pill--accent',
+        title: 'Nombre de parcours terminés depuis la mise en ligne. Un ordre de grandeur : rien n’empêche quelqu’un de le gonfler.',
+        text: `${ctx.stats.total} parcours terminé${ctx.stats.total > 1 ? 's' : ''}`,
+      }) : null,
       foldAll('results', quiz.results, ctx),
       el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'res-add', text: '+ Profil' }),
     ]),
@@ -375,6 +380,20 @@ function resultCard(quiz, result, index, ctx) {
         class: 'pill pill--warn', text: 'jamais atteint',
         title: 'Aucune combinaison de réponses ne mène à ce profil.',
       }),
+      /* Combien de fois ce profil est tombé. Le pourcentage dit plus que
+         le nombre brut : c'est l'équilibre entre les sorties qu'un auteur
+         cherche à lire, pas le trafic. */
+      (() => {
+        const n = ctx.stats?.profils?.[result.id] || 0;
+        const total = ctx.stats?.total || 0;
+        if (!total) return null;
+        const part = Math.round((n / total) * 100);
+        return el('span', {
+          class: 'pill' + (n === 0 ? ' pill--warn' : ''),
+          title: n === 0 ? 'Personne n’est jamais tombé sur ce profil.' : `${n} sur ${total} parcours terminés`,
+          text: `${part} %`,
+        });
+      })(),
       el('span', { class: 'editor-card__tools' }, [
         tool('res-up', result.id, 'Monter', '↑', { disabled: index === 0 }),
         tool('res-down', result.id, 'Descendre', '↓', { disabled: index === quiz.results.length - 1 }),

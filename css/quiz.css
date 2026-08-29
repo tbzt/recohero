@@ -469,6 +469,29 @@
   font-weight: var(--fw-medium);
 }
 
+/* La porte entrouverte. Volontairement en retrait : c'est une invitation
+   à revenir, pas un second résultat qui concurrencerait le premier. */
+.presque {
+  margin-top: var(--s-6);
+  padding: var(--s-4) var(--s-5);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.presque__intro { font-size: var(--t-sm); color: var(--ink-muted); margin-bottom: var(--s-1); }
+.presque__intro strong { color: var(--accent-deep); font-family: var(--font-display); }
+.presque__sous {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--t-sm);
+  color: var(--ink-faint);
+  margin-bottom: var(--s-3);
+}
+.presque__recos { display: grid; gap: var(--s-1); margin: 0; }
+.presque__recos li { font-size: var(--t-sm); color: var(--ink); }
+.presque__titre { font-weight: var(--fw-medium); }
+.presque__auteur, .presque__cote { color: var(--ink-muted); }
+
 .result__actions {
   display: flex;
   flex-wrap: wrap;

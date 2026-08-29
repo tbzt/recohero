@@ -80,6 +80,69 @@ export function ceilings(quiz) {
   return max;
 }
 
+/* --- La proximité -----------------------------------------------------------
+   « Vous avez eu ça, mais vous n'étiez pas loin de ça. »
+
+   Encore faut-il que ce soit vrai. On mesure donc, pour chaque profil
+   écarté, de COMBIEN il a été manqué — dans l'unité du questionnaire, des
+   points d'axe — et on ne propose le plus proche que si l'écart est petit
+   au regard de ce qui était en jeu.
+
+   Un filet « par défaut » n'est jamais une quasi-réussite : il attrape
+   tout, il ne se rate pas. Il est écarté.                               */
+
+function ecart(regle, scores, plafonds) {
+  switch (regle.mode) {
+    case 'dominant': {
+      /* Combien de points il aurait fallu de plus sur cet axe pour qu'il
+         mène. Zéro veut dire à égalité — manqué de rien du tout. */
+      const value = scores.counts[regle.axis] ?? 0;
+      return { points: Math.max(0, scores.best - value), axis: regle.axis };
+    }
+    case 'range': {
+      const value = scores.counts[regle.axis] ?? 0;
+      if (value < regle.min) return { points: regle.min - value, axis: regle.axis };
+      if (value > regle.max) return { points: value - regle.max, axis: regle.axis };
+      return { points: 0, axis: regle.axis };
+    }
+    case 'total': {
+      if (scores.total < regle.min) return { points: regle.min - scores.total, axis: null };
+      if (scores.total > regle.max) return { points: scores.total - regle.max, axis: null };
+      return { points: 0, axis: null };
+    }
+    default:
+      return null;   // le filet ne se rate pas
+  }
+}
+
+export function proximite(quiz, scores, gagnant) {
+  const plafonds = ceilings(quiz);
+
+  const candidats = quiz.results
+    .filter((r) => r !== gagnant && r.rule.mode !== 'fallback' && r.title.trim())
+    .map((r) => ({ resultat: r, ...(ecart(r.rule, scores, plafonds) || {}) }))
+    .filter((c) => Number.isFinite(c.points))
+    .sort((a, b) => a.points - b.points);
+
+  const meilleur = candidats[0];
+  if (!meilleur) return null;
+
+  /* Le seuil suit l'échelle du questionnaire : deux points d'écart ne
+     veulent pas dire la même chose sur un axe qui plafonne à 6 et sur un
+     qui plafonne à 40. En dessous de deux points, on affiche toujours —
+     c'est un quasi ex æquo quelle que soit l'échelle. */
+  const plafond = meilleur.axis ? (plafonds[meilleur.axis] || 0)
+                                : Object.values(plafonds).reduce((a, b) => a + b, 0);
+  const seuil = Math.max(2, Math.ceil(plafond * 0.15));
+  if (meilleur.points > seuil) return null;
+
+  return {
+    resultat: meilleur.resultat,
+    points: meilleur.points,
+    axe: meilleur.axis ? quiz.axes.find((a) => a.id === meilleur.axis) : null,
+  };
+}
+
 /* Un profil est-il atteignable ? Le backoffice s'en sert pour prévenir
    avant publication qu'une règle ne se déclenchera jamais.
    On explore exhaustivement quand c'est petit, on échantillonne sinon. */

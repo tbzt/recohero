@@ -6,8 +6,8 @@
    ========================================================================== */
 
 import { resolveQuiz } from './core/catalog.js';
-import { vitrines as chargerVitrines } from './core/remote.js';
-import { tally, resolve, ceilings } from './core/scoring.js';
+import { vitrines as chargerVitrines, compterParcours } from './core/remote.js';
+import { tally, resolve, ceilings, proximite } from './core/scoring.js';
 import { RECO_TYPES, slugify } from './core/schema.js';
 import { questionView } from './core/views.js';
 import * as store from './core/store.js';
@@ -251,6 +251,10 @@ function renderResult() {
   if (!state.finished) {
     state.finished = true;
     store.clearSession(quiz.id);
+    /* Une fois par parcours terminé, jamais en mode test : compter les
+       essais de l'auteur fausserait la seule chose que le compteur sait
+       dire. L'appel n'est pas attendu — le résultat s'affiche d'abord. */
+    if (espace && !isTest) compterParcours(espace, quiz.id, profile?.id);
     if (!isTest && profile) {
       store.addResult({
         quizId: quiz.id, quizTitle: quiz.title, quizEmoji: quiz.emoji,
@@ -308,6 +312,8 @@ function renderResult() {
 
     profile.recos.length ? recosNode : null,
 
+    presqueNode(quiz, scores, profile),
+
     el('div', { class: 'result__actions' }, [
       el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'card', text: '🖼 Ma carte de résultat' }),
       el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'share', text: '⤴ Partager ce questionnaire' }),
@@ -320,6 +326,38 @@ function renderResult() {
      après coup : la largeur au repos est donc toujours juste, même si
      l'onglet est en arrière-plan quand le résultat est calculé.        */
   return node;
+}
+
+/* « Vous n'étiez pas loin de… ». Ne s'affiche que si c'est vrai — la
+   mesure est dans scoring.js, et elle rend null plutôt que d'inventer une
+   quasi-réussite. On donne l'écart en points d'axe : « à 2 ★ près » dit
+   quelque chose de concret, là où « vous étiez proche » ne dit rien.
+
+   Deux recommandations au plus : c'est une porte entrouverte, pas un
+   second résultat qui viendrait concurrencer le premier.               */
+function presqueNode(quiz, scores, profile) {
+  const proche = proximite(quiz, scores, profile);
+  if (!proche) return null;
+
+  const ecart = proche.points === 0
+    ? 'à égalité'
+    : `à ${proche.points} ${proche.axe ? proche.axe.glyph : 'point'}${!proche.axe && proche.points > 1 ? 's' : ''} près`;
+
+  const recos = proche.resultat.recos.filter((r) => r.title.trim()).slice(0, 2);
+
+  return el('section', { class: 'presque' }, [
+    el('p', { class: 'presque__intro' }, [
+      'Vous n’étiez pas loin de ',
+      el('strong', { text: `« ${proche.resultat.title} »` }),
+      ` — ${ecart}.`,
+    ]),
+    proche.resultat.subtitle && el('p', { class: 'presque__sous', text: proche.resultat.subtitle }),
+    recos.length && el('ul', { class: 'presque__recos' }, recos.map((r) => el('li', {}, [
+      el('span', { class: 'presque__titre', text: r.title }),
+      r.creator && el('span', { class: 'presque__auteur', text: ` — ${r.creator}` }),
+      r.location && el('span', { class: 'presque__cote', text: ` · 📍 ${r.location}` }),
+    ]))),
+  ]);
 }
 
 function renderReco(reco, index) {

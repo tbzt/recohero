@@ -45,6 +45,7 @@ const state = {
   membres: [],          /* l'équipe de l'espace, lisible des seuls membres */
   profils: {},          /* leurs profils, lisibles de l'équipe seule */
   vitrines: {},         /* ce que chacun a choisi de rendre public */
+  stats: {},            /* parcours terminés, par questionnaire et par profil */
   remote: [],           /* les questionnaires de cet espace */
   remoteSession: null,  /* { email, uid } une fois connecté */
   panel: 'identite',
@@ -422,6 +423,7 @@ async function renderPanel() {
     ctx.membres = state.membres;
     ctx.profils = state.profils;
     ctx.vitrines = state.vitrines;
+    ctx.stats = state.quiz ? state.stats?.[state.quiz.id] : null;
     ctx.inEspace = state.remote.some((q) => q.id === state.quiz.id);
   }
 
@@ -1456,9 +1458,10 @@ async function refreshEspace() {
   state.membres = state.remoteSession
     ? await remote.membres(state.espace).catch(() => [])
     : [];
-  [state.profils, state.vitrines] = await Promise.all([
+  [state.profils, state.vitrines, state.stats] = await Promise.all([
     state.remoteSession ? remote.profilsEquipe(state.espace).catch(() => ({})) : {},
     remote.vitrines(state.espace),
+    state.remoteSession ? remote.stats(state.espace).catch(() => ({})) : {},
   ]);
   await verifierGardeFou();
 }
