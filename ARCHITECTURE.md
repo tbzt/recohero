@@ -191,7 +191,7 @@ redéclare ces media queries.
 
 ---
 
-## Quatre pièges payés comptant
+## Cinq pièges payés comptant
 
 **Les listes s'imbriquent.** Les réponses vivent dans les questions, les
 recommandations dans les profils. Un `pointerdown` sur une poignée intérieure
@@ -214,6 +214,20 @@ qui ne se produit jamais ne laisse aucune trace pour le dire : un import par
 collage n'importait rien, en silence. `dismiss(dialog, then)` ferme, retire et
 exécute explicitement ; l'écouteur `close` ne garde que le ramassage des
 fermetures qu'on ne provoque pas soi-même — Échap, clic sur le fond.
+
+**Un import qui ne sait que dupliquer rend la sauvegarde inutile.** `adopt()`
+réattribuait un identifiant neuf dès qu'il en rencontrait un déjà présent.
+Tant que l'import ne servait qu'à recevoir le modèle d'un tiers, c'était le
+bon réflexe. Du jour où l'export d'un catalogue est devenu la seule sauvegarde
+d'un espace — la base gratuite n'ayant aucune restauration — ce réflexe rendait
+la restauration impossible : douze doublons au lieu de douze originaux. La
+question est désormais posée, une fois pour tout un fichier.
+
+Corollaire trouvé au test : le questionnaire ouvert dans l'éditeur était le
+seul à ne jamais se restaurer. La sauvegarde différée le réécrivait par-dessus
+sa propre restauration, et le compte des remplacements mentait — trois
+remplacés, deux restaurés. `adopt()` écrit donc l'état courant, puis lâche
+`state.quiz`, avant d'importer quoi que ce soit.
 
 ---
 

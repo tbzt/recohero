@@ -124,7 +124,13 @@ texte mordre sur la signature.
 
 ## Diffuser un questionnaire
 
-Trois voies, et elles ne servent pas à la même chose.
+Quatre voies, et elles ne servent pas à la même chose. Le **lien** va d'une
+personne à une personne. L'**espace** publie durablement, à plusieurs. Le
+**fichier** transmet un questionnaire modifiable. L'**intégration** l'installe
+dans la page d'un autre site.
+
+Aucune ne demande git — le dépôt ne sert plus qu'à héberger le questionnaire
+d'exemple.
 
 ### Par lien — immédiat, rien à déployer
 
@@ -199,6 +205,53 @@ fabriquer un depuis le web. C'est voulu.
 
 ---
 
+### Par fichier — pour se passer un modèle
+
+Un lien se répond, un espace se consulte. Le **fichier** est la seule voie qui
+transporte un questionnaire *éditable* d'une personne à l'autre : qui le reçoit
+l'ouvre dans son propre backoffice et le modifie à sa guise. C'est ce qu'il
+faut pour partir du questionnaire de quelqu'un plutôt que de la page blanche.
+
+Backoffice → **Diffuser** → `↓ Exporter le fichier`, ou `⧉ Copier le JSON`.
+Dans l'autre sens, `↑ Importer un fichier` et `⌨ Coller du JSON`. Le JSON
+contient tout : questions, axes, profils, recommandations, images intégrées.
+
+Un `↓` figure aussi sur chaque ligne du rail — au kiosque comme dans un
+espace — pour exporter ce questionnaire-là sans en passer par une copie locale.
+
+#### Sauvegarder un espace, et le restaurer
+
+Deux boutons exportent un **catalogue entier** plutôt qu'un questionnaire :
+`↓ Exporter tout l'espace`, dans la carte Espace, et `↓ Exporter tous mes
+brouillons`. Le fichier produit est une enveloppe qui se décrit elle-même,
+pour qu'on sache dans six mois ce qu'on tient :
+
+```json
+{ "recohero": 1, "espace": "maupassant", "exporteLe": "2026-08-29T…", "quizzes": [ … ] }
+```
+
+**Ce n'est pas un confort, c'est le seul filet.** Une base Firebase gratuite
+n'offre aucune restauration : une suppression dans un espace est définitive, et
+rien ne la rattrape. L'export du catalogue est la seule sauvegarde qui existe.
+
+C'est aussi pourquoi l'import sait **remplacer**. Quand il rencontre des
+identifiants déjà présents en local, il demande — une fois pour tout le
+fichier, pas une fois par questionnaire :
+
+| Choix | Effet | Quand |
+|---|---|---|
+| **Remplacer ma copie** | écrase les brouillons de même identifiant | restaurer une sauvegarde |
+| **Créer une variante** | garde les deux, le nouveau prend un identifiant neuf | dupliquer volontairement |
+
+Sans le premier, la sauvegarde n'en serait pas une : réimporter douze
+questionnaires produirait douze doublons au lieu de rétablir douze originaux.
+Une sauvegarde qu'on ne peut pas restaurer n'est pas une sauvegarde.
+
+L'import accepte les deux formes — un questionnaire seul, ou une enveloppe de
+catalogue — et refuse proprement, en le disant, ce qu'il ne sait pas lire.
+
+---
+
 ### Par intégration — dans la page de quelqu'un d'autre
 
 Backoffice → **Diffuser** → **⧉ Code d'intégration**. Le dialogue produit une
@@ -209,8 +262,12 @@ L'adresse produite prend l'une de deux formes, et le dialogue dit laquelle :
 
 | Le questionnaire est… | L'adresse porte… | Conséquence |
 |---|---|---|
-| déjà dans le dépôt | son identifiant (`?q=…`) | l'intégration suit le dépôt : ce que vous pousserez demain s'affichera sans retoucher au code collé |
-| encore un brouillon | son contenu (`#k=…`) | l'intégration fige le questionnaire tel qu'il est à la seconde où vous copiez |
+| servi en ligne — au kiosque ou dans un espace | son identifiant (`?q=…`, plus `&espace=…` s'il vient d'un espace) | l'intégration le **désigne** : ses mises à jour s'afficheront sans retoucher au code collé |
+| un brouillon local | son contenu (`#k=…`) | l'intégration **fige** le questionnaire tel qu'il est à la seconde où vous copiez |
+
+Le critère n'est pas où le questionnaire a été écrit, mais s'il est servi
+quelque part. Un questionnaire publié dans un espace est désigné, donc suivi,
+exactement comme celui du kiosque.
 
 Le paramètre qui fait tout est `embed=1`. Il change deux choses, et deux
 seulement. **Les sorties disparaissent** — le « ← Kiosque » du bandeau, le
