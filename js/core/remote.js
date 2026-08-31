@@ -145,7 +145,7 @@ async function token() {
    ce n'est pas d'avoir un compte, c'est de figurer dans les membres de
    l'espace ; et cette liste-là, les règles la gardent.                  */
 
-async function identite(url, corps) {
+async function appelIdentityToolkit(url, corps) {
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -171,7 +171,7 @@ function secretJetable() {
    l'appelant demandera alors son identifiant à la personne, puisque rien
    côté client ne permet de le retrouver.                               */
 export async function creerCompte(email) {
-  const data = await identite(SIGN_UP, {
+  const data = await appelIdentityToolkit(SIGN_UP, {
     email, password: secretJetable(), returnSecureToken: false,
   });
   return data.localId;
@@ -189,14 +189,14 @@ export async function creerCompte(email) {
    commodité empêcher l'invitation elle-même. */
 export async function envoyerCourrielMotDePasse(email, continueUrl = null) {
   const base = { requestType: 'PASSWORD_RESET', email };
-  if (!continueUrl) return identite(OOB, base);
+  if (!continueUrl) return appelIdentityToolkit(OOB, base);
 
   try {
-    return await identite(OOB, { ...base, continueUrl });
+    return await appelIdentityToolkit(OOB, { ...base, continueUrl });
   } catch (err) {
     if (err.code !== 'UNAUTHORIZED_DOMAIN' && err.code !== 'INVALID_CONTINUE_URI') throw err;
     console.info('[remote] domaine non autorisé pour le retour : courriel envoyé sans redirection.');
-    return identite(OOB, base);
+    return appelIdentityToolkit(OOB, base);
   }
 }
 
@@ -205,7 +205,7 @@ export async function envoyerCourrielMotDePasse(email, continueUrl = null) {
 export async function changerMotDePasse(motDePasse) {
   const idToken = await token();
   if (!idToken) throw new Error('Il faut être connecté.');
-  const data = await identite(UPDATE, { idToken, password: motDePasse, returnSecureToken: true });
+  const data = await appelIdentityToolkit(UPDATE, { idToken, password: motDePasse, returnSecureToken: true });
   const saved = store.getRemote();
   store.setRemote({
     ...saved,
@@ -321,6 +321,84 @@ export async function vitrines(espace) {
   } catch {
     return {};
   }
+}
+
+/* --- L'identité de l'espace --------------------------------------------------
+   Lue sans compte : c'est le kiosque public qui l'affiche, et il n'en a
+   pas. Écrite par les membres. Effacer la branche rend au kiosque son
+   apparence par défaut — il n'y a pas de « désactiver », il y a « rien ».
+   Même raisonnement que les vitrines : ce qui n'est pas écrit ne peut pas
+   être mal lu.                                                          */
+
+export async function identite(espace) {
+  if (!espace) return null;
+  try {
+    const response = await fetch(branche(espace, 'identite'));
+    if (!response.ok) return null;
+    return (await response.json()) || null;
+  } catch {
+    /* Base injoignable : le kiosque garde son apparence par défaut plutôt
+       que de ne pas s'afficher. */
+    return null;
+  }
+}
+
+export async function enregistrerIdentite(espace, valeurs) {
+  const url = branche(espace, 'identite');
+  if (!valeurs) return call(url, { method: 'DELETE' });
+  return call(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(valeurs),
+  });
+}
+
+/* --- La corbeille -------------------------------------------------------------
+   Retirer de l'espace ne détruit plus : cela déplace. Le dépôt s'avouait
+   démuni sur ce point — « une suppression dans un espace est définitive, et
+   rien ne la rattrape » — alors que le produit entier repose sur la loi
+   inverse : rien ne demande confirmation, tout s'annule.
+
+   Sans serveur, personne ne fait le ménage à minuit : la corbeille est
+   donc bornée à l'écriture, et le plus ancien sort quand le plafond est
+   atteint. Une expiration promise que rien n'exécuterait vaudrait moins
+   que ce plafond visible.                                               */
+
+const CORBEILLE_MAX = 20;
+
+export async function corbeille(espace) {
+  const data = await call(branche(espace, 'corbeille')).catch(() => null);
+  return Object.values(data || {}).sort((a, b) => (b.supprimeLe || 0) - (a.supprimeLe || 0));
+}
+
+function ligneCorbeille(espace, id) {
+  return branche(espace, 'corbeille', `/${encodeURIComponent(id)}`);
+}
+
+export async function viderCorbeille(espace) {
+  return call(branche(espace, 'corbeille'), { method: 'DELETE' });
+}
+
+export async function jeterDefinitivement(espace, id) {
+  return call(ligneCorbeille(espace, id), { method: 'DELETE' });
+}
+
+/* Remettre en ligne. La règle de révision accepte le retour : la branche
+   `quizzes` n'a plus ce questionnaire, donc `data` n'existe pas, et c'est
+   le premier terme de la validation qui s'applique — une révision
+   supérieure ou égale à 1 suffit. */
+export async function restaurerQuiz(espace, id) {
+  const items = await corbeille(espace);
+  const trouve = items.find((q) => q.id === id);
+  if (!trouve) throw new Error('Ce questionnaire n’est plus dans la corbeille.');
+  const { supprimeLe, supprimePar, ...quiz } = trouve;
+  await call(path(espace, `/${encodeURIComponent(id)}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...quiz, rev: Math.max(1, Number(quiz.rev) || 1) }),
+  });
+  await jeterDefinitivement(espace, id);
+  return quiz;
 }
 
 /* --- Membres ---------------------------------------------------------------
@@ -455,6 +533,30 @@ export async function guardActive(espace, quiz) {
   }
 }
 
+/* Retirer de l'espace : on dépose dans la corbeille AVANT d'effacer. Si le
+   dépôt échoue, on n'efface pas — perdre le questionnaire en croyant le
+   ranger serait exactement le défaut qu'on corrige. */
 export async function deleteQuiz(espace, id) {
+  const distant = await lireQuiz(espace, id);
+  if (distant) {
+    const auth = session();
+    await call(ligneCorbeille(espace, id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...distant, supprimeLe: Date.now(), supprimePar: auth?.uid || '' }),
+    });
+    await elaguerCorbeille(espace);
+  }
   return call(path(espace, `/${encodeURIComponent(id)}`), { method: 'DELETE' });
+}
+
+/* Le plafond, appliqué après chaque dépôt. Un échec ici ne doit rien
+   casser : la corbeille sera simplement plus longue que prévu. */
+async function elaguerCorbeille(espace) {
+  try {
+    const items = await corbeille(espace);
+    for (const vieux of items.slice(CORBEILLE_MAX)) {
+      await jeterDefinitivement(espace, vieux.id);
+    }
+  } catch { /* tant pis : mieux vaut une corbeille trop longue que vide */ }
 }

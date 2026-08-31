@@ -17,6 +17,24 @@
           }
         },
 
+        "identite": {
+          ".read": true,
+
+          ".write": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
+
+          ".validate": "!newData.exists() || newData.hasChildren(['titre'])"
+        },
+
+        "corbeille": {
+          ".read": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
+
+          ".write": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
+
+          "$quiz": {
+            ".validate": "!newData.exists() || newData.hasChildren(['id', 'title', 'supprimeLe'])"
+          }
+        },
+
         "membres": {
           ".read": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
 

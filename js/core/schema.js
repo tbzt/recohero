@@ -266,6 +266,44 @@ export function normalize(raw) {
   };
 }
 
+/* --- L'identité d'un espace --------------------------------------------------
+   Une médiathèque met son nom, sa couleur, son logo et le lien vers son
+   propre site ; le kiosque s'habille avec. La branche est lisible de tous
+   — le kiosque public en a besoin — donc elle passe par le même
+   poste-frontière que le reste : une identité venue de la base n'est pas
+   plus digne de confiance qu'un questionnaire reçu par lien.
+
+   `titre` est le seul champ nécessaire. Sans lui, il n'y a pas d'identité
+   du tout, et le kiosque garde la nôtre — ce qui est le bon repli : mieux
+   vaut notre marque qu'une page anonyme.                                */
+
+export const IDENTITE_VIDE = {
+  titre: '', accroche: '', accent: '', logo: '', intro: '',
+  retour: { libelle: '', url: '' }, pied: '',
+};
+
+export function normaliserIdentite(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const titre = String(raw.titre || '').slice(0, 80).trim();
+  if (!titre) return null;
+
+  const url = /^https?:\/\/[^\s"'<>]+$/i.test(raw.retour?.url || '') ? raw.retour.url : '';
+
+  return {
+    titre,
+    accroche: String(raw.accroche || '').slice(0, 160),
+    /* Même validation que l'accent d'un questionnaire : tout le thème en
+       découle par color-mix, une valeur folle déteindrait sur la page. */
+    accent: /^#[0-9a-f]{3,8}$/i.test(raw.accent || '') ? raw.accent : '',
+    logo: safeImage(raw.logo),
+    intro: String(raw.intro || '').slice(0, 600),
+    /* Un lien de retour sans adresse n'est pas un lien ; une adresse sans
+       libellé se nomme toute seule. */
+    retour: url ? { libelle: String(raw.retour.libelle || '').slice(0, 60) || 'Retour au site', url } : null,
+    pied: String(raw.pied || '').slice(0, 200),
+  };
+}
+
 function clampScore(value) {
   const n = Math.round(Number(value));
   if (!Number.isFinite(n)) return 0;

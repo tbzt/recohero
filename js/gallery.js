@@ -4,7 +4,9 @@
 
 import { loadAll } from './core/catalog.js';
 import * as store from './core/store.js';
-import { el, formatDate, toast, espaceCourant, avecEspace, garderEspace } from './core/ui.js';
+import { identite as chargerIdentite } from './core/remote.js';
+import { normaliserIdentite } from './core/schema.js';
+import { el, formatDate, toast, espaceCourant, avecEspace, garderEspace, applyAccent } from './core/ui.js';
 
 /* L'espace vient de l'adresse, jamais du code : une même page sert le
    kiosque du dépôt et celui de n'importe quelle médiathèque. Tout lien
@@ -23,6 +25,10 @@ garderEspace();
 boot();
 
 async function boot() {
+  /* L'identité d'abord : elle habille la page avant que la liste
+     n'arrive, pour qu'on ne voie pas notre marque céder la place à celle
+     de la structure. Un espace sans identité garde la nôtre. */
+  if (espace) habiller(normaliserIdentite(await chargerIdentite(espace)));
   renderQuizzes(await loadAll({ espace }));
   renderHistory();
   /* Même règle que dans le backoffice : on agit, on laisse un retour.
@@ -42,6 +48,63 @@ async function boot() {
       },
     });
   });
+}
+
+/* --- L'identité de l'espace ---------------------------------------------------
+   Le kiosque d'une médiathèque affichait notre marque, notre accroche et
+   notre pied de page : une structure publique qui diffusait ce lien à ses
+   usagers diffusait notre identité, pas la sienne.
+
+   Ce que la structure ne remplit pas reste à nous. C'est le bon repli —
+   une page anonyme serait pire que la marque d'un outil assumé.        */
+
+function habiller(id) {
+  if (!id) return;
+  const pose = (elementId, valeur) => {
+    const noeud = document.getElementById(elementId);
+    if (noeud && valeur) noeud.textContent = valeur;
+  };
+
+  document.title = `${id.titre} — questionnaires`;
+  if (id.accent) applyAccent(id.accent);
+
+  pose('marqueNom', id.titre);
+  pose('marqueAccroche', id.accroche);
+
+  /* Le logo remplace le signe, il ne s'ajoute pas : deux marques côte à
+     côte ne feraient qu'une confusion. */
+  const signe = document.getElementById('marqueSigne');
+  if (signe && id.logo) {
+    signe.replaceChildren(el('img', { class: 'brand__logo', src: id.logo, alt: '' }));
+  }
+
+  /* La barre du haut appartient au visiteur : on y met la sortie vers le
+     site de la structure. Le backoffice, qui ne le concerne pas, se
+     replie dans le pied de page — l'équipe le trouve par son adresse, et
+     elle l'a. */
+  const sortie = document.getElementById('sortieHaut');
+  if (sortie && id.retour) {
+    sortie.replaceChildren(el('a', {
+      class: 'btn btn--ghost btn--sm', href: id.retour.url,
+      rel: 'noopener', title: id.retour.libelle, 'aria-label': id.retour.libelle,
+      text: `${id.retour.libelle} ↗`,
+    }));
+  }
+
+  /* Le bandeau dit qui ; le titre dit pourquoi. Sans accroche, le titre
+     reprend le nom plutôt que de laisser le nôtre. */
+  const titre = document.getElementById('heroTitre');
+  if (titre) titre.textContent = id.accroche || id.titre;
+
+  const intro = document.getElementById('heroIntro');
+  if (intro && id.intro) {
+    intro.textContent = id.intro;
+    intro.hidden = false;
+  }
+
+  pose('piedTexte', id.pied);
+  const lienPied = document.getElementById('piedLien');
+  if (lienPied) lienPied.textContent = 'Backoffice';
 }
 
 function renderQuizzes(quizzes) {

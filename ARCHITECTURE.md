@@ -512,6 +512,26 @@ schéma leur ferait perdre l'espace ; à l'inverse, le nom de l'espace n'a rien
 Le retour arrière n'appelle aucun code : dès lors que chaque navigation
 emporte le paramètre, l'historique le contient.
 
+**L'espace a un visage, et il passe par le poste-frontière.**
+`espaces/<nom>/identite` est lisible de tous — le kiosque public en a besoin —
+et écrit par les membres. Elle traverse donc `normaliserIdentite()` comme un
+questionnaire traverse `normalize()` : logo par `safeImage()`, couleur par la
+validation d'accent, lien de retour par `^https?://`. Ce qui vient de la base
+n'est pas plus sûr que ce qui vient d'un lien.
+
+Le repli est **notre** marque, pas une page vide. Un champ laissé vide n'est pas
+un trou à combler : c'est la valeur par défaut qui reste, et elle est assumée.
+
+**Retirer de l'espace déplace, et n'efface plus.** `deleteQuiz()` dépose dans
+`espaces/<nom>/corbeille` **avant** de retirer de `quizzes` — dans cet ordre,
+parce qu'un dépôt qui échoue doit interrompre la suppression : perdre le
+questionnaire en croyant le ranger serait exactement le défaut qu'on corrige.
+La restauration repasse par `quizzes` avec une révision d'au moins 1, ce que la
+règle du garde-fou accepte puisque la branche n'a plus ce questionnaire.
+
+Le plafond de vingt est tenu à l'écriture, jamais par une expiration : sans
+serveur, personne ne fait le ménage à minuit.
+
 **Le kiosque d'un espace ne montre que cet espace.** Ni les questionnaires du
 dépôt, ni les brouillons locaux — alors même que le kiosque ordinaire montre
 les seconds. L'exception est délibérée : celle qui publie doit voir exactement

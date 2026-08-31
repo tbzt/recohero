@@ -372,4 +372,31 @@
 @media (max-width: 46rem) {
   .brand__tagline { display: none; }
 }
+/* Le nom d'une structure peut être long — « Médiathèque intercommunale
+   des Deux-Rives ». Sans min-width, c'est la PAGE qui déborde et non la
+   marque : le piège est consigné dans la liste de contrôle CSS, et il a
+   été payé une fois de plus en posant l'identité des espaces. */
+.brand { min-width: 0; }
+.brand > span:not(.brand__mark) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .topbar__spacer { flex: 1; }
+
+/* Idem pour la sortie vers le site de la structure : son libellé est
+   écrit par elle, il peut faire n'importe quelle longueur, et un bouton
+   ne renvoie pas à la ligne. Il rétrécit donc, et le titre complet reste
+   accessible à la souris comme à la synthèse vocale. */
+.topbar__sortie { flex: 0 1 auto; min-width: 0; display: flex; }
+.topbar__sortie .btn {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  line-height: calc(var(--tap-sm) - 2px);
+}

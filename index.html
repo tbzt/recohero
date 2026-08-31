@@ -44,13 +44,19 @@
 
   <header class="topbar">
     <div class="page topbar__inner">
-      <a class="brand" href="index.html">
-        <span class="brand__mark">✦</span>
-        <span>RecoHero</span>
-        <span class="brand__tagline">la reco dont vous êtes le héros</span>
+      <!-- L'identité par défaut est la nôtre. Dans un espace, gallery.js la
+           remplace par celle de la structure — et si l'espace n'en a pas
+           défini, celle-ci reste : mieux vaut une marque assumée qu'une
+           page anonyme. -->
+      <a class="brand" href="index.html" id="marque">
+        <span class="brand__mark" id="marqueSigne">✦</span>
+        <span id="marqueNom">RecoHero</span>
+        <span class="brand__tagline" id="marqueAccroche">la reco dont vous êtes le héros</span>
       </a>
       <span class="topbar__spacer"></span>
-      <a class="btn btn--ghost btn--sm" href="admin.html">Backoffice</a>
+      <span class="topbar__sortie" id="sortieHaut">
+        <a class="btn btn--ghost btn--sm" href="admin.html">Backoffice</a>
+      </span>
     </div>
   </header>
 
@@ -58,7 +64,8 @@
     <div class="page">
 
       <section class="hero">
-        <h1 class="hero__title">La reco dont vous êtes <em>le héros</em></h1>
+        <h1 class="hero__title" id="heroTitre">La reco dont vous êtes <em>le héros</em></h1>
+        <p class="hero__intro" id="heroIntro" hidden></p>
       </section>
 
       <section class="section">
@@ -80,9 +87,9 @@
       </section>
 
       <footer class="footer">
-        <span>RecoHero — statique, sans compte, sans serveur.</span>
+        <span id="piedTexte">RecoHero — statique, sans compte, sans serveur.</span>
         <span class="footer__spacer"></span>
-        <a href="admin.html">Créer un questionnaire</a>
+        <a href="admin.html" id="piedLien">Créer un questionnaire</a>
       </footer>
 
     </div>

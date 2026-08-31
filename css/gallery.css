@@ -2,6 +2,27 @@
    RecoHero — gallery.css — le kiosque : ce qu'on voit en arrivant.
    ========================================================================== */
 
+/* Le logo d'une structure, à la place de notre signe. Il est contraint en
+   hauteur : une image de 2000 px ne doit pas décider de la hauteur du
+   bandeau. */
+.brand__logo {
+  display: block;
+  height: 1.6em;
+  width: auto;
+  max-width: 12rem;
+  object-fit: contain;
+}
+
+/* Le mot d'accueil d'un espace, sous le titre. */
+.hero__intro {
+  max-width: var(--content);
+  margin: var(--s-4) auto 0;
+  color: var(--ink-muted);
+  font-size: var(--t-md);
+  line-height: var(--lh-body);
+  text-align: center;
+}
+
 .hero {
   padding-block: var(--s-8) var(--s-6);
   text-align: center;

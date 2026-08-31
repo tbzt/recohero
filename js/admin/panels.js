@@ -532,11 +532,22 @@ function espaceCard(ctx) {
         el('h3', { text: `Espace « ${ctx.espace} »` }),
         ctx.remoteSession
           ? el('div', {}, [
-              el('p', { text: 'Publier dépose le questionnaire dans l’espace : il paraît aussitôt sur son kiosque, pour tout le monde, sans que personne ait à se connecter pour y répondre.' }),
+              el('p', { text: 'Publier dépose le questionnaire dans l’espace : il paraît aussitôt sur son kiosque, pour tout le monde, sans que personne ait à se connecter pour y répondre. Retirer ne détruit rien — le questionnaire part à la corbeille de l’espace, d’où il se restaure.' }),
               el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
                 el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'remote-publish', text: '⇧ Publier dans l’espace' }),
                 ctx.inEspace && el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'remote-unpublish', text: '⌫ Retirer de l’espace' }),
               ]),
+
+              /* Ce qui concerne l'espace entier, et non ce questionnaire :
+                 son apparence publique, et ce qu'on en a retiré. */
+              el('div', { class: 'row', style: { marginTop: 'var(--s-4)' } }, [
+                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'identite-espace',
+                  text: ctx.identite ? `✦ ${ctx.identite.titre}` : '✦ Personnaliser le kiosque' }),
+                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'corbeille',
+                  text: ctx.corbeille ? `🗑 Corbeille · ${ctx.corbeille}` : '🗑 Corbeille' }),
+              ]),
+              !ctx.identite && el('p', { class: 'field__hint', text:
+                'Sans identité, le kiosque de cet espace affiche la marque RecoHero à vos usagers — son nom, son accroche et son pied de page.' }),
 
               /* Une règle de base de données absente ne se voit nulle part :
                  l'espace a exactement la même apparence, protégé ou non.

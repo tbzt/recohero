@@ -189,6 +189,54 @@ Une fois connecté, le panneau **Diffuser** gagne « ⇧ Publier dans l'espace �
 Le questionnaire paraît aussitôt sur le kiosque de l'équipe. « ⌫ Retirer de
 l'espace » l'en enlève sans toucher à la copie locale.
 
+#### Le kiosque porte votre nom, pas le nôtre
+
+Un espace sans identité affiche la marque RecoHero à ses usagers : notre
+signe, notre accroche, notre pied de page. Une structure publique qui diffuse
+ce lien diffuse donc notre identité en croyant diffuser la sienne.
+
+Backoffice → **Diffuser** → **✦ Personnaliser le kiosque**. On y met le nom de
+la structure, une accroche, un mot d'accueil, un logo, une couleur, un pied de
+page, et surtout un **lien de retour** vers son propre site — il remplace le
+bouton « Backoffice » du bandeau, qui ne concerne pas un usager.
+
+| Champ | Où ça se voit |
+|---|---|
+| **Nom** | Le bandeau, et le titre de l'onglet |
+| **Accroche** | Le grand titre de la page |
+| **Mot d'accueil** | Sous le titre |
+| **Logo** | À la place du signe ✦ |
+| **Couleur** | Le kiosque entier, par `--accent` |
+| **Lien de retour** | Le bandeau, à la place de « Backoffice » |
+| **Pied de page** | Le pied de page |
+
+**Ce qu'on laisse vide reste à nous**, et c'est le bon repli : une page anonyme
+serait pire qu'une marque assumée. Le nom est le seul champ nécessaire — sans
+lui, il n'y a pas d'identité du tout.
+
+Tout y passe par le même filtre que le reste : le logo par `safeImage()`, la
+couleur par la validation d'un accent, le lien de retour par `^https?://`. Une
+identité venue de la base n'est pas plus digne de confiance qu'un questionnaire
+reçu par lien. Conséquence à connaître : un **SVG en `data:` est refusé** — le
+filtre n'accepte que png, jpeg, webp, gif et avif. Un SVG hébergé et donné par
+son adresse `https` passe sans problème.
+
+#### Retirer ne détruit plus
+
+« ⌫ Retirer de l'espace » déplace le questionnaire dans la **corbeille de
+l'espace** au lieu de l'effacer. Il s'en restaure tel qu'il était, depuis
+**Diffuser** → **🗑 Corbeille**, ou depuis le bandeau qui suit le retrait.
+
+C'était le seul geste du produit qui ne s'annulait pas. Les vingt derniers
+retraits sont conservés ; au-delà, le plus ancien s'efface. Le plafond est tenu
+à l'écriture et non par une expiration : sans serveur, personne ne fait le
+ménage à minuit, et une promesse que rien n'exécute vaudrait moins que ce
+plafond-là.
+
+**Ce n'est toujours pas une sauvegarde.** L'export du catalogue reste la seule.
+La corbeille rattrape le geste de trop ; elle ne rattrape pas la perte d'un
+projet Firebase.
+
 #### Ce qui est public, et pourquoi ce n'est pas un oubli
 
 Les deux constantes en tête de [`js/core/remote.js`](js/core/remote.js) — URL

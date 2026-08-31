@@ -9,6 +9,7 @@ import { PANELS } from './panels.js';
 import {
   makeQuiz, makeAxis, makeQuestion, makeOption, makeResult, makeReco,
   normalize, diagnose, uid, slugify, safeImage, imageWeight,
+  normaliserIdentite,
 } from '../core/schema.js';
 import { reachability } from '../core/scoring.js';
 import { bindSortables } from '../core/sortable.js';
@@ -45,6 +46,8 @@ const state = {
   membres: [],          /* l'équipe de l'espace, lisible des seuls membres */
   profils: {},          /* leurs profils, lisibles de l'équipe seule */
   vitrines: {},         /* ce que chacun a choisi de rendre public */
+  identite: null,       /* l'apparence publique du kiosque de l'espace */
+  corbeille: [],        /* ce qu'on en a retiré, et qu'on peut reprendre */
   stats: {},            /* parcours terminés, par questionnaire et par profil */
   remote: [],           /* les questionnaires de cet espace */
   remoteSession: null,  /* { email, uid } une fois connecté */
@@ -428,6 +431,8 @@ async function renderPanel() {
     ctx.vitrines = state.vitrines;
     ctx.stats = state.quiz ? state.stats?.[state.quiz.id] : null;
     ctx.inEspace = state.remote.some((q) => q.id === state.quiz.id);
+    ctx.identite = state.identite;
+    ctx.corbeille = state.corbeille.length;
   }
 
   /* L'état du questionnaire, au-dessus de tous les panneaux. Les
@@ -986,6 +991,8 @@ function onClick(event) {
     case 'membre-retirer':   return retirerMembre(id);
     case 'copier-uid':       return copierUid();
     case 'mon-mot-de-passe': return changerMonMotDePasse();
+    case 'identite-espace':  return editerIdentite();
+    case 'corbeille':        return ouvrirCorbeille();
     case 'export-espace': return exportEspace();
     case 'export-drafts': return exportDrafts();
     case 'export-one':    return exportOne(id);
@@ -1520,6 +1527,191 @@ function changerMonMotDePasse() {
   champ.focus();
 }
 
+
+/* --- L'apparence publique de l'espace ----------------------------------------
+   Ce qu'une médiathèque montre à ses usagers. Sans cette branche, son
+   kiosque affiche NOTRE marque — elle diffuse notre identité à son public
+   en croyant diffuser la sienne.
+
+   Le titre est le seul champ nécessaire : sans lui il n'y a pas d'identité,
+   et le kiosque garde la nôtre, ce qui vaut mieux qu'une page anonyme. */
+
+function editerIdentite() {
+  if (!state.remoteSession) return showSignIn();
+  const actuelle = state.identite || {};
+
+  const titre = el('input', { class: 'input', value: actuelle.titre || '', placeholder: 'Médiathèque Maupassant', maxlength: '80' });
+  const accroche = el('input', { class: 'input', value: actuelle.accroche || '', placeholder: 'Trois minutes, et vous repartez avec une idée', maxlength: '160' });
+  const intro = el('textarea', { class: 'textarea', rows: '3', placeholder: 'Deux phrases d’accueil, facultatives.', maxlength: '600' });
+  intro.value = actuelle.intro || '';
+  const logo = el('input', { class: 'input input--mono', value: actuelle.logo || '', placeholder: 'https://… (facultatif)' });
+  const accent = el('input', { class: 'swatch-input', type: 'color', value: actuelle.accent || '#2E6BA8' });
+  const retourUrl = el('input', { class: 'input input--mono', value: actuelle.retour?.url || '', placeholder: 'https://mediatheque.fr' });
+  const retourLib = el('input', { class: 'input', value: actuelle.retour?.libelle || '', placeholder: 'Retour au site de la médiathèque', maxlength: '60' });
+  const pied = el('input', { class: 'input', value: actuelle.pied || '', placeholder: 'Médiathèque Maupassant · Mentions légales', maxlength: '200' });
+
+  const erreur = el('p', { class: 'alerte', hidden: true });
+  const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Enregistrer' });
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: `Le kiosque de « ${state.espace} »` }),
+      el('p', { class: 'panel__hint', text:
+        'Ce que voient les usagers en arrivant sur l’adresse publique de cet espace. Ce que tu laisses vide reste à RecoHero.' }),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Nom de la structure' }), titre]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'field__label', text: 'Accroche' }), accroche,
+        el('span', { class: 'field__hint', text: 'Le grand titre de la page. Le nom, lui, est déjà dans le bandeau.' }),
+      ]),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Mot d’accueil' }), intro]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'field__label', text: 'Logo' }), logo,
+        el('span', { class: 'field__hint', text:
+          'Adresse d’une image — elle remplace le signe ✦ dans le bandeau. Un SVG en ligne (data:) est refusé par le filtre du projet ; hébergez-le et donnez son adresse https, ou passez par un PNG.' }),
+      ]),
+      el('div', { class: 'field' }, [
+        el('span', { class: 'field__label', text: 'Couleur' }),
+        el('div', { class: 'row' }, [accent, el('span', { class: 'field__hint', style: { margin: '0' }, text: 'Habille le kiosque entier.' })]),
+      ]),
+      el('div', { class: 'card', style: { background: 'var(--surface-2)' } }, [
+        el('span', { class: 'field__label', text: 'Lien de retour' }),
+        el('span', { class: 'field__hint', style: { display: 'block', marginBottom: 'var(--s-3)' }, text:
+          'Remplace le bouton « Backoffice » dans le bandeau : un usager n’a rien à y faire, mais il peut vouloir revenir chez vous.' }),
+        retourUrl, el('div', { style: { height: 'var(--s-2)' } }), retourLib,
+      ]),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Pied de page' }), pied]),
+      erreur,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      actuelle.titre && el('button', { class: 'btn btn--danger btn--sm', type: 'button', text: 'Rendre l’apparence par défaut',
+        onClick: () => enregistrerIdentite(dialog, null, valider, erreur) }),
+      el('span', { class: 'section__spacer' }),
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler', onClick: () => dismiss(dialog) }),
+      valider,
+    ]),
+  ]);
+
+  valider.addEventListener('click', () => {
+    if (!titre.value.trim()) {
+      erreur.textContent = 'Le nom de la structure est nécessaire : c’est lui qui remplace le nôtre.';
+      erreur.hidden = false;
+      return;
+    }
+    /* Normalisé AVANT l'envoi comme il le sera à la lecture : ce qui ne
+       passe pas le filtre ne doit pas partir dans la base non plus. */
+    const propre = normaliserIdentite({
+      titre: titre.value, accroche: accroche.value, intro: intro.value,
+      logo: logo.value, accent: accent.value, pied: pied.value,
+      retour: { url: retourUrl.value.trim(), libelle: retourLib.value },
+    });
+    if (retourUrl.value.trim() && !propre.retour) {
+      erreur.textContent = 'Le lien de retour doit être une adresse complète, en http:// ou https://.';
+      erreur.hidden = false;
+      return;
+    }
+    enregistrerIdentite(dialog, propre, valider, erreur);
+  });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  titre.focus();
+  return undefined;
+}
+
+async function enregistrerIdentite(dialog, valeurs, valider, erreur) {
+  valider.disabled = true;
+  try {
+    await remote.enregistrerIdentite(state.espace, valeurs);
+    await refreshEspace();
+    dismiss(dialog, () => {
+      toast(valeurs ? 'Le kiosque porte désormais votre identité.' : 'Le kiosque a repris l’apparence par défaut.');
+      repaint();
+    });
+  } catch (err) {
+    erreur.textContent = err.message;
+    erreur.hidden = false;
+    valider.disabled = false;
+  }
+}
+
+/* --- La corbeille de l'espace -------------------------------------------------
+   Retirer de l'espace déplace ici plutôt que de détruire. C'était le seul
+   geste du produit qui ne s'annulait pas, et le dépôt s'en avouait démuni :
+   « une suppression dans un espace est définitive, et rien ne la rattrape ».
+
+   Le plafond est tenu à l'écriture, pas par une expiration : sans serveur,
+   personne ne fait le ménage à minuit, et une promesse que rien n'exécute
+   vaudrait moins que ce plafond-là. */
+
+function ouvrirCorbeille() {
+  if (!state.remoteSession) return showSignIn();
+  const items = state.corbeille;
+
+  const ligne = (q) => el('div', { class: 'sheet__row' }, [
+    el('span', { class: 'sheet__emoji', text: q.emoji || '✦' }),
+    el('span', { class: 'sheet__label' }, [
+      el('span', { text: q.title || 'Questionnaire sans titre' }),
+      el('span', { class: 'field__hint', style: { display: 'block' }, text:
+        `Retiré ${q.supprimeLe ? formatDate(q.supprimeLe) : 'à une date inconnue'}`
+        + (q.supprimePar ? ` par ${nommer(q.supprimePar)}` : '') }),
+    ]),
+    el('button', { class: 'btn btn--quiet btn--sm', type: 'button',
+      'data-poubelle': 'jeter', 'data-id': q.id, title: 'Supprimer définitivement', text: '✕' }),
+    el('button', { class: 'btn btn--ghost btn--sm', type: 'button',
+      'data-poubelle': 'restaurer', 'data-id': q.id, text: '↺ Restaurer' }),
+  ]);
+
+  const dialog = el('dialog', { class: 'modal sheet' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Corbeille de l’espace' }),
+      el('p', { class: 'panel__hint', text: items.length
+        ? 'Ce qui a été retiré du kiosque. Restaurer le remet en ligne tel qu’il était.'
+        : 'Rien n’a été retiré de cet espace. Ce qu’on en retire atterrit ici, et s’en reprend.' }),
+      items.length ? el('div', { class: 'sheet__list' }, items.map(ligne)) : null,
+      items.length ? el('p', { class: 'field__hint', text:
+        'Les vingt derniers retraits sont conservés — au-delà, le plus ancien s’efface. Ce n’est pas une sauvegarde : l’export du catalogue reste la seule.' }) : null,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      items.length && el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-poubelle': 'vider', text: 'Vider la corbeille' }),
+      el('span', { class: 'section__spacer' }),
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
+    ]),
+  ]);
+
+  dialog.addEventListener('click', async (event) => {
+    const cible = event.target.closest('[data-poubelle]');
+    if (!cible) return;
+    const { poubelle, id } = cible.dataset;
+    cible.disabled = true;
+    try {
+      if (poubelle === 'restaurer') {
+        const repris = await remote.restaurerQuiz(state.espace, id);
+        await refreshEspace();
+        dismiss(dialog, () => { toast(`« ${repris.title} » est de retour sur le kiosque.`); repaint(); });
+        return;
+      }
+      if (poubelle === 'jeter') {
+        await remote.jeterDefinitivement(state.espace, id);
+        await refreshEspace();
+        dismiss(dialog, () => { toast('Supprimé définitivement.'); repaint(); ouvrirCorbeille(); });
+        return;
+      }
+      await remote.viderCorbeille(state.espace);
+      await refreshEspace();
+      dismiss(dialog, () => { toast('Corbeille vidée.'); repaint(); });
+    } catch (err) {
+      cible.disabled = false;
+      toast(err.message, 'danger');
+    }
+  });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  return undefined;
+}
+
 /* --- Diffusion --------------------------------------------------------------------- */
 
 async function testRun() {
@@ -1645,10 +1837,12 @@ async function refreshEspace() {
   state.membres = state.remoteSession
     ? await remote.membres(state.espace).catch(() => [])
     : [];
-  [state.profils, state.vitrines, state.stats] = await Promise.all([
+  [state.profils, state.vitrines, state.stats, state.identite, state.corbeille] = await Promise.all([
     state.remoteSession ? remote.profilsEquipe(state.espace).catch(() => ({})) : {},
     remote.vitrines(state.espace),
     state.remoteSession ? remote.stats(state.espace).catch(() => ({})) : {},
+    remote.identite(state.espace).then(normaliserIdentite).catch(() => null),
+    state.remoteSession ? remote.corbeille(state.espace).catch(() => []) : [],
   ]);
   await verifierGardeFou();
 }
@@ -1829,7 +2023,16 @@ async function unpublishRemote() {
   try {
     await remote.deleteQuiz(state.espace, state.quiz.id);
     await refreshEspace();
-    toast(`« ${titre} » retiré de l’espace. Ta copie locale est intacte.`);
+    toast(`« ${titre} » retiré de l’espace — il part à la corbeille, et ta copie locale est intacte.`, {
+      action: { label: 'Annuler', onClick: async () => {
+        try {
+          await remote.restaurerQuiz(state.espace, state.quiz.id);
+          await refreshEspace();
+          repaint();
+          toast(`« ${titre} » est de retour sur le kiosque.`);
+        } catch (err) { toast(err.message, 'danger'); }
+      } },
+    });
     repaint();
   } catch (err) {
     toast(err.message, 'danger');
