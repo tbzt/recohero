@@ -9,7 +9,7 @@ import { PANELS } from './panels.js';
 import {
   makeQuiz, makeAxis, makeQuestion, makeOption, makeResult, makeReco,
   normalize, diagnose, uid, slugify, safeImage, imageWeight,
-  normaliserIdentite,
+  normaliserIdentite, normaliserPresentation, presentationPourLaBase,
 } from '../core/schema.js';
 import { reachability } from '../core/scoring.js';
 import { bindSortables } from '../core/sortable.js';
@@ -48,6 +48,7 @@ const state = {
   vitrines: {},         /* ce que chacun a choisi de rendre public */
   identite: null,       /* l'apparence publique du kiosque de l'espace */
   corbeille: [],        /* ce qu'on en a retiré, et qu'on peut reprendre */
+  presentation: normaliserPresentation(null),   /* l'ordre du kiosque, et ce qu'on en masque */
   stats: {},            /* parcours terminés, par questionnaire et par profil */
   remote: [],           /* les questionnaires de cet espace */
   remoteSession: null,  /* { email, uid } une fois connecté */
@@ -277,7 +278,7 @@ function sectionBadge(counts) {
   });
 }
 
-/* « Camille, hier · v7 ». Sans profil, `nommer()` retombe sur un
+/* « Albertine, hier · v7 ». Sans profil, `nommer()` retombe sur un
    identifiant tronqué, dit comme tel plutôt que déguisé en nom. Une
    publication antérieure au garde-fou n'a ni auteur ni révision : on ne
    dit rien plutôt que d'inventer. */
@@ -462,6 +463,7 @@ async function renderPanel() {
     ctx.inEspace = state.remote.some((q) => q.id === state.quiz.id);
     ctx.identite = state.identite;
     ctx.corbeille = state.corbeille.length;
+    ctx.masques = state.presentation.masques.size;
   }
 
   /* L'état du questionnaire, au-dessus de tous les panneaux. Les
@@ -1023,6 +1025,7 @@ function onClick(event) {
     case 'identite-espace':  return editerIdentite();
     case 'corbeille':        return ouvrirCorbeille();
     case 'frequentation':    return ouvrirFrequentation();
+    case 'vitrine':          return ouvrirPresentation();
     case 'export-espace': return exportEspace();
     case 'export-drafts': return exportDrafts();
     case 'export-one':    return exportOne(id);
@@ -1298,7 +1301,7 @@ function parametresCompte() {
 }
 
 /* Nommer quelqu'un de l'équipe. Le profil est lisible des seuls membres,
-   ce qui suffit ici : dire « Camille » à un collègue n'expose personne au
+   ce qui suffit ici : dire « Albertine » à un collègue n'expose personne au
    public. Faute de profil, l'identifiant tronqué — dit comme tel plutôt
    que déguisé en nom.                                                   */
 function nommer(uid) {
@@ -1324,8 +1327,8 @@ function monProfil() {
   const actuel = state.profils?.[uid] || {};
   const enVitrine = Boolean(state.vitrines?.[uid]);
 
-  const prenom = el('input', { class: 'input', value: actuel.prenom || '', placeholder: 'Camille' });
-  const nom = el('input', { class: 'input', value: actuel.nom || '', placeholder: 'Ndiaye' });
+  const prenom = el('input', { class: 'input', value: actuel.prenom || '', placeholder: 'Albertine' });
+  const nom = el('input', { class: 'input', value: actuel.nom || '', placeholder: 'Sarrazin' });
   const poste = el('input', { class: 'input', value: actuel.poste || '', placeholder: 'Responsable du secteur adulte' });
   const photo = el('input', { class: 'input input--mono', value: actuel.image || '', placeholder: 'https://… (facultatif)' });
   const publier = el('input', { type: 'checkbox' });
@@ -1852,6 +1855,162 @@ function tauxGlobalItem(taux) {
   ]);
 }
 
+
+/* --- La vitrine de l'espace ---------------------------------------------------
+   L'ordre des questionnaires sur le kiosque, ceux qu'on en retire sans les
+   détruire, et celui qu'on met à la une.
+
+   Retirer de la vitrine n'est PAS dépublier : jusqu'ici, cacher un
+   questionnaire saisonnier demandait de le sortir de l'espace, c'est-à-dire
+   de le supprimer. Masquer le laisse en ligne, à son adresse, pour qui a le
+   lien — il ne figure simplement plus sur la page d'accueil.
+
+   Le glisser-déposer est celui de l'éditeur (`sortable.js`), et les flèches
+   ↑↓ restent à côté : c'est le chemin clavier, il ne disparaît pas.      */
+
+function ouvrirPresentation() {
+  if (!state.remoteSession) return showSignIn();
+  if (!state.remote.length) return toast('Cet espace n’a aucun questionnaire en ligne.', 'danger');
+
+  /* On travaille sur une copie : tant qu'on n'a pas enregistré, le kiosque
+     ne bouge pas. */
+  const brouillon = {
+    ordre: ordreCourant(),
+    masques: new Set(state.presentation.masques),
+    epingle: state.presentation.epingle,
+  };
+
+  const corps = el('div', { class: 'modal__body stack' });
+  const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Enregistrer' });
+  const dialog = el('dialog', { class: 'modal sheet' }, [
+    corps,
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-vitrine': 'defaut', text: 'Rendre l’ordre alphabétique' }),
+      el('span', { class: 'section__spacer' }),
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler', onClick: () => dismiss(dialog) }),
+      valider,
+    ]),
+  ]);
+
+  const dessiner = () => {
+    const parId = new Map(state.remote.map((q) => [q.id, q]));
+    const liste = brouillon.ordre.map((id) => parId.get(id)).filter(Boolean);
+
+    corps.replaceChildren(
+      el('h2', { text: `La vitrine de « ${state.espace} »` }),
+      el('p', { class: 'panel__hint', text:
+        'L’ordre du kiosque, de haut en bas. Masquer retire de la page d’accueil sans dépublier : le questionnaire reste en ligne à son adresse, pour qui a le lien.' }),
+
+      el('div', { class: 'editor-list', 'data-sortable': 'vitrine' }, liste.map((quiz, i) => {
+        const masque = brouillon.masques.has(quiz.id);
+        const alaune = brouillon.epingle === quiz.id;
+        return el('div', { class: 'sheet__row' + (masque ? ' is-masque' : '') }, [
+          el('span', { class: 'grip', title: 'Glisser pour déplacer', 'aria-hidden': 'true', text: '⠿' }),
+          el('span', { class: 'sheet__emoji', text: quiz.emoji || '✦' }),
+          el('span', { class: 'sheet__label' }, [
+            el('span', { text: quiz.title }),
+            masque && el('span', { class: 'field__hint', style: { display: 'block' }, text: 'masqué du kiosque' }),
+          ]),
+          el('button', {
+            class: 'btn btn--icon btn--quiet' + (alaune ? ' is-on' : ''),
+            type: 'button', 'data-vitrine': 'une', 'data-id': quiz.id,
+            title: alaune ? 'Retirer de la une' : 'Mettre à la une',
+            'aria-pressed': String(alaune), text: '★',
+          }),
+          el('button', {
+            class: 'btn btn--icon btn--quiet', type: 'button',
+            'data-vitrine': 'masquer', 'data-id': quiz.id,
+            title: masque ? 'Remettre sur le kiosque' : 'Masquer du kiosque',
+            'aria-pressed': String(masque), text: masque ? '◌' : '●',
+          }),
+          el('button', {
+            class: 'btn btn--icon btn--quiet', type: 'button', 'data-vitrine': 'monter', 'data-id': quiz.id,
+            title: 'Monter', 'aria-label': 'Monter', text: '↑', ...(i === 0 ? { disabled: true } : {}),
+          }),
+          el('button', {
+            class: 'btn btn--icon btn--quiet', type: 'button', 'data-vitrine': 'descendre', 'data-id': quiz.id,
+            title: 'Descendre', 'aria-label': 'Descendre', text: '↓', ...(i === liste.length - 1 ? { disabled: true } : {}),
+          }),
+        ]);
+      })),
+
+      el('p', { class: 'field__hint', text:
+        'Un questionnaire publié plus tard se rangera après ceux-ci, par ordre alphabétique, jusqu’à ce qu’on lui donne sa place.' }),
+    );
+
+    bindSortables(corps, (cle, de, vers) => {
+      if (cle !== 'vitrine' || de === vers) return;
+      brouillon.ordre.splice(vers, 0, brouillon.ordre.splice(de, 1)[0]);
+      dessiner();
+    });
+  };
+
+  const deplacer = (id, delta) => {
+    const de = brouillon.ordre.indexOf(id);
+    const vers = de + delta;
+    if (de < 0 || vers < 0 || vers >= brouillon.ordre.length) return;
+    brouillon.ordre.splice(vers, 0, brouillon.ordre.splice(de, 1)[0]);
+  };
+
+  dialog.addEventListener('click', async (event) => {
+    const cible = event.target.closest('[data-vitrine]');
+    if (!cible) return;
+    const { vitrine, id } = cible.dataset;
+
+    if (vitrine === 'masquer') {
+      brouillon.masques.has(id) ? brouillon.masques.delete(id) : brouillon.masques.add(id);
+      /* Un questionnaire masqué ne peut pas être à la une : les deux se
+         contrediraient à l'écran, et c'est le masque qui gagnerait. */
+      if (brouillon.masques.has(id) && brouillon.epingle === id) brouillon.epingle = null;
+      return dessiner();
+    }
+    if (vitrine === 'une') {
+      brouillon.epingle = brouillon.epingle === id ? null : id;
+      if (brouillon.epingle) brouillon.masques.delete(brouillon.epingle);
+      return dessiner();
+    }
+    if (vitrine === 'monter') { deplacer(id, -1); return dessiner(); }
+    if (vitrine === 'descendre') { deplacer(id, 1); return dessiner(); }
+    if (vitrine === 'defaut') {
+      brouillon.ordre = [...state.remote].sort((a, b) => a.title.localeCompare(b.title, 'fr')).map((q) => q.id);
+      brouillon.masques = new Set();
+      brouillon.epingle = null;
+      return dessiner();
+    }
+    return undefined;
+  });
+
+  valider.addEventListener('click', async () => {
+    valider.disabled = true;
+    try {
+      await remote.enregistrerPresentation(state.espace, presentationPourLaBase(brouillon));
+      await refreshEspace();
+      dismiss(dialog, () => { toast('La vitrine du kiosque est enregistrée.'); repaint(); });
+    } catch (err) {
+      valider.disabled = false;
+      toast(err.message, 'danger');
+    }
+  });
+
+  dessiner();
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  return undefined;
+}
+
+/* L'ordre à éditer : celui qui est enregistré, complété par ce qui a été
+   publié depuis — et débarrassé de ce qui n'existe plus. */
+function ordreCourant() {
+  const presents = new Set(state.remote.map((q) => q.id));
+  const connus = state.presentation.ordre.filter((id) => presents.has(id));
+  const restants = [...state.remote]
+    .filter((q) => !connus.includes(q.id))
+    .sort((a, b) => a.title.localeCompare(b.title, 'fr'))
+    .map((q) => q.id);
+  return [...connus, ...restants];
+}
+
 /* --- Diffusion --------------------------------------------------------------------- */
 
 async function testRun() {
@@ -1984,6 +2143,9 @@ async function refreshEspace() {
     remote.identite(state.espace).then(normaliserIdentite).catch(() => null),
     state.remoteSession ? remote.corbeille(state.espace).catch(() => []) : [],
   ]);
+  state.presentation = normaliserPresentation(
+    await remote.presentation(state.espace).catch(() => null),
+  );
   await verifierGardeFou();
 }
 

@@ -25,6 +25,12 @@
           ".validate": "!newData.exists() || newData.hasChildren(['titre'])"
         },
 
+        "presentation": {
+          ".read": true,
+
+          ".write": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()"
+        },
+
         "corbeille": {
           ".read": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
 

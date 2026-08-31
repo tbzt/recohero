@@ -111,6 +111,11 @@
 }
 .tab.is-active /* Qui a publié, quand, en quelle version. Sous le titre, en retrait :
    c'est un renseignement, pas une étiquette. */
+/* Une ligne de vitrine masquée : présente, éditable, mais visiblement
+   hors de la page d'accueil. */
+.sheet__row.is-masque { opacity: 0.6; }
+.sheet__row.is-masque .sheet__label > span:first-child { text-decoration: line-through; }
+
 .rail__item__signature {
   display: block;
   font-size: var(--t-xs);

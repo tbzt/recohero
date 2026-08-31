@@ -304,6 +304,45 @@ export function normaliserIdentite(raw) {
   };
 }
 
+/* --- La présentation du kiosque ----------------------------------------------
+   L'ordre des questionnaires, ceux qu'on retire de la vitrine sans les
+   détruire, et celui qu'on met à la une. Lisible de tous — le kiosque
+   public s'en sert — donc filtré comme le reste.
+
+   Un identifiant absent de `ordre` se range APRÈS les autres,
+   alphabétiquement : publier ne demande donc pas de penser au rangement, et
+   la liste ne casse pas quand un identifiant disparaît.               */
+
+export function normaliserPresentation(raw) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const identifiant = (v) => (typeof v === 'string' && v ? v.slice(0, 80) : null);
+
+  const ordre = (Array.isArray(source.ordre) ? source.ordre : [])
+    .map(identifiant).filter(Boolean).slice(0, 200);
+
+  /* Les masques arrivent en objet depuis la base ; on n'en garde que les
+     clés vraies. Un `false` traîné ne veut rien dire de plus qu'une
+     absence, et deux façons de dire non en feraient une de trop. */
+  const masques = new Set(
+    Object.entries(source.masques && typeof source.masques === 'object' ? source.masques : {})
+      .filter(([, v]) => v === true)
+      .map(([k]) => k)
+      .filter(Boolean),
+  );
+
+  return { ordre, masques, epingle: identifiant(source.epingle) };
+}
+
+/* L'inverse, pour l'écriture : Set et null ne traversent pas JSON, et une
+   branche vide vaut mieux qu'une branche pleine de faux. */
+export function presentationPourLaBase({ ordre = [], masques = new Set(), epingle = null }) {
+  const corps = {};
+  if (ordre.length) corps.ordre = ordre;
+  if (masques.size) corps.masques = Object.fromEntries([...masques].map((id) => [id, true]));
+  if (epingle) corps.epingle = epingle;
+  return Object.keys(corps).length ? corps : null;
+}
+
 function clampScore(value) {
   const n = Math.round(Number(value));
   if (!Number.isFinite(n)) return 0;

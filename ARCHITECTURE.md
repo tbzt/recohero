@@ -541,6 +541,18 @@ comptait zéro. Rien ne le signalait, et le premier geste remettait tout d'aplom
 — ce qui rendait le défaut d'autant plus difficile à voir. `open()` appelle
 désormais `refreshEspace()`.
 
+**Masquer n'est pas dépublier.** `espaces/<nom>/presentation` porte l'ordre du
+kiosque, ce qu'on en retire de la vitrine, et ce qu'on met à la une. Un
+questionnaire masqué reste servi à son adresse : il quitte la page d'accueil,
+pas l'espace. Sans cette branche, cacher un questionnaire saisonnier demandait
+de le sortir de l'espace — c'est-à-dire de le supprimer.
+
+Un identifiant absent de `ordre` se range **après** ceux qui y figurent,
+alphabétiquement. Deux conséquences voulues : publier ne demande pas de penser
+au rangement, et un identifiant disparu ne casse pas la liste. `à la une` et
+`masqué` sont exclusifs — ils se contrediraient à l'écran, et c'est le masque
+qui gagnerait.
+
 **Le kiosque d'un espace ne montre que cet espace.** Ni les questionnaires du
 dépôt, ni les brouillons locaux — alors même que le kiosque ordinaire montre
 les seconds. L'exception est délibérée : celle qui publie doit voir exactement

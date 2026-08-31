@@ -237,6 +237,28 @@ plafond-là.
 La corbeille rattrape le geste de trop ; elle ne rattrape pas la perte d'un
 projet Firebase.
 
+#### Ranger la vitrine
+
+**Diffuser → ▦ Vitrine** décide de l'ordre du kiosque, de haut en bas, au
+glisser-déposer — les flèches ↑↓ restent à côté, c'est le chemin clavier.
+
+Deux gestes de plus y vivent :
+
+| Geste | Effet |
+|---|---|
+| **★ À la une** | Le questionnaire prend toute la largeur de la grille et porte son étiquette |
+| **● Masquer** | Il quitte la page d'accueil **sans être dépublié** |
+
+Masquer n'est pas dépublier, et c'est tout l'intérêt : jusqu'ici, cacher un
+questionnaire saisonnier demandait de le sortir de l'espace, c'est-à-dire de le
+supprimer. Un questionnaire masqué reste **en ligne, à son adresse**, pour qui a
+le lien ou l'a intégré dans une page — il ne figure simplement plus sur la page
+d'accueil de l'espace.
+
+Un questionnaire publié plus tard se range après ceux qu'on a rangés, par ordre
+alphabétique, jusqu'à ce qu'on lui donne sa place. Publier ne demande donc pas
+de penser au rangement, et la liste ne casse pas quand un identifiant disparaît.
+
 #### Ce qui a servi, et qui l'a publié
 
 **Diffuser → 📊 Fréquentation** met côte à côte tous les questionnaires de
@@ -251,7 +273,7 @@ chacun a répondu. **Pas de pourcentage sous trente parcours** : à sept, « 14 
 désigne une personne.
 
 Et dans le rail, chaque questionnaire de l'espace porte désormais qui l'a publié,
-quand, et en quelle version — « *Camille Ndiaye · 30 août à 14:31 · v7* ». La
+quand, et en quelle version — « *Albertine Sarrazin · 30 août à 14:31 · v7* ». La
 donnée existait depuis le garde-fou anti-écrasement ; elle ne se montrait que
 dans le message de conflit, c'est-à-dire seulement quand ça avait déjà mal
 tourné.

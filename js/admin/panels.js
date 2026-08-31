@@ -545,6 +545,8 @@ function espaceCard(ctx) {
                   text: ctx.identite ? `✦ ${ctx.identite.titre}` : '✦ Personnaliser le kiosque' }),
                 el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'corbeille',
                   text: ctx.corbeille ? `🗑 Corbeille · ${ctx.corbeille}` : '🗑 Corbeille' }),
+                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'vitrine',
+                  text: ctx.masques ? `▦ Vitrine · ${ctx.masques} masqué${ctx.masques > 1 ? 's' : ''}` : '▦ Vitrine' }),
                 el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'frequentation',
                   text: '📊 Fréquentation' }),
               ]),

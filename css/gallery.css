@@ -80,6 +80,25 @@
   height: 4px;
   background: var(--card-accent);
 }
+/* Le questionnaire mis à la une par l'équipe : il prend toute la largeur
+   de la grille et porte son étiquette. La prééminence se lit à la taille,
+   pas à une couleur de plus. */
+.quiz-card--une { grid-column: 1 / -1; }
+.quiz-card--une .quiz-card__title { font-size: var(--t-xl); }
+.quiz-card__une {
+  position: absolute;
+  top: var(--s-3);
+  right: var(--s-3);
+  z-index: var(--z-raised);
+  padding: 2px var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--card-accent);
+  color: var(--accent-ink);
+  font-size: var(--t-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: .02em;
+}
+
 .quiz-card:hover {
   transform: translateY(-3px);
   border-color: var(--card-accent);

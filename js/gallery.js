@@ -4,8 +4,8 @@
 
 import { loadAll } from './core/catalog.js';
 import * as store from './core/store.js';
-import { identite as chargerIdentite } from './core/remote.js';
-import { normaliserIdentite } from './core/schema.js';
+import { identite as chargerIdentite, presentation as chargerPresentation } from './core/remote.js';
+import { normaliserIdentite, normaliserPresentation } from './core/schema.js';
 import { el, formatDate, toast, espaceCourant, avecEspace, garderEspace, applyAccent } from './core/ui.js';
 
 /* L'espace vient de l'adresse, jamais du code : une même page sert le
@@ -29,7 +29,8 @@ async function boot() {
      n'arrive, pour qu'on ne voie pas notre marque céder la place à celle
      de la structure. Un espace sans identité garde la nôtre. */
   if (espace) habiller(normaliserIdentite(await chargerIdentite(espace)));
-  renderQuizzes(await loadAll({ espace }));
+  const presentation = espace ? normaliserPresentation(await chargerPresentation(espace)) : null;
+  renderQuizzes(await loadAll({ espace }), presentation);
   renderHistory();
   /* Même règle que dans le backoffice : on agit, on laisse un retour.
      L'historique est reconstitué depuis la mémoire, pas depuis le disque. */
@@ -107,7 +108,26 @@ function habiller(id) {
   if (lienPied) lienPied.textContent = 'Backoffice';
 }
 
-function renderQuizzes(quizzes) {
+/* L'ordre voulu par l'équipe, puis l'alphabet pour le reste. Un
+   identifiant absent de `ordre` n'est pas une erreur : c'est un
+   questionnaire publié sans qu'on ait pensé au rangement, et il se range
+   après ceux qu'on a rangés. */
+function ranger(quizzes, presentation) {
+  if (!presentation) return null;
+  const visibles = quizzes.filter((q) => !presentation.masques.has(q.id));
+  const rang = new Map(presentation.ordre.map((id, i) => [id, i]));
+  return visibles.sort((a, b) => {
+    const ra = rang.has(a.id) ? rang.get(a.id) : Infinity;
+    const rb = rang.has(b.id) ? rang.get(b.id) : Infinity;
+    if (ra !== rb) return ra - rb;
+    return a.title.localeCompare(b.title, 'fr');
+  });
+}
+
+function renderQuizzes(quizzes, presentation = null) {
+  const ranges = ranger(quizzes, presentation);
+  if (ranges) quizzes = ranges;
+
   dom.count.textContent = quizzes.length
     ? `${quizzes.length} questionnaire${quizzes.length > 1 ? 's' : ''}`
     : '';
@@ -125,21 +145,25 @@ function renderQuizzes(quizzes) {
     return;
   }
 
-  const sorted = [...quizzes].sort((a, b) => {
+  /* Dans un espace rangé, l'ordre est celui de l'équipe. Ailleurs, les
+     brouillons d'abord puis l'alphabet, comme depuis toujours. */
+  const sorted = ranges || [...quizzes].sort((a, b) => {
     if (a.source !== b.source) return a.source === 'draft' ? -1 : 1;
     return a.title.localeCompare(b.title, 'fr');
   });
 
-  dom.grid.replaceChildren(...sorted.map(card));
+  const alaune = presentation?.epingle;
+  dom.grid.replaceChildren(...sorted.map((quiz) => card(quiz, quiz.id === alaune)));
 }
 
-function card(quiz) {
+function card(quiz, alaune = false) {
   const questions = quiz.questions.length;
   return el('a', {
-    class: 'quiz-card',
+    class: 'quiz-card' + (alaune ? ' quiz-card--une' : ''),
     href: avecEspace(`quiz.html?q=${encodeURIComponent(quiz.id)}`),
     style: { '--card-accent': quiz.accent },
   }, [
+    alaune && el('span', { class: 'quiz-card__une', text: 'À la une' }),
     quiz.image && el('img', { class: 'quiz-card__cover', src: quiz.image, alt: '', loading: 'lazy' }),
     el('div', { class: 'quiz-card__top' }, [
       el('span', { class: 'quiz-card__emoji', text: quiz.emoji || '✦', 'aria-hidden': 'true' }),

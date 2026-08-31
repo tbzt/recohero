@@ -353,6 +353,32 @@ export async function enregistrerIdentite(espace, valeurs) {
   });
 }
 
+/* --- La présentation du kiosque ----------------------------------------------
+   Lue sans compte, comme l'identité : c'est le kiosque public qui s'en sert.
+   Écrite par les membres. Une branche absente vaut « ordre alphabétique,
+   rien de masqué » — le comportement d'avant, qui reste le défaut. */
+
+export async function presentation(espace) {
+  if (!espace) return null;
+  try {
+    const response = await fetch(branche(espace, 'presentation'));
+    if (!response.ok) return null;
+    return (await response.json()) || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function enregistrerPresentation(espace, corps) {
+  const url = branche(espace, 'presentation');
+  if (!corps) return call(url, { method: 'DELETE' });
+  return call(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corps),
+  });
+}
+
 /* --- La corbeille -------------------------------------------------------------
    Retirer de l'espace ne détruit plus : cela déplace. Le dépôt s'avouait
    démuni sur ce point — « une suppression dans un espace est définitive, et
