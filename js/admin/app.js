@@ -1300,6 +1300,43 @@ function parametresCompte() {
   dialog.showModal();
 }
 
+
+/* --- Les noms d'exemple ------------------------------------------------------
+   Un formulaire a besoin d'un nom pour montrer ce qu'il attend. Autant que ce
+   soit une recommandation de plus : des autrices, tirées au sort à chaque
+   ouverture. Celles qui ont ouvert des portes — la proto-science-fiction avant
+   que le mot existe, les pulps, l'âge d'or, la fantasy — et quelques
+   françaises qu'on cite trop peu.
+
+   Rien ne l'explique à l'écran, et c'est voulu : qui reconnaît sourit, qui ne
+   reconnaît pas voit un nom plausible d'agent de médiathèque. Une note de bas
+   de page tuerait les deux.
+
+   Les deux champs viennent du MÊME tirage — un « Ursula Sarrazin » serait un
+   bel hommage à personne.                                                */
+
+const AUTRICES = [
+  { prenom: 'Margaret',  nom: 'Cavendish' },   // The Blazing World, 1666 — avant le mot
+  { prenom: 'Mary',      nom: 'Shelley' },     // Frankenstein, 1818 — l'acte de naissance
+  { prenom: 'Catherine', nom: 'Moore' },       // « Shambleau », 1933 — signait C. L. Moore
+  { prenom: 'Leigh',     nom: 'Brackett' },    // reine du space opera, et L'Empire contre-attaque
+  { prenom: 'Alice',     nom: 'Sheldon' },     // signait James Tiptree Jr., et personne ne le savait
+  { prenom: 'Ursula',    nom: 'Le Guin' },     // La Main gauche de la nuit · Terremer
+  { prenom: 'Joanna',    nom: 'Russ' },        // L'Autre moitié de l'homme
+  { prenom: 'Octavia',   nom: 'Butler' },      // Kindred · La Parabole du semeur
+  { prenom: 'Angélica',  nom: 'Gorodischer' }, // Kalpa impérial, que Le Guin a traduite
+  { prenom: 'Élisabeth', nom: 'Vonarburg' },   // Chroniques du Pays des Mères
+  { prenom: 'Joëlle',    nom: 'Wintrebert' },  // la SF française, depuis les années 1970
+  { prenom: 'Albertine', nom: 'Sarrazin' },    // L'Astragale, 1965
+  { prenom: 'Violette',  nom: 'Leduc' },       // La Bâtarde
+  { prenom: 'Christiane',nom: 'Rochefort' },   // Les Petits Enfants du siècle
+  { prenom: 'Anne',      nom: 'Garréta' },     // Sphinx — et l'Oulipo, comme Perec
+];
+
+function autriceAuHasard() {
+  return AUTRICES[Math.floor(Math.random() * AUTRICES.length)];
+}
+
 /* Nommer quelqu'un de l'équipe. Le profil est lisible des seuls membres,
    ce qui suffit ici : dire « Albertine » à un collègue n'expose personne au
    public. Faute de profil, l'identifiant tronqué — dit comme tel plutôt
@@ -1327,8 +1364,9 @@ function monProfil() {
   const actuel = state.profils?.[uid] || {};
   const enVitrine = Boolean(state.vitrines?.[uid]);
 
-  const prenom = el('input', { class: 'input', value: actuel.prenom || '', placeholder: 'Albertine' });
-  const nom = el('input', { class: 'input', value: actuel.nom || '', placeholder: 'Sarrazin' });
+  const exemple = autriceAuHasard();
+  const prenom = el('input', { class: 'input', value: actuel.prenom || '', placeholder: exemple.prenom });
+  const nom = el('input', { class: 'input', value: actuel.nom || '', placeholder: exemple.nom });
   const poste = el('input', { class: 'input', value: actuel.poste || '', placeholder: 'Responsable du secteur adulte' });
   const photo = el('input', { class: 'input input--mono', value: actuel.image || '', placeholder: 'https://… (facultatif)' });
   const publier = el('input', { type: 'checkbox' });
@@ -1424,7 +1462,11 @@ function monProfil() {
    Si l'adresse a déjà un compte, rien côté client ne permet d'en
    retrouver l'identifiant : on le demande, plutôt que d'échouer. */
 function inviter() {
-  const email = el('input', { class: 'input', type: 'email', placeholder: 'collegue@mediatheque.fr' });
+  const invitee = autriceAuHasard();
+  const email = el('input', {
+    class: 'input', type: 'email',
+    placeholder: `${slugify(invitee.prenom).slice(0, 1)}.${slugify(invitee.nom)}@mediatheque.fr`,
+  });
   const uidChamp = el('input', { class: 'input input--mono', placeholder: 'son identifiant, s’il a déjà un compte' });
   const info = el('p', { class: 'panel__hint', hidden: true });
   const erreur = el('p', { class: 'alerte', hidden: true });
