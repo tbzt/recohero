@@ -4,15 +4,12 @@
 
 import { loadAll } from './core/catalog.js';
 import * as store from './core/store.js';
-import { el, formatDate, toast } from './core/ui.js';
+import { el, formatDate, toast, espaceCourant, avecEspace, garderEspace } from './core/ui.js';
 
 /* L'espace vient de l'adresse, jamais du code : une même page sert le
-   kiosque du dépôt et celui de n'importe quelle médiathèque. */
-const espace = new URLSearchParams(location.search).get('espace');
-
-/* Tout lien interne doit reconduire l'espace, sinon un clic ramène au
-   kiosque du dépôt et le visiteur change de catalogue sans le vouloir. */
-const withEspace = (url) => (espace ? `${url}&espace=${encodeURIComponent(espace)}` : url);
+   kiosque du dépôt et celui de n'importe quelle médiathèque. Tout lien
+   interne doit le reconduire — cf. ui.js, § « L'espace, dans l'adresse ». */
+const espace = espaceCourant();
 
 const dom = {
   grid: document.getElementById('quizGrid'),
@@ -22,6 +19,7 @@ const dom = {
   clear: document.getElementById('clearHistory'),
 };
 
+garderEspace();
 boot();
 
 async function boot() {
@@ -57,7 +55,7 @@ function renderQuizzes(quizzes) {
       el('p', { text: 'Aucun questionnaire pour l’instant.' }),
       el('p', {}, [
         'Passez par le ',
-        el('a', { href: 'admin.html', text: 'backoffice' }),
+        el('a', { href: avecEspace('admin.html'), text: 'backoffice' }),
         ' pour en créer un.',
       ]),
     ]));
@@ -76,7 +74,7 @@ function card(quiz) {
   const questions = quiz.questions.length;
   return el('a', {
     class: 'quiz-card',
-    href: withEspace(`quiz.html?q=${encodeURIComponent(quiz.id)}`),
+    href: avecEspace(`quiz.html?q=${encodeURIComponent(quiz.id)}`),
     style: { '--card-accent': quiz.accent },
   }, [
     quiz.image && el('img', { class: 'quiz-card__cover', src: quiz.image, alt: '', loading: 'lazy' }),
@@ -123,7 +121,7 @@ function renderHistory() {
     ))),
     el('a', {
       class: 'btn btn--quiet btn--sm',
-      href: withEspace(`quiz.html?q=${encodeURIComponent(entry.quizId)}`),
+      href: avecEspace(`quiz.html?q=${encodeURIComponent(entry.quizId)}`),
       text: 'Refaire',
     }),
   ])));

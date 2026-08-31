@@ -19,7 +19,7 @@ import * as store from '../core/store.js';
 import { linkFor, encode } from '../core/share.js';
 import {
   el, toast, copy, download, applyAccent, debounce, formatDate,
-  imageFromFile, formatBytes, IMAGE_LIMITS,
+  imageFromFile, formatBytes, IMAGE_LIMITS, espaceCourant, avecEspace, garderEspace,
 } from '../core/ui.js';
 
 /* --- La porte -------------------------------------------------------------
@@ -65,7 +65,10 @@ async function boot() {
                     'quizName', 'saveStatus', 'topActions', 'tabbar']) {
     dom[id] = document.getElementById(id);
   }
-  state.espace = new URLSearchParams(location.search).get('espace');
+  state.espace = espaceCourant();
+  /* La marque du bandeau ramène au kiosque : à celui de l'espace quand on
+     y travaille, sinon on quitte l'environnement sans s'en apercevoir. */
+  garderEspace();
 
   /* Deux portes, et une seule s'ouvre selon l'adresse.
 
@@ -1522,7 +1525,11 @@ function changerMonMotDePasse() {
 async function testRun() {
   flush();
   const url = await linkFor(state.quiz, 'quiz.html');
-  window.open(`${url.split('#')[0]}?test=1#${url.split('#')[1]}`, '_blank', 'noopener');
+  const [adresse, charge] = url.split('#');
+  /* L'espace voyage avec l'essai : sans lui, la sortie du parcours de test
+     ramènerait au backoffice du dépôt et non à celui de l'équipe. */
+  const essai = avecEspace(`${adresse}?test=1`, state.espace);
+  window.open(`${essai}#${charge}`, '_blank', 'noopener');
 }
 
 async function copyLink() {

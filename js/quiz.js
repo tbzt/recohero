@@ -13,7 +13,7 @@ import { questionView } from './core/views.js';
 import * as store from './core/store.js';
 import { linkFor } from './core/share.js';
 import { renderResultCard, toBlob } from './core/card.js';
-import { el, paragraphs, escapeHtml, applyAccent, toast, copy, downloadBlob } from './core/ui.js';
+import { el, paragraphs, escapeHtml, applyAccent, toast, copy, downloadBlob, avecEspace, garderEspace } from './core/ui.js';
 
 const params = new URLSearchParams(location.search);
 const isTest = params.has('test');
@@ -22,7 +22,12 @@ const espace = params.get('espace');
 
 /* Le kiosque d'origine, celui du dépôt ou celui d'un espace : toute sortie
    doit y revenir, sinon le visiteur d'une médiathèque atterrit chez nous. */
-const kiosque = espace ? `index.html?espace=${encodeURIComponent(espace)}` : 'index.html';
+const kiosque = avecEspace('index.html', espace);
+
+/* En mode test, la sortie ramène à l'éditeur d'où l'on vient — et à SON
+   espace. Le libellé disait « Retour au backoffice » depuis toujours ;
+   l'adresse, elle, menait au kiosque. */
+const sortie = isTest ? avecEspace('admin.html', espace) : kiosque;
 
 const dom = {
   bar: document.getElementById('quizbar'),
@@ -62,8 +67,9 @@ async function boot() {
     dom.title.textContent = quiz.title;
     dom.bar.hidden = false;
 
-    dom.exit.href = kiosque;
+    dom.exit.href = sortie;
     if (isTest) dom.exit.textContent = '← Retour au backoffice';
+    garderEspace();
     if (isEmbed) wireEmbed();
 
     const saved = store.getSession(quiz.id);
@@ -687,11 +693,7 @@ async function shareQuiz() {
      Un brouillon local n'existe nulle part ailleurs : il voyage entier. */
   const addressable = state.quiz.source === 'published' || state.quiz.source === 'remote';
   const url = addressable
-    ? new URL(
-        `quiz.html?q=${encodeURIComponent(state.quiz.id)}`
-        + (espace ? `&espace=${encodeURIComponent(espace)}` : ''),
-        location.href,
-      ).toString()
+    ? new URL(avecEspace(`quiz.html?q=${encodeURIComponent(state.quiz.id)}`, espace), location.href).toString()
     : await linkFor(state.quiz);
   if (navigator.share) {
     try {

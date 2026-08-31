@@ -44,7 +44,7 @@ placés sous lui.
 | `core/views.js` | La vue d'une question, **partagée** par le parcours et l'aperçu du backoffice. | connaître l'état de l'un ou de l'autre |
 | `core/sortable.js` | Réordonner une liste au pointeur. | connaître ce qu'elle contient |
 | `core/card.js` | Dessiner la carte de résultat sur un canvas. | lire le DOM de la page |
-| `core/ui.js` | Les gestes d'interface : nœud, notification, copie, thème, réduction d'image. | connaître le métier |
+| `core/ui.js` | Les gestes d'interface : nœud, notification, copie, thème, réduction d'image, **et l'espace dans l'adresse**. | connaître le métier |
 
 ---
 
@@ -498,6 +498,19 @@ est conservé — par `store.js`, comme tout le reste, parce qu'aucun module
 n'écrit dans `localStorage` de son côté. Il expire en une heure et se
 renouvelle en silence : une session de travail d'une après-midi ne doit pas
 se couper au milieu d'une phrase.
+
+**L'espace ne se perd pas en chemin.** Il vient de l'adresse, et chaque lien
+interne le reconduit : `avecEspace()` pour ceux que le rendu fabrique,
+`garderEspace()` pour ceux écrits en dur dans le HTML. C'est de l'adressage et
+non du métier — ces fonctions ne savent d'un espace que ceci : il se nomme
+dans la query. Le tri se fait sur l'**origine** et non sur la forme de
+l'adresse : les nôtres sont parfois absolues — le lien d'essai que fabrique
+le backoffice en est une — et les écarter au seul motif qu'elles portent un
+schéma leur ferait perdre l'espace ; à l'inverse, le nom de l'espace n'a rien
+à faire dans l'adresse d'un tiers.
+
+Le retour arrière n'appelle aucun code : dès lors que chaque navigation
+emporte le paramètre, l'historique le contient.
 
 **Le kiosque d'un espace ne montre que cet espace.** Ni les questionnaires du
 dépôt, ni les brouillons locaux — alors même que le kiosque ordinaire montre

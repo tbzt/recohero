@@ -122,6 +122,64 @@ export function applyAccent(hex, root = document.documentElement) {
   root.style.setProperty('--accent-ink', inkOn(hex));
 }
 
+/* --- L'espace, dans l'adresse ------------------------------------------------
+   Le nom de l'espace vient de l'adresse, et il doit y rester. Un lien
+   interne qui l'oublie fait changer de catalogue sans le dire : on partait
+   du kiosque d'une médiathèque, on se retrouve sur le nôtre, et rien à
+   l'écran n'explique pourquoi les questionnaires ne sont plus les mêmes.
+
+   Le retour arrière du navigateur n'a besoin d'aucun traitement : dès lors
+   que chaque navigation emporte le paramètre, l'historique le contient.
+
+   C'est de l'adressage et non du métier — ces fonctions ne savent d'un
+   espace que ceci : il se nomme dans la query.                          */
+
+export function espaceCourant(recherche = location.search) {
+  return new URLSearchParams(recherche).get('espace');
+}
+
+export function avecEspace(url, espace = espaceCourant()) {
+  if (!espace || !url) return url;
+  /* Jamais chez les autres : le nom de l'espace n'a rien à faire dans
+     l'adresse d'un tiers. Une reco pointe vers un catalogue, un éditeur,
+     une notice — aucun n'a à savoir d'où vient le visiteur.
+
+     Le tri se fait sur l'ORIGINE, pas sur la forme : nos propres adresses
+     sont parfois absolues — le lien de test que fabrique le backoffice en
+     est une — et les écarter sur le seul motif qu'elles portent un schéma
+     leur ferait perdre l'espace. */
+  const texte = String(url);
+  if (/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(texte)) {
+    try {
+      if (new URL(texte, location.href).origin !== location.origin) return url;
+    } catch {
+      return url;
+    }
+  }
+  const [chemin, fragment] = texte.split('#');
+  /* Une ancre seule ne désigne pas une page : lui poser une query la
+     ferait quitter celle où l'on est. */
+  if (!chemin) return url;
+  if (/[?&]espace=/.test(chemin)) return url;
+  const separateur = chemin.includes('?') ? '&' : '?';
+  const complet = `${chemin}${separateur}espace=${encodeURIComponent(espace)}`;
+  return fragment === undefined ? complet : `${complet}#${fragment}`;
+}
+
+/* Les liens écrits en dur dans le HTML : la marque, « Backoffice », le pied
+   de page. Ceux que le rendu fabrique passent par avecEspace() à la
+   construction. On ne touche qu'aux adresses relatives — un lien externe,
+   un `mailto:` ou une ancre n'ont rien à voir avec notre catalogue. */
+export function garderEspace(racine = document) {
+  const espace = espaceCourant();
+  if (!espace) return;
+  for (const lien of racine.querySelectorAll('a[href]')) {
+    const href = lien.getAttribute('href');
+    if (!href || /^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(href)) continue;
+    lien.setAttribute('href', avecEspace(href, espace));
+  }
+}
+
 export function formatDate(timestamp) {
   return new Intl.DateTimeFormat('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',

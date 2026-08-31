@@ -173,6 +173,14 @@ Un **espace** est une équipe et son catalogue. Il se nomme dans l'adresse :
 | `…/?espace=maupassant` | tout le monde | Le kiosque de cette équipe, et lui seul. On répond **sans compte**. |
 | `…/admin.html?espace=maupassant` | l'équipe | Le backoffice. Demande une adresse et un mot de passe, une fois. |
 
+**Une fois dans un espace, on y reste.** Le nom de l'espace voyage avec
+chaque lien interne — la marque du bandeau, « Backoffice », le pied de page,
+les vignettes du kiosque, la sortie d'un parcours, l'essai lancé depuis
+l'éditeur. Le retour arrière du navigateur suit tout seul, puisque
+l'historique porte le paramètre. Sans cela, un clic sur le logo ramenait au
+kiosque du dépôt : les questionnaires changeaient, et rien à l'écran ne
+disait pourquoi.
+
 Le kiosque d'un espace ne montre **que** cet espace : ni les questionnaires du
 dépôt, ni les brouillons locaux. Ce n'est pas un oubli — c'est la condition
 pour que celle qui publie voie exactement ce que verra le visiteur.
