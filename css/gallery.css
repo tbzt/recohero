@@ -99,11 +99,24 @@
   letter-spacing: .02em;
 }
 
+/* Les vignettes se posent l'une après l'autre : le kiosque se remplit
+   sous les yeux au lieu d'apparaître fait. Le délai est posé au rendu. */
+.quiz-card { animation: vignette var(--dur-base) var(--ease-out) both; }
+@keyframes vignette {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
 .quiz-card:hover {
   transform: translateY(-3px);
   border-color: var(--card-accent);
   box-shadow: var(--shadow-2);
 }
+/* Au survol, la couverture respire dans son cadre — la carte ne bouge pas
+   toute seule, c'est l'image qui avance. */
+.quiz-card__cover { transition: transform var(--dur-slow) var(--ease-out); }
+.quiz-card:hover .quiz-card__cover { transform: scale(1.05); }
+.quiz-card:active { transform: translateY(-1px) scale(0.995); }
 .quiz-card__cover {
   width: calc(100% + var(--s-5) * 2);
   margin: calc(var(--s-5) * -1) calc(var(--s-5) * -1) 0;

@@ -99,7 +99,53 @@ function fail(message, detail) {
 
 /* --- Rendu ---------------------------------------------------------------- */
 
+/* La transition de vue est un SUPPLÉMENT, jamais le socle. Le navigateur qui
+   ne la connaît pas — ou la personne qui a demandé moins de mouvement — reçoit
+   le rendu direct et l'animation d'entrée maison, qui suffit. C'est la règle
+   du projet : la valeur au repos doit être juste sans elle.
+
+   Elle apporte ce que `replaceChildren` ne pouvait pas donner : la SORTIE de
+   l'écran quittant. Le navigateur photographie l'avant et l'après ; nous
+   n'avons aucune position absolue à poser, donc rien qui puisse fausser la
+   hauteur annoncée à un site hôte en mode embarqué. */
 function render() {
+  const transitionnable = typeof document.startViewTransition === 'function'
+    && !MOUVEMENT_REDUIT?.matches;
+
+  if (!transitionnable) return dessiner();
+
+  /* Une transition en cours ne doit pas faire attendre la suivante. Sans
+     cette coupure, un écran demandé pendant l'animation était mis en file :
+     qui enchaîne les réponses au clavier — ou change d'avis — sentait le
+     parcours traîner d'un demi-tour à chaque fois. On coupe court, et la
+     nouvelle part tout de suite. */
+  transitionEnCours?.skipTransition();
+
+  document.documentElement.classList.add('a-la-transition');
+  document.documentElement.style.setProperty('--sens', state.direction === 'back' ? '-1' : '1');
+
+  const geste = document.startViewTransition(() => dessiner());
+  transitionEnCours = geste;
+
+  const nettoyer = () => {
+    if (transitionEnCours !== geste) return;
+    transitionEnCours = null;
+    document.documentElement.classList.remove('a-la-transition');
+  };
+
+  /* Couper une transition REJETTE ses promesses, et c'est le cas nominal
+     ici — on coupe à chaque écran demandé pendant l'animation. Il faut donc
+     les traiter toutes les deux : un `.finally()` laisse passer le rejet, et
+     le parcours crachait onze rejets non gérés dans la console. Ce n'est pas
+     une erreur, c'est le fonctionnement. */
+  geste.finished.then(nettoyer, nettoyer);
+  geste.ready.catch(() => {});
+  return undefined;
+}
+
+let transitionEnCours = null;
+
+function dessiner() {
   const { quiz, step } = state;
   const view =
     step < 0 ? renderCover() :
@@ -148,12 +194,15 @@ function updateBar() {
   /* Le compteur est une région vivante : le reconstruire à chaque rendu
      le ferait relire à chaque changement d'écran, alors que rien n'a
      changé. On ne le refait que quand les nombres bougent. */
-  const empreinte = montres.map((a) => scores.counts[a.id]).join('·');
+  const empreinte = montres.map((a) => scores.counts[a.id]).join('·') + '|' + scores.leaders.join(',');
   if (empreinte !== derniersScores) {
     derniersScores = empreinte;
     dom.tally.replaceChildren(...montres.map((axis) => el(
     'span',
-    { class: 'tally__axis', style: { '--axis': axis.color }, title: axis.label, 'data-axis': axis.id },
+    { /* Qui mène, pendant qu'on joue. La course est le sujet du
+         questionnaire ; jusqu'ici elle ne se lisait qu'à l'arrivée. */
+      class: 'tally__axis' + (scores.leaders.includes(axis.id) && scores.best > 0 ? ' is-lead' : ''),
+      style: { '--axis': axis.color }, title: axis.label, 'data-axis': axis.id },
     [
       el('span', { class: 'tally__glyph', text: axis.glyph }),
       el('span', { class: 'tally__count', text: String(scores.counts[axis.id]) }),

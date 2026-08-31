@@ -386,6 +386,43 @@ remplacés, deux restaurés. `adopt()` écrit donc l'état courant, puis lâche
 
 ---
 
+## Le mouvement
+
+Une règle avant les effets : **la valeur au repos doit être juste sans eux.**
+Tout passe par les jetons de durée, qui tombent à 1 ms sous
+`prefers-reduced-motion` ; rien de l'état ne dépend d'une animation, et ce qui
+ne s'exécute pas ne manque à personne.
+
+**La transition de vue est un supplément, pas le socle.** `replaceChildren` ne
+laisse rien à animer : l'écran quittant disparaissait d'un coup, et le parcours
+avait le mouvement d'un diaporama. `document.startViewTransition()` sait animer
+la SORTIE — le navigateur photographie l'avant et l'après et fait le fondu
+lui-même. Aucune position absolue à poser de notre côté, donc aucun risque pour
+la hauteur annoncée au site hôte en mode embarqué. Le navigateur qui ne la
+connaît pas reçoit l'animation d'entrée maison, qui suffit.
+
+Trois choses apprises en la posant :
+
+- **Une transition en cours met la suivante en file.** Qui enchaîne les
+  réponses au clavier sentait le parcours traîner d'un demi-tour à chaque
+  écran. `skipTransition()` sur la précédente, et la nouvelle part tout de
+  suite.
+- **Couper une transition rejette ses promesses**, et c'est ici le cas
+  nominal. Un `.finally()` laisse passer le rejet : le parcours crachait onze
+  rejets non gérés par partie. Il faut traiter `finished` des deux côtés et
+  taire `ready`.
+- **Le bandeau et la couche des points en vol en sont exclus** par un
+  `view-transition-name` propre à durée nulle. Le premier est collant et
+  clignoterait ; la seconde contient des glyphes encore en route, qui seraient
+  photographiés figés pendant que leurs jumeaux vivants finissent leur course.
+
+**Les moments, et pourquoi ceux-là.** Le mouvement souligne ce que le produit
+raconte, il ne décore pas : les points volent de la réponse touchée jusqu'à
+leur axe (on récolte), l'axe en tête porte un halo dans le bandeau (on court),
+le titre du profil arrive seul, un peu après et d'un peu plus loin (on
+révèle), l'affiche se présente inclinée puis se pose (on emporte). Un seul
+geste appuyé à chaque fois, plutôt que dix petits.
+
 ## La carte de résultat
 
 `core/card.js` compose une affiche 1080 × 1350 sur un canvas. Aucune

@@ -200,6 +200,17 @@
   color: var(--ink-muted);
   min-width: 1.2em;
 }
+/* L'axe qui mène. Un halo, pas une couleur de plus : la teinte de l'axe
+   dit déjà de qui il s'agit, la couronne dit seulement qu'il est devant. */
+.tally__axis.is-lead .tally__glyph {
+  text-shadow: 0 0 0 transparent;
+  filter: drop-shadow(0 0 5px color-mix(in oklab, var(--axis, var(--accent)) 55%, transparent));
+}
+.tally__axis.is-lead .tally__count {
+  color: var(--ink);
+  font-weight: var(--fw-bold);
+}
+
 .tally__axis.is-bumped .tally__glyph {
   transform: scale(1.5) rotate(-8deg);
 }

@@ -153,15 +153,17 @@ function renderQuizzes(quizzes, presentation = null) {
   });
 
   const alaune = presentation?.epingle;
-  dom.grid.replaceChildren(...sorted.map((quiz) => card(quiz, quiz.id === alaune)));
+  /* Douze au plus : au-delà, la cascade devient une attente. */
+  dom.grid.replaceChildren(...sorted.map((quiz, i) =>
+    card(quiz, quiz.id === alaune, Math.min(i, 12) * 45)));
 }
 
-function card(quiz, alaune = false) {
+function card(quiz, alaune = false, retard = 0) {
   const questions = quiz.questions.length;
   return el('a', {
     class: 'quiz-card' + (alaune ? ' quiz-card--une' : ''),
     href: avecEspace(`quiz.html?q=${encodeURIComponent(quiz.id)}`),
-    style: { '--card-accent': quiz.accent },
+    style: { '--card-accent': quiz.accent, animationDelay: `${retard}ms` },
   }, [
     alaune && el('span', { class: 'quiz-card__une', text: 'À la une' }),
     quiz.image && el('img', { class: 'quiz-card__cover', src: quiz.image, alt: '', loading: 'lazy' }),

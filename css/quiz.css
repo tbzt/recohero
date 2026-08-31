@@ -125,9 +125,27 @@
 }
 .stage__inner { width: 100%; }
 
+/* --- Le passage d'un écran à l'autre ------------------------------------------
+   Deux mécaniques, et la seconde est un supplément.
+
+   L'ANIMATION D'ENTRÉE, ci-dessous, est le socle : elle ne dépend de rien,
+   marche partout, et suffit. C'est elle qui tient quand le reste ne
+   s'exécute pas.
+
+   LA TRANSITION DE VUE (plus bas) s'ajoute quand le navigateur la connaît.
+   Elle seule sait animer la SORTIE : jusqu'ici l'écran quittant disparaissait
+   d'un coup — `replaceChildren` ne laisse rien à animer — et le parcours
+   avait le mouvement d'un diaporama plutôt que d'un feuilletage. Le
+   navigateur, lui, photographie l'avant et l'après et fait le fondu
+   lui-même : aucune position absolue à poser, donc aucun risque pour la
+   hauteur annoncée au site hôte en mode embarqué.                       */
+
 .view-enter {
   animation: view-in var(--dur-slow) var(--ease-out) both;
 }
+/* Quand la transition de vue prend le relais, l'entrée maison s'efface :
+   les deux se superposeraient. */
+html.a-la-transition .view-enter { animation: none; }
 .view-enter--back { animation-name: view-in-back; }
 @keyframes view-in {
   from { opacity: 0; transform: translate3d(22px, 0, 0); }
@@ -136,6 +154,34 @@
 @keyframes view-in-back {
   from { opacity: 0; transform: translate3d(-22px, 0, 0); }
   to   { opacity: 1; transform: none; }
+}
+
+/* Le bandeau ne participe pas : il est collant, il reste. Le lui laisser
+   prendre part le ferait clignoter à chaque écran. */
+.quizbar { view-transition-name: quizbar; }
+::view-transition-group(quizbar) { animation-duration: 0ms; }
+
+/* La couche des points en vol non plus : un glyphe encore en route serait
+   photographié dans l'image sortante et resterait figé pendant que son
+   jumeau vivant finit sa course. */
+.vol { view-transition-name: vol; }
+::view-transition-group(vol) { animation-duration: 0ms; }
+
+/* Le sens du geste : on avance vers la gauche, on recule vers la droite.
+   `--sens` est posé par quiz.js juste avant la transition. */
+/* Court : on traverse ces écrans par dizaines. Une transition qu'on
+   remarque deux fois devient une attente à la vingtième. */
+::view-transition-old(root) {
+  animation: sortie-vue var(--dur-fast) var(--ease-in-out) both;
+}
+::view-transition-new(root) {
+  animation: entree-vue var(--dur-base) var(--ease-out) both;
+}
+@keyframes sortie-vue {
+  to { opacity: 0; transform: translateX(calc(var(--sens, 1) * -18px)); }
+}
+@keyframes entree-vue {
+  from { opacity: 0; transform: translateX(calc(var(--sens, 1) * 26px)); }
 }
 
 /* --- Écran de couverture -------------------------------------------------- */
@@ -395,10 +441,39 @@
   from { opacity: 0; transform: scale(0.6) rotate(-10deg); }
   to   { opacity: 1; transform: none; }
 }
+/* Le moment que le parcours entier prépare : « voilà qui vous êtes ».
+   Il arrivait comme le reste, dans le fondu général. Il arrive maintenant
+   un peu après, d'un peu plus loin, et un filet d'accent se déplie sous
+   lui — un seul geste, appuyé, plutôt que dix petits.
+
+   La valeur au repos est la bonne : sans animation, le titre est
+   simplement là, à sa place, dans sa couleur. */
 .result__title {
   font-size: clamp(var(--t-2xl), 6.5vw, var(--t-4xl));
   color: var(--accent-deep);
   margin-bottom: var(--s-2);
+  animation: revelation var(--dur-slow) var(--ease-spring) 120ms both;
+}
+@keyframes revelation {
+  from { opacity: 0; transform: translateY(14px) scale(0.94); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Le filet qui se déplie sous le titre, depuis le centre. */
+.result__banner::after {
+  content: "";
+  display: block;
+  height: 3px;
+  width: min(9rem, 45%);
+  margin: var(--s-4) auto 0;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  transform-origin: center;
+  animation: filet var(--dur-slow) var(--ease-out) 340ms both;
+}
+@keyframes filet {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: none; opacity: 1; }
 }
 .result__subtitle {
   font-family: var(--font-display);
@@ -607,4 +682,12 @@
   height: auto;
   border-radius: var(--r-md);
   box-shadow: var(--shadow-1);
+  /* L'affiche se présente comme une affiche : elle arrive de dessous,
+     légèrement inclinée, et se pose. C'est l'objet qu'on va partager —
+     il mérite d'être montré, pas affiché. */
+  animation: affiche var(--dur-slow) var(--ease-spring) both;
+}
+@keyframes affiche {
+  from { opacity: 0; transform: translateY(20px) rotate(-1.4deg) scale(0.96); }
+  to   { opacity: 1; transform: none; }
 }
