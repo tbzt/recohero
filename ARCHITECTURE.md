@@ -569,6 +569,30 @@ règle du garde-fou accepte puisque la branche n'a plus ce questionnaire.
 Le plafond de vingt est tenu à l'écriture, jamais par une expiration : sans
 serveur, personne ne fait le ménage à minuit.
 
+**Un espace ne se règle pas depuis un questionnaire.** Identité du kiosque,
+vitrine, corbeille, fréquentation, équipe : tout cela décrit l'espace, pas le
+document ouvert. C'était pourtant rangé dans le panneau « Diffuser » — lequel ne
+s'affiche qu'avec un questionnaire ouvert. Conséquence : une personne arrivant
+sur un navigateur neuf, sans brouillon local, voyait « Aucun questionnaire
+ouvert » et n'avait **aucun chemin** vers les réglages de son espace. Ils vivent
+désormais dans la feuille du compte, atteignable depuis la barre en toutes
+circonstances ; « Diffuser » n'en garde qu'un renvoi.
+
+**L'en-tête d'authentification est plus strict que la query.** Le passage de
+`?auth=` à `Authorization: Bearer` a fermé une fuite — un jeton dans une query
+finit dans l'historique et les journaux — mais a changé un comportement :
+
+    ?auth=<périmé>                  → ignoré, la lecture publique passe
+    Authorization: Bearer <périmé>  → 401, même sur une branche publique
+
+Un mot de passe changé ailleurs, une session révoquée, une horloge décalée, et
+c'est tout qui échoue — y compris ce qui n'a jamais eu besoin de compte.
+L'équipe voit un espace vide et des profils absents alors que rien n'a bougé
+dans la base. `call()` retente donc une LECTURE refusée sans jeton, et jette le
+jeton en cache en gardant celui de renouvellement : la session se répare en un
+appel, sans déconnecter personne. Une ÉCRITURE refusée reste refusée — là, il
+faut vraiment un compte.
+
 **L'état d'un espace se charge à l'ouverture, pas en réaction.** Tout ce qui
 le décrit — l'équipe, les profils, les vitrines, les compteurs, l'identité du
 kiosque, la corbeille — n'était rempli qu'après une connexion, une invitation

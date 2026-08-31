@@ -467,15 +467,53 @@ function path(espace, rest = '') {
    et dans les journaux de tout intermédiaire — exactement ce que share.js
    évite avec soin pour les questionnaires (« le fragment, et non la
    query »). Le même réflexe des deux côtés. */
+/* Le passage de `?auth=` à l'en-tête a corrigé une fuite — un jeton dans une
+   query finit dans l'historique et les journaux — mais il a changé un
+   comportement, et pas dans le bon sens :
+
+     ?auth=<périmé>              → IGNORÉ, la lecture publique passe
+     Authorization: Bearer <périmé> → 401, même sur une branche publique
+
+   Autrement dit, un jeton révoqué ou périmé — mot de passe changé ailleurs,
+   session invalidée, horloge décalée — faisait soudain échouer tout, y compris
+   ce qui n'avait jamais eu besoin de compte. L'équipe voyait un espace vide et
+   des profils absents, alors que rien n'avait bougé dans la base.
+
+   Deux garde-fous, donc. Une LECTURE refusée est retentée sans jeton : si la
+   branche est publique, elle répond, et c'était bien le jeton le fautif. Et
+   dans ce cas on jette le jeton en cache — en gardant celui de renouvellement
+   — pour que l'appel suivant en redemande un neuf. La session se répare
+   d'elle-même en un appel, sans déconnecter personne.
+
+   Une ÉCRITURE refusée reste refusée : là, il faut vraiment un compte, et
+   réessayer sans en serait un mensonge.                                  */
+
+function estUneLecture(options) {
+  const methode = (options.method || 'GET').toUpperCase();
+  return methode === 'GET';
+}
+
 async function call(url, options = {}) {
   const auth = await token();
-  const response = await fetch(url, {
+  const envoyer = (jeton) => fetch(url, {
     ...options,
     headers: {
       ...options.headers,
-      ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+      ...(jeton ? { Authorization: `Bearer ${jeton}` } : {}),
     },
   });
+
+  let response = await envoyer(auth);
+
+  if (response.status === 401 && auth) {
+    /* Le jeton est suspect : on le retire du cache pour forcer un
+       renouvellement au prochain appel, sans toucher au renouvellement
+       lui-même — la personne reste connectée. */
+    const saved = store.getRemote();
+    if (saved) store.setRemote({ ...saved, idToken: null, expiresAt: 0 });
+    if (estUneLecture(options)) response = await envoyer(null);
+  }
+
   if (response.status === 401) {
     throw new Error('Écriture refusée : ce compte n’est pas membre de cet espace.');
   }

@@ -541,17 +541,11 @@ function espaceCard(ctx) {
               /* Ce qui concerne l'espace entier, et non ce questionnaire :
                  son apparence publique, et ce qu'on en a retiré. */
               el('div', { class: 'row', style: { marginTop: 'var(--s-4)' } }, [
-                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'identite-espace',
-                  text: ctx.identite ? `✦ ${ctx.identite.titre}` : '✦ Personnaliser le kiosque' }),
-                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'corbeille',
-                  text: ctx.corbeille ? `🗑 Corbeille · ${ctx.corbeille}` : '🗑 Corbeille' }),
-                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'vitrine',
-                  text: ctx.masques ? `▦ Vitrine · ${ctx.masques} masqué${ctx.masques > 1 ? 's' : ''}` : '▦ Vitrine' }),
-                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'frequentation',
-                  text: '📊 Fréquentation' }),
+                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'compte',
+                  text: '⚙ Réglages de l’espace' }),
               ]),
-              !ctx.identite && el('p', { class: 'field__hint', text:
-                'Sans identité, le kiosque de cet espace affiche la marque RecoHero à vos usagers — son nom, son accroche et son pied de page.' }),
+              el('p', { class: 'field__hint', text:
+                'L’identité du kiosque, sa vitrine, sa corbeille, sa fréquentation et l’équipe : tout cela concerne l’espace entier et non ce questionnaire. On y accède aussi par le bouton du compte, dans la barre du haut — même sans questionnaire ouvert.' }),
 
               /* Une règle de base de données absente ne se voit nulle part :
                  l'espace a exactement la même apparence, protégé ou non.

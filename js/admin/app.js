@@ -440,6 +440,15 @@ async function renderPanel() {
             text: `Partir de « ${state.published[0].title} »`,
           }),
         ]),
+        /* Un espace ne se gère pas depuis un questionnaire : arriver ici sur
+           un navigateur neuf ne doit pas couper l'équipe de son kiosque. */
+        state.espace && state.remoteSession && el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-6)' } }, [
+          'Le kiosque de l’espace, sa vitrine, sa corbeille et l’équipe se règlent ailleurs — ',
+          'ils ne dépendent pas du questionnaire ouvert.',
+        ]),
+        state.espace && state.remoteSession && el('div', { class: 'row', style: { justifyContent: 'center', marginTop: 'var(--s-3)' } }, [
+          el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'compte', text: `⚙ Réglages de « ${state.espace} »` }),
+        ]),
       ]),
     ]));
     return;
@@ -1258,8 +1267,31 @@ function parametresCompte() {
 
   const dialog = el('dialog', { class: 'modal sheet' }, [
     el('div', { class: 'modal__body stack' }, [
-      el('h2', { text: 'Mon compte' }),
-      el('p', { class: 'panel__hint', text: `${state.remoteSession.email} — espace « ${state.espace} »` }),
+      el('h2', { text: `Espace « ${state.espace} »` }),
+      el('p', { class: 'panel__hint', text: `Connecté comme ${state.remoteSession.email}.` }),
+
+      /* Tout ce qui concerne l'ESPACE, et non le questionnaire ouvert.
+         C'était rangé dans le panneau « Diffuser », qui ne s'affiche que
+         lorsqu'un questionnaire est ouvert : une personne arrivant sur un
+         navigateur neuf, sans brouillon local, n'avait donc aucun chemin
+         vers l'identité du kiosque, sa vitrine, sa corbeille ni ses
+         compteurs. Le compte, lui, est atteignable depuis la barre en
+         toutes circonstances. */
+      el('span', { class: 'field__label', text: 'Le kiosque de l’équipe' }),
+      el('div', { class: 'row' }, [
+        el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'identite-espace',
+          text: state.identite ? `✦ ${state.identite.titre}` : '✦ Personnaliser le kiosque' }),
+        el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'vitrine',
+          text: state.presentation.masques.size ? `▦ Vitrine · ${state.presentation.masques.size} masqué${state.presentation.masques.size > 1 ? 's' : ''}` : '▦ Vitrine' }),
+        el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'corbeille',
+          text: state.corbeille.length ? `🗑 Corbeille · ${state.corbeille.length}` : '🗑 Corbeille' }),
+        el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'frequentation',
+          text: '📊 Fréquentation' }),
+      ]),
+      !state.identite && el('p', { class: 'field__hint', text:
+        'Sans identité, le kiosque de cet espace affiche la marque RecoHero à vos usagers — son nom, son accroche et son pied de page.' }),
+
+      el('span', { class: 'field__label', style: { marginTop: 'var(--s-4)' }, text: 'Moi' }),
 
       el('div', { class: 'row' }, [
         el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'mon-profil',
