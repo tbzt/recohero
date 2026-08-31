@@ -545,6 +545,8 @@ function espaceCard(ctx) {
                   text: ctx.identite ? `✦ ${ctx.identite.titre}` : '✦ Personnaliser le kiosque' }),
                 el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'corbeille',
                   text: ctx.corbeille ? `🗑 Corbeille · ${ctx.corbeille}` : '🗑 Corbeille' }),
+                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'frequentation',
+                  text: '📊 Fréquentation' }),
               ]),
               !ctx.identite && el('p', { class: 'field__hint', text:
                 'Sans identité, le kiosque de cet espace affiche la marque RecoHero à vos usagers — son nom, son accroche et son pied de page.' }),

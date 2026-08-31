@@ -532,6 +532,15 @@ règle du garde-fou accepte puisque la branche n'a plus ce questionnaire.
 Le plafond de vingt est tenu à l'écriture, jamais par une expiration : sans
 serveur, personne ne fait le ménage à minuit.
 
+**L'état d'un espace se charge à l'ouverture, pas en réaction.** Tout ce qui
+le décrit — l'équipe, les profils, les vitrines, les compteurs, l'identité du
+kiosque, la corbeille — n'était rempli qu'après une connexion, une invitation
+ou une publication. Qui revenait avec une session encore valide ouvrait donc un
+backoffice où l'équipe était vide, l'identité paraissait absente et la corbeille
+comptait zéro. Rien ne le signalait, et le premier geste remettait tout d'aplomb
+— ce qui rendait le défaut d'autant plus difficile à voir. `open()` appelle
+désormais `refreshEspace()`.
+
 **Le kiosque d'un espace ne montre que cet espace.** Ni les questionnaires du
 dépôt, ni les brouillons locaux — alors même que le kiosque ordinaire montre
 les seconds. L'exception est délibérée : celle qui publie doit voir exactement

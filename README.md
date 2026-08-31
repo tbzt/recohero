@@ -237,6 +237,25 @@ plafond-là.
 La corbeille rattrape le geste de trop ; elle ne rattrape pas la perte d'un
 projet Firebase.
 
+#### Ce qui a servi, et qui l'a publié
+
+**Diffuser → 📊 Fréquentation** met côte à côte tous les questionnaires de
+l'espace : parcours commencés, terminés, taux d'achèvement, et le nombre de
+profils que personne n'atteint. Aucune donnée nouvelle n'est collectée pour
+cela — tout était déjà écrit, mais ne se voyait qu'un questionnaire à la fois,
+dans l'éditeur, donc jamais au moment où l'on se demande ce qui marche.
+
+Deux choses qu'on s'y refuse. **Pas de courbe dans le temps** : les compteurs
+sont des nombres sans date, et en tracer une demanderait d'écrire *quand*
+chacun a répondu. **Pas de pourcentage sous trente parcours** : à sept, « 14 % »
+désigne une personne.
+
+Et dans le rail, chaque questionnaire de l'espace porte désormais qui l'a publié,
+quand, et en quelle version — « *Camille Ndiaye · 30 août à 14:31 · v7* ». La
+donnée existait depuis le garde-fou anti-écrasement ; elle ne se montrait que
+dans le message de conflit, c'est-à-dire seulement quand ça avait déjà mal
+tourné.
+
 #### Ce qui est public, et pourquoi ce n'est pas un oubli
 
 Les deux constantes en tête de [`js/core/remote.js`](js/core/remote.js) — URL

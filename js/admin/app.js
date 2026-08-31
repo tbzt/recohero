@@ -171,6 +171,15 @@ async function open() {
   const drafts = store.allDrafts();
   if (drafts.length) select(drafts[0].id);
 
+  /* Tout ce qui décrit l'espace — l'équipe, les profils, les vitrines, les
+     compteurs, l'identité du kiosque, la corbeille — n'était chargé qu'en
+     RÉACTION : après une connexion, une invitation, une publication. Qui
+     revenait avec une session encore valide ouvrait donc un backoffice où
+     l'équipe était vide, l'identité paraissait absente et la corbeille
+     comptait zéro. Rien ne le disait, et tout redevenait juste au premier
+     geste — ce qui rendait le défaut d'autant plus difficile à voir. */
+  if (state.espace && state.remoteSession) await refreshEspace();
+
   renderRail();
   renderPanel();
   renderTopbar();
@@ -268,6 +277,18 @@ function sectionBadge(counts) {
   });
 }
 
+/* « Camille, hier · v7 ». Sans profil, `nommer()` retombe sur un
+   identifiant tronqué, dit comme tel plutôt que déguisé en nom. Une
+   publication antérieure au garde-fou n'a ni auteur ni révision : on ne
+   dit rien plutôt que d'inventer. */
+function signature(quiz) {
+  const parts = [];
+  if (quiz.updatedBy) parts.push(nommer(quiz.updatedBy));
+  if (quiz.updatedAt) parts.push(formatDate(quiz.updatedAt));
+  if (quiz.rev > 0) parts.push(`v${quiz.rev}`);
+  return parts.join(' · ');
+}
+
 function renderRail() {
   const drafts = store.allDrafts();
   const draftIds = new Set(drafts.map((q) => q.id));
@@ -318,7 +339,15 @@ function renderRail() {
       el('div', { class: 'rail__head' }, [el('h2', { text: `Espace « ${state.espace} »` })]),
       el('div', { class: 'rail__list' }, state.remote.map((quiz) => el('div', { class: 'rail__item' }, [
         el('span', { class: 'rail__item__emoji', text: quiz.emoji || '✦' }),
-        el('span', { class: 'rail__item__label', text: quiz.title }),
+        /* Qui a touché à quoi. La donnée existe depuis le garde-fou
+           anti-écrasement, qui impose `updatedBy` et `rev` à chaque
+           publication — on ne la montrait que dans le message de conflit,
+           c'est-à-dire seulement quand ça avait déjà mal tourné. C'est
+           pourtant ce qu'une équipe demande en premier. */
+        el('span', { class: 'rail__item__label' }, [
+          el('span', { style: { display: 'block' }, text: quiz.title }),
+          signature(quiz) && el('span', { class: 'rail__item__signature', text: signature(quiz) }),
+        ]),
         el('button', {
           class: 'btn btn--icon btn--quiet', type: 'button',
           'data-act': 'export-one', 'data-id': quiz.id,
@@ -993,6 +1022,7 @@ function onClick(event) {
     case 'mon-mot-de-passe': return changerMonMotDePasse();
     case 'identite-espace':  return editerIdentite();
     case 'corbeille':        return ouvrirCorbeille();
+    case 'frequentation':    return ouvrirFrequentation();
     case 'export-espace': return exportEspace();
     case 'export-drafts': return exportDrafts();
     case 'export-one':    return exportOne(id);
@@ -1710,6 +1740,116 @@ function ouvrirCorbeille() {
   document.body.append(dialog);
   dialog.showModal();
   return undefined;
+}
+
+
+/* --- La fréquentation de l'espace ---------------------------------------------
+   Rien de neuf n'est collecté ici : `debuts`, `total` et la répartition par
+   profil sont écrits depuis toujours, questionnaire par questionnaire. Ils
+   ne s'affichaient qu'un questionnaire à la fois, dans l'éditeur — donc
+   jamais au moment où l'on se demande ce qui marche.
+
+   Ce qu'on se refuse à montrer : une courbe. Les compteurs sont des entiers
+   cumulés, sans date. En fabriquer une demanderait d'horodater chaque
+   parcours, donc d'écrire QUAND quelqu'un a répondu. Le projet a choisi de
+   n'écrire que des nombres ; une jolie courbe ne vaut pas qu'on revienne
+   là-dessus.                                                              */
+
+function tauxDe(s) {
+  if (!s?.debuts) return null;
+  return Math.min(100, Math.round(((s.total || 0) / s.debuts) * 100));
+}
+
+function ouvrirFrequentation() {
+  if (!state.remoteSession) return showSignIn();
+
+  const lignes = state.remote.map((quiz) => ({ quiz, s: state.stats?.[quiz.id] || {} }))
+    .sort((a, b) => (b.s.total || 0) - (a.s.total || 0));
+
+  const cumul = lignes.reduce((acc, { s }) => ({
+    debuts: acc.debuts + (s.debuts || 0),
+    total: acc.total + (s.total || 0),
+  }), { debuts: 0, total: 0 });
+
+  const chiffre = (valeur, libelle) => el('span', { class: 'etat__item' }, [
+    el('strong', { class: 'etat__valeur', text: String(valeur) }),
+    el('span', { class: 'etat__libelle', text: libelle }),
+  ]);
+
+  const ligne = ({ quiz, s }) => {
+    const taux = tauxDe(s);
+    /* Les profils que personne n'atteint : ce que l'auteur cherche
+       vraiment quand il regarde des compteurs. On ne le dit que si le
+       questionnaire a servi — à zéro parcours, tous les profils sont
+       « jamais atteints », et le signaler serait du bruit. */
+    const jamais = (s.total || 0) > 0
+      ? quiz.results.filter((r) => !(s.profils?.[r.id] > 0)).length
+      : 0;
+
+    return el('div', { class: 'sheet__row' }, [
+      el('span', { class: 'sheet__emoji', text: quiz.emoji || '✦' }),
+      el('span', { class: 'sheet__label' }, [
+        el('span', { text: quiz.title }),
+        el('span', { class: 'field__hint', style: { display: 'block' }, text:
+          /* « 0 commencé · 12 terminés » se lirait comme une anomalie. Un
+             questionnaire mis en ligne avant le comptage des départs n'a
+             pas zéro départ : il n'en a aucun de connu. On ne dit alors
+             que ce qu'on sait. */
+          (s.debuts ? `${s.debuts} commencé${s.debuts > 1 ? 's' : ''} · ` : '')
+          + `${s.total || 0} terminé${(s.total || 0) > 1 ? 's' : ''}`
+          + (jamais ? ` · ${jamais} profil${jamais > 1 ? 's' : ''} jamais atteint${jamais > 1 ? 's' : ''}` : '') }),
+      ]),
+      taux === null
+        ? el('span', { class: 'pill', title: 'Ce questionnaire a été mis en ligne avant le comptage des départs.', text: '—' })
+        : el('span', {
+            class: 'pill' + (taux < 50 ? ' pill--warn' : ''),
+            title: `${s.total || 0} parcours terminés sur ${s.debuts} commencés.`,
+            text: `${taux} %`,
+          }),
+    ]);
+  };
+
+  const tauxGlobal = tauxDe(cumul);
+
+  const dialog = el('dialog', { class: 'modal sheet' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: `Fréquentation de « ${state.espace} »` }),
+
+      lignes.length ? el('div', { class: 'etat', style: { marginBottom: 'var(--s-4)' } }, [
+        chiffre(cumul.debuts, cumul.debuts > 1 ? 'parcours commencés' : 'parcours commencé'),
+        chiffre(cumul.total, cumul.total > 1 ? 'terminés' : 'terminé'),
+        tauxGlobalItem(tauxGlobal),
+      ].filter(Boolean)) : null,
+
+      lignes.length
+        ? el('div', { class: 'sheet__list' }, lignes.map(ligne))
+        : el('p', { class: 'panel__hint', text: 'Aucun questionnaire en ligne dans cet espace : il n’y a rien à compter.' }),
+
+      el('p', { class: 'field__hint', text:
+        'Un ordre de grandeur, pas une mesure d’audience : l’écriture est ouverte — qui répond n’a pas de compte — et rien n’empêche quelqu’un de gonfler un compteur. « Refaire » compte un départ ET une arrivée, pour que le taux reste juste. Les essais depuis l’éditeur ne comptent pas.' }),
+      el('p', { class: 'field__hint', text:
+        'Pas de courbe dans le temps, et ce n’est pas un oubli : les compteurs sont des nombres sans date. En tracer une demanderait d’écrire quand chacun a répondu.' }),
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
+    ]),
+  ]);
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  return undefined;
+}
+
+/* Le taux global ne s'affiche que si des départs ont été comptés — sinon
+   il vaudrait 100 % sur des questionnaires antérieurs au compteur, ce qui
+   serait faux et flatteur. */
+function tauxGlobalItem(taux) {
+  if (taux === null) return null;
+  return el('span', { class: 'etat__item' + (taux < 50 ? ' etat__item--erreur' : '') }, [
+    el('strong', { class: 'etat__valeur', text: `${taux} %` }),
+    el('span', { class: 'etat__libelle', text: 'terminés' }),
+  ]);
 }
 
 /* --- Diffusion --------------------------------------------------------------------- */

@@ -109,7 +109,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.tab.is-active .rail__item__badge { color: var(--accent-ink); border-color: currentColor; }
+.tab.is-active /* Qui a publié, quand, en quelle version. Sous le titre, en retrait :
+   c'est un renseignement, pas une étiquette. */
+.rail__item__signature {
+  display: block;
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail__item__badge { color: var(--accent-ink); border-color: currentColor; }
 
 /* Sur un onglet réduit, la pastille se pose en coin plutôt que de
    s'ajouter à la largeur : deux sections en défaut ne doivent pas voler
