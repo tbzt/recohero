@@ -56,7 +56,7 @@ function renderQuizzes(quizzes) {
       el('div', { class: 'empty__icon', text: '📭' }),
       el('p', { text: 'Aucun questionnaire pour l’instant.' }),
       el('p', {}, [
-        'Passe par le ',
+        'Passez par le ',
         el('a', { href: 'admin.html', text: 'backoffice' }),
         ' pour en créer un.',
       ]),

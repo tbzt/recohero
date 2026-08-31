@@ -6,8 +6,8 @@
    ========================================================================== */
 
 import { resolveQuiz } from './core/catalog.js';
-import { vitrines as chargerVitrines, compterParcours } from './core/remote.js';
-import { tally, resolve, ceilings, proximite } from './core/scoring.js';
+import { vitrines as chargerVitrines, compterParcours, compterDebut } from './core/remote.js';
+import { tally, resolve, proximite } from './core/scoring.js';
 import { RECO_TYPES, slugify } from './core/schema.js';
 import { questionView } from './core/views.js';
 import * as store from './core/store.js';
@@ -52,7 +52,7 @@ boot();
 async function boot() {
   try {
     const quiz = await resolveQuiz({ id: params.get('q'), espace });
-    if (!quiz) return fail('Questionnaire introuvable.', "Vérifie le lien, ou reviens au kiosque.");
+    if (!quiz) return fail('Questionnaire introuvable.', "Vérifiez le lien, ou revenez au kiosque.");
     if (!quiz.questions.length) return fail('Ce questionnaire n’a pas encore de question.', quiz.title);
 
     state.quiz = quiz;
@@ -123,6 +123,8 @@ function render() {
   firstPaint = false;
 }
 
+let derniersScores = null;
+
 function updateBar() {
   const { quiz, step } = state;
   const answered = Object.keys(state.answers).length;
@@ -132,15 +134,99 @@ function updateBar() {
   dom.progress.style.width = `${Math.round(ratio * 100)}%`;
 
   const scores = tally(quiz, state.answers);
-  dom.tally.replaceChildren(...quiz.axes.map((axis) => el(
+  /* Huit au plus, comme la carte de résultat — et resserrés au-delà de six.
+     Le bandeau est collant : ce qu'il prend, le parcours ne l'a plus. */
+  const montres = quiz.axes.slice(0, 8);
+  dom.tally.classList.toggle('is-dense', montres.length > 6);
+
+  /* Le compteur est une région vivante : le reconstruire à chaque rendu
+     le ferait relire à chaque changement d'écran, alors que rien n'a
+     changé. On ne le refait que quand les nombres bougent. */
+  const empreinte = montres.map((a) => scores.counts[a.id]).join('·');
+  if (empreinte !== derniersScores) {
+    derniersScores = empreinte;
+    dom.tally.replaceChildren(...montres.map((axis) => el(
     'span',
     { class: 'tally__axis', style: { '--axis': axis.color }, title: axis.label, 'data-axis': axis.id },
     [
       el('span', { class: 'tally__glyph', text: axis.glyph }),
       el('span', { class: 'tally__count', text: String(scores.counts[axis.id]) }),
     ],
-  )));
+    )));
+  }
   dom.tally.hidden = step < 0;
+}
+
+/* --- Les points qui volent ---------------------------------------------------
+   De la réponse touchée jusqu'à son axe, dans le bandeau. Rien de l'état
+   n'en dépend : le compteur est déjà juste quand le premier point décolle,
+   et si l'animation ne s'exécute pas — mouvement réduit, onglet en
+   arrière-plan, navigateur sans Web Animations — le parcours est
+   rigoureusement identique. C'est la règle du projet : la valeur au repos
+   doit être juste sans JS, l'animation est un supplément.             */
+
+const MOUVEMENT_REDUIT = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+const POINTS_MAX = 4;    /* un +9 ne doit pas gicler neuf fois */
+const VOL_MS = 240;
+
+let couche = null;
+
+function envoler(depuis, gains) {
+  if (MOUVEMENT_REDUIT?.matches || typeof Element.prototype.animate !== 'function') {
+    return bump(gains.map((g) => g.axe.id));
+  }
+
+  const depart = depuis.getBoundingClientRect();
+  if (!couche) {
+    couche = el('div', { class: 'vol', 'aria-hidden': 'true' });
+    document.body.append(couche);
+  }
+
+  for (const { axe, points } of gains) {
+    const cible = dom.tally.querySelector(`[data-axis="${CSS.escape(axe.id)}"] .tally__glyph`);
+    if (!cible) { bump([axe.id]); continue; }
+    const arrivee = cible.getBoundingClientRect();
+
+    const combien = Math.min(points, POINTS_MAX);
+    for (let i = 0; i < combien; i += 1) {
+      const x0 = depart.left + depart.width * (0.18 + 0.1 * i);
+      const y0 = depart.top + depart.height / 2;
+      const x1 = arrivee.left + arrivee.width / 2;
+      const y1 = arrivee.top + arrivee.height / 2;
+
+      const point = el('span', {
+        class: 'vol__point', text: axe.glyph, style: { '--axis': axe.color },
+      });
+      couche.append(point);
+
+      const geste = point.animate([
+        { transform: `translate(${x0}px, ${y0}px) scale(0.6)`, opacity: 0 },
+        { transform: `translate(${x0 + (x1 - x0) * 0.25}px, ${y0 - 26}px) scale(1.15)`, opacity: 1, offset: 0.3 },
+        { transform: `translate(${x1}px, ${y1}px) scale(0.7)`, opacity: 0.9 },
+      ], { duration: VOL_MS + i * 70, easing: 'cubic-bezier(0.32, 0, 0.24, 1)', fill: 'forwards' });
+
+      /* Le compteur réagit quand le point ARRIVE, pas quand il part.
+
+         Mais l'arrivée ne peut pas reposer sur `finished` SEUL : une
+         animation ne progresse pas dans un onglet qui ne compose pas, la
+         promesse ne se résout alors jamais, et le glyphe resterait dans le
+         document indéfiniment. C'est le même interdit que le
+         `requestAnimationFrame` proscrit dans ARCHITECTURE.md, et il se
+         paie ici aussi. Un délai de secours ferme donc le geste, quoi
+         qu'il arrive ; `atterrir` ne s'exécute qu'une fois. */
+      let pose = false;
+      const atterrir = () => {
+        if (pose) return;
+        pose = true;
+        clearTimeout(secours);
+        point.remove();
+        bump([axe.id]);
+      };
+      const secours = setTimeout(atterrir, VOL_MS + i * 70 + 400);
+      geste.finished.then(atterrir, atterrir);
+    }
+  }
+  return undefined;
 }
 
 function bump(axisIds) {
@@ -167,8 +253,11 @@ function renderCover() {
     el('h1', { class: 'cover__title', text: quiz.title }),
     quiz.tagline && el('p', { class: 'cover__tagline', text: quiz.tagline }),
     quiz.intro && el('div', { class: 'cover__intro', html: paragraphs(quiz.intro) }),
-    el('div', { class: 'cover__axes' }, quiz.axes.map((axis) => el(
-      'span', { class: 'cover__axis', style: { '--axis': axis.color } },
+    el('div', { class: 'cover__axes' }, quiz.axes.map((axis, rang) => el(
+      'span', {
+        class: 'cover__axis',
+        style: { '--axis': axis.color, animationDelay: `${120 + rang * 60}ms` },
+      },
       [el('span', { class: 'glyph', text: axis.glyph }), axis.label],
     ))),
     el('div', { class: 'cover__actions' }, [
@@ -257,7 +346,6 @@ function renderResult() {
   const { quiz } = state;
   const scores = tally(quiz, state.answers);
   const profile = resolve(quiz, scores);
-  const caps = ceilings(quiz);
 
   if (!state.finished) {
     state.finished = true;
@@ -288,7 +376,11 @@ function renderResult() {
       el('h2', { text: 'À lire, voir, écouter' }),
       el('span', { class: 'pill pill--accent', text: `${profile.recos.length} reco${profile.recos.length > 1 ? 's' : ''}` }),
     ]),
-    el('div', { class: 'recos__list' }, profile.recos.map((reco, i) => renderReco(reco, i))),
+    /* Les recos entrent APRÈS la feuille de score : le résultat se lit
+       dans l'ordre où il a été établi — voilà ce que vous avez récolté,
+       voilà donc ce qu'on vous propose. */
+    el('div', { class: 'recos__list' },
+      profile.recos.map((reco, i) => renderReco(reco, i, quiz.axes.length * 55 + 90))),
   ]);
 
   const node = el('section', { class: 'result' }, [
@@ -300,25 +392,37 @@ function renderResult() {
       profile.text && el('div', { class: 'result__text', html: paragraphs(profile.text) }),
     ]),
 
-    el('div', { class: 'scores' }, quiz.axes.map((axis) => {
-      const value = scores.counts[axis.id];
-      const cap = Math.max(caps[axis.id] || 0, value, 1);
-      return el('div', {
-        class: 'score' + (scores.leaders.includes(axis.id) ? ' is-lead' : ''),
-        style: { '--axis': axis.color },
-      }, [
-        el('span', { class: 'score__label' }, [
-          el('span', { class: 'glyph', text: axis.glyph }), axis.label,
-        ]),
-        el('div', { class: 'score__track' }, [
-          el('div', {
-            class: 'score__fill',
-            style: { width: `${Math.round(Math.min(1, Math.max(0, value) / cap) * 100)}%` },
-          }),
-        ]),
-        el('span', { class: 'score__value', text: `${value}/${cap}` }),
-      ]);
-    })),
+    /* La jauge se lit d'un axe à l'autre, pas contre un plafond que le
+       questionnaire rend inatteignable. Le plafond théorique d'un axe
+       suppose qu'on ait répondu dans sa direction à chaque question —
+       ce que personne ne fait : sur le questionnaire d'exemple, l'axe
+       GAGNANT se remplissait à 54 % en moyenne, et aucun parcours sur
+       34 992 n'atteignait 100 %. Le résultat, moment de récompense,
+       montrait donc des barres à moitié vides et un « /16 » qui annonçait
+       un objectif hors d'atteinte. On rapporte désormais au plus haut
+       score obtenu : l'axe qui mène remplit sa barre, les autres se
+       situent par rapport à lui. */
+    el('div', { class: 'scores' }, (() => {
+      const sommet = Math.max(1, ...quiz.axes.map((a) => scores.counts[a.id] || 0));
+      return quiz.axes.map((axis, rang) => {
+        const value = scores.counts[axis.id];
+        return el('div', {
+          class: 'score' + (scores.leaders.includes(axis.id) ? ' is-lead' : ''),
+          style: { '--axis': axis.color, animationDelay: `${rang * 55}ms` },
+        }, [
+          el('span', { class: 'score__label' }, [
+            el('span', { class: 'glyph', text: axis.glyph }), axis.label,
+          ]),
+          el('div', { class: 'score__track' }, [
+            el('div', {
+              class: 'score__fill',
+              style: { width: `${Math.round(Math.min(1, Math.max(0, value) / sommet) * 100)}%` },
+            }),
+          ]),
+          el('span', { class: 'score__value', text: String(value) }),
+        ]);
+      });
+    })()),
 
     profile.recos.length ? recosNode : null,
 
@@ -370,14 +474,14 @@ function presqueNode(quiz, scores, profile) {
   ]);
 }
 
-function renderReco(reco, index) {
+function renderReco(reco, index, retard = 0) {
   const type = RECO_TYPES.find((t) => t.id === reco.type) || RECO_TYPES.at(-1);
   const meta = [reco.creator, reco.year].filter(Boolean).join(' · ');
   const title = reco.link
     ? `<a href="${escapeHtml(reco.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(reco.title)} ↗</a>`
     : escapeHtml(reco.title);
 
-  return el('article', { class: 'reco', style: { animationDelay: `${index * 70}ms` } }, [
+  return el('article', { class: 'reco', style: { animationDelay: `${retard + index * 70}ms` } }, [
     reco.image
       ? el('img', { class: 'reco__cover', src: reco.image, alt: '', loading: 'lazy' })
       : el('div', { class: 'reco__icon', text: type.icon, title: type.label, 'aria-hidden': 'true' }),
@@ -397,12 +501,16 @@ function renderReco(reco, index) {
 
 /* --- Interactions ----------------------------------------------------------- */
 
+/* Le rendez-vous de l'avancée automatique. Au niveau du module : il n'y
+   en a jamais qu'un en attente, et toute navigation explicite le périme. */
+let attenteAvance = 0;
+
 function onStageClick(event) {
   const trigger = event.target.closest('[data-act]');
   if (!trigger || !dom.stage.contains(trigger)) return;
 
   switch (trigger.dataset.act) {
-    case 'start':
+    case 'start':   return demarrer();
     case 'resume':  return go(0);
     case 'restart': return restart();
     case 'back':    return go(state.step - 1);
@@ -419,15 +527,28 @@ function pick(button) {
   if (!question) return;
   const optionId = button.dataset.option;
   const option = question.options.find((o) => o.id === optionId);
-  const gained = option ? state.quiz.axes.filter((a) => (option.scores[a.id] || 0) > 0).map((a) => a.id) : [];
+  const gains = option
+    ? state.quiz.axes
+        .map((axe) => ({ axe, points: option.scores[axe.id] || 0 }))
+        .filter((g) => g.points > 0)
+    : [];
 
   if (question.type === 'multiple') {
     const current = new Set(state.answers[question.id] || []);
-    current.has(optionId) ? current.delete(optionId) : current.add(optionId);
+    const ajoute = !current.has(optionId);
+    ajoute ? current.add(optionId) : current.delete(optionId);
     if (current.size) state.answers[question.id] = [...current];
     else delete state.answers[question.id];
     persist();
-    return render();
+    render();
+    /* Cocher fait voler les points ; décocher ne fait rien voler — on ne
+       met pas en scène un retrait. Le rendu a lieu avant, pour que le
+       bouton visé et le compteur soient à leur place définitive. */
+    if (ajoute) {
+      const revenu = dom.stage.querySelector(`[data-option="${CSS.escape(optionId)}"]`);
+      if (revenu) envoler(revenu, gains);
+    }
+    return undefined;
   }
 
   state.answers[question.id] = optionId;
@@ -439,26 +560,48 @@ function pick(button) {
   }
   button.classList.add('is-confirmed');
   updateBar();
-  bump(gained);
+  envoler(button, gains);
 
   /* Un temps de respiration avant d'enchaîner : assez pour voir le
-     compteur bouger, assez court pour que ça reste fluide.            */
-  setTimeout(() => advance(), 340);
+     compteur bouger, assez court pour que ça reste fluide.
+
+     Le différé est REPRIS, jamais empilé. Changer d'avis pendant ces
+     340 ms est le geste le plus normal d'un questionnaire de goût :
+     deux clics programmaient deux avancées, la seconde arrivait sur une
+     question encore vide, et le parcours reprochait au répondant de
+     n'avoir pas répondu — alors qu'il avait répondu deux fois. */
+  clearTimeout(attenteAvance);
+  attenteAvance = setTimeout(() => advance(), 340);
 }
 
 function advance() {
   const question = state.quiz.questions[state.step];
   if (question && state.answers[question.id] == null) {
-    return toast('Choisis au moins une réponse.', 'danger');
+    /* Un constat, pas une réprimande : le répondant n'a rien fait de mal,
+       il manque une réponse. */
+    return toast('Il manque une réponse à cette question.', 'danger');
   }
   return go(state.step + 1);
 }
 
 function go(step) {
+  /* On change d'écran : une avancée encore en attente vise l'écran d'avant
+     et n'a plus lieu d'être. */
+  clearTimeout(attenteAvance);
   const max = state.quiz.questions.length;
   state.direction = step < state.step ? 'back' : 'forward';
   state.step = Math.max(-1, Math.min(step, max));
   render();
+}
+
+/* Un départ compté, pour que le nombre d'arrivées veuille dire quelque
+   chose. « Reprendre » n'en est pas un — le départ a déjà été compté au
+   parcours précédent ; « Refaire » en est un, puisque l'arrivée sera
+   comptée elle aussi. Les deux compteurs doivent recenser les mêmes
+   évènements, sans quoi le taux qu'on en tire ne veut rien dire. */
+function demarrer() {
+  if (espace && !isTest) compterDebut(espace, state.quiz.id);
+  return go(0);
 }
 
 function restart() {
@@ -467,11 +610,21 @@ function restart() {
   state.step = 0;
   state.direction = 'forward';
   store.clearSession(state.quiz.id);
+  if (espace && !isTest) compterDebut(espace, state.quiz.id);
   render();
 }
 
+/* Une seule fois par visite : répéter l'avertissement à chaque réponse
+   serait pire que le silence. Embarqué, on ne dit rien — Safari bloque le
+   stockage tiers et Chrome le cloisonne, c'est attendu et documenté. */
+let refusSignale = false;
+
 function persist() {
-  if (!isTest) store.saveSession(state.quiz.id, state.answers);
+  if (isTest) return;
+  const ok = store.saveSession(state.quiz.id, state.answers);
+  if (ok || refusSignale || isEmbed) return;
+  refusSignale = true;
+  toast('Ce navigateur refuse d’enregistrer : vous ne pourrez pas reprendre ce parcours plus tard.', 'danger');
 }
 
 /* --- Mode embarqué -----------------------------------------------------------

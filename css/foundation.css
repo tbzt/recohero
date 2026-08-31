@@ -91,7 +91,12 @@
 
   --ink:        #1B1613;
   --ink-muted:  #6A5F55;
-  --ink-faint:  #9B8F83;
+  /* 4,8:1 sur --bg, --bg-sunk et --surface. L'ancienne valeur (#9B8F83)
+     tombait à 2,96:1 : sous le seuil AA de 4,5 pour du texte de moins de
+     18,66 px — or ce jeton porte la progression du parcours, la feuille de
+     score, la poignée de déplacement et le chevron de repli. Le niveau le
+     plus discret de la hiérarchie, pas le moins lisible. */
+  --ink-faint:  #736555;
 
   --danger:  #B3261E;
   --warning: #A16207;
@@ -140,7 +145,7 @@
 
     --ink:        #F6EFE6;
     --ink-muted:  #B0A395;
-    --ink-faint:  #7D7266;
+    --ink-faint:  #9E9083;
 
     --accent: #F0714F;
     --danger:  #F2776C;
@@ -169,7 +174,7 @@
   --line-strong:#4C4136;
   --ink:        #F6EFE6;
   --ink-muted:  #B0A395;
-  --ink-faint:  #7D7266;
+  --ink-faint:  #9E9083;
   --danger:  #F2776C;
   --warning: #E0A22E;
   --success: #4ADE80;

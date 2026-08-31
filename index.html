@@ -3,6 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- B4 — Défense en profondeur. Ce site exécute une charge utile venue
+       d'un fragment d'URL : si jamais un jour quelque chose échappait à
+       safeImage() ou à escapeHtml(), cette ligne reste entre l'injection et
+       son exécution.
+
+       Trois précautions dans le choix des directives :
+       · `frame-ancestors` est ABSENT, et il l'est exprès. Il est de toute
+         façon ignoré dans un <meta> — mais le poser dans un en-tête tuerait
+         le mode embarqué, dont toute la raison d'être est d'être encadré
+         par le site de quelqu'un d'autre.
+       · `img-src https:` accepte n'importe quelle image distante : c'est la
+         promesse faite aux auteurs, qui collent l'adresse d'une couverture.
+       · `connect-src` nomme les trois hôtes de l'espace partagé. Sans eux,
+         publier cesserait de fonctionner en silence. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'self';
+    object-src 'none';
+    frame-src 'none';
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: https:;
+    font-src 'self';
+    form-action 'self';
+    connect-src 'self' https://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;
+  ">
   <title>RecoHero — la reco dont vous êtes le héros</title>
   <meta name="description" content="Des questionnaires qui comptent les étoiles et les ronds, et qui finissent par une recommandation culturelle.">
   <meta name="color-scheme" content="light dark">
@@ -46,7 +72,7 @@
 
       <section class="section" id="historySection" hidden>
         <div class="section__head">
-          <h2>Tes résultats</h2>
+          <h2>Vos résultats</h2>
           <span class="section__spacer"></span>
           <button class="btn btn--quiet btn--sm" type="button" id="clearHistory">Effacer</button>
         </div>

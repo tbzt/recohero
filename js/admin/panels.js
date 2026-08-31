@@ -9,6 +9,10 @@ import { RECO_TYPES, GLYPHS, ACCENTS, RULE_MODES, slugify, imageWeight } from '.
 import { ceilings } from '../core/scoring.js';
 import { el, formatBytes } from '../core/ui.js';
 
+/* En dessous de tant de parcours terminés, on montre le compte plutôt que
+   la part : un pourcentage sur sept parcours désigne des personnes. */
+const PETIT_ECHANTILLON = 30;
+
 const tool = (act, id, label, glyph, extra = {}) => el('button', {
   class: 'btn btn--icon btn--quiet', type: 'button',
   'data-act': act, 'data-id': id, title: label, 'aria-label': label, text: glyph, ...extra,
@@ -286,7 +290,7 @@ function questionCard(quiz, question, index, ctx = {}) {
               }),
               input(`option:${question.id}:${option.id}:text`, option.text,
                 { placeholder: `Réponse ${j + 1}`, 'aria-label': `Réponse ${j + 1}` }),
-              el('span', { class: 'scoreset' }, quiz.axes.map((axis) => el('span', {
+              el('span', { class: 'scoreset' + (quiz.axes.length > 4 ? ' scoreset--dense' : '') }, quiz.axes.map((axis) => el('span', {
                 class: 'scorechip' + ((option.scores[axis.id] || 0) !== 0 ? ' is-set' : ''),
                 style: { '--axis': axis.color }, title: axis.label,
               }, [
@@ -332,7 +336,7 @@ export function resultats(quiz, ctx = {}) {
     head('Profils de sortie', "Ce que le répondant obtient à la fin. Les règles sont examinées de haut en bas : la première qui matche gagne, et « par défaut » passe toujours en dernier.", [
       ctx.stats?.total ? el('span', {
         class: 'pill pill--accent',
-        title: 'Nombre de parcours terminés depuis la mise en ligne. Un ordre de grandeur : rien n’empêche quelqu’un de le gonfler.',
+        title: 'Parcours terminés depuis la mise en ligne, reprises comprises. Un ordre de grandeur : rien n’empêche quelqu’un de le gonfler.',
         text: `${ctx.stats.total} parcours terminé${ctx.stats.total > 1 ? 's' : ''}`,
       }) : null,
       foldAll('results', quiz.results, ctx),
@@ -353,8 +357,13 @@ function resultCard(quiz, result, index, ctx) {
   /* Un profil « par défaut » est un filet : qu'il n'attrape jamais rien
      est le cas nominal, pas un défaut. On ne le signale donc que pour
      les règles qui prétendent, elles, se déclencher. */
+  /* Et seulement sur une exploration COMPLÈTE. Au-delà du plafond, la
+     joignabilité est échantillonnée : n'avoir pas rencontré un profil sur
+     4 000 tirages ne prouve pas qu'il soit hors d'atteinte, et l'annoncer
+     serait affirmer une certitude qu'on n'a pas. */
   const unreachable = result.rule.mode !== 'fallback'
-    && ctx.reach && ctx.reach.hit && ctx.reach.hit[result.id] === false;
+    && ctx.reach && ctx.reach.exhaustive && ctx.reach.hit
+    && ctx.reach.hit[result.id] === false;
   const mode = RULE_MODES.find((m) => m.id === result.rule.mode) || RULE_MODES[0];
   const needsAxis = result.rule.mode === 'dominant' || result.rule.mode === 'range';
   const needsRange = result.rule.mode === 'range' || result.rule.mode === 'total';
@@ -383,15 +392,23 @@ function resultCard(quiz, result, index, ctx) {
       /* Combien de fois ce profil est tombé. Le pourcentage dit plus que
          le nombre brut : c'est l'équilibre entre les sorties qu'un auteur
          cherche à lire, pas le trafic. */
+      /* Le pourcentage ne dit quelque chose que sur un effectif. À sept
+         parcours, « 14 % » désigne une personne, et un auteur qui
+         rééquilibre ses axes là-dessus travaille sur du bruit. En dessous
+         du seuil, on montre donc le compte brut — qui ne ment pas sur ce
+         qu'il vaut. */
       (() => {
         const n = ctx.stats?.profils?.[result.id] || 0;
         const total = ctx.stats?.total || 0;
         if (!total) return null;
-        const part = Math.round((n / total) * 100);
+        const assez = total >= PETIT_ECHANTILLON;
         return el('span', {
           class: 'pill' + (n === 0 ? ' pill--warn' : ''),
-          title: n === 0 ? 'Personne n’est jamais tombé sur ce profil.' : `${n} sur ${total} parcours terminés`,
-          text: `${part} %`,
+          title: n === 0
+            ? 'Personne n’est jamais tombé sur ce profil.'
+            : `${n} sur ${total} parcours terminés`
+              + (assez ? '' : ` — trop peu pour un pourcentage (${PETIT_ECHANTILLON} minimum).`),
+          text: assez ? `${Math.round((n / total) * 100)} %` : `${n}/${total}`,
         });
       })(),
       el('span', { class: 'editor-card__tools' }, [

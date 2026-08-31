@@ -36,15 +36,26 @@ export function questionView(quiz, question, index, options = {}) {
 
     question.hint && el('p', { class: 'question__hint', text: question.hint }),
 
-    el('div', { class: 'options', role: multiple ? 'group' : 'radiogroup' },
-      question.options.map((option, i) => el(interactive ? 'button' : 'div', {
+    /* `group`, et surtout PAS `radiogroup`. Le rôle radio promet une
+       convention que ce parcours ne tient pas : dans un groupe de radios,
+       ← et → déplacent la sélection À L'INTÉRIEUR du groupe — ici elles
+       changent de question, ce qui est la navigation documentée du
+       parcours et le geste que les gens ont appris. Un utilisateur de
+       lecteur d'écran qui appliquait la convention annoncée changeait donc
+       de question sans l'avoir demandé. Des boutons qui s'annoncent comme
+       des boutons ne mentent sur rien, et restent parfaitement
+       accessibles : l'état se dit par `aria-pressed`, le groupe est nommé
+       par la question elle-même. */
+    el('div', {
+      class: 'options',
+      role: 'group',
+      'aria-label': question.text || `Question ${index + 1}`,
+    }, question.options.map((option, i) => el(interactive ? 'button' : 'div', {
         class: 'option' + (chosen.has(option.id) ? ' is-picked' : ''),
         type: interactive ? 'button' : null,
         'data-act': interactive ? 'pick' : null,
         'data-option': interactive ? option.id : null,
-        'aria-pressed': interactive && multiple ? String(chosen.has(option.id)) : null,
-        role: interactive && !multiple ? 'radio' : null,
-        'aria-checked': interactive && !multiple ? String(chosen.has(option.id)) : null,
+        'aria-pressed': interactive ? String(chosen.has(option.id)) : null,
       }, [
         el('span', { class: 'option__key', text: i < 9 ? String(i + 1) : '·', 'aria-hidden': 'true' }),
         option.image && el('img', { class: 'option__thumb', src: option.image, alt: '', loading: 'lazy' }),

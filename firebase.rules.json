@@ -33,14 +33,21 @@
           ".read": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
 
           "$quiz": {
+            ".validate": "root.child('espaces').child($espace).child('quizzes').child($quiz).exists()",
+
             "total": {
-              ".write": true,
+              ".write": "newData.exists()",
+              ".validate": "newData.isNumber() && (!data.exists() ? newData.val() === 1 : newData.val() === data.val() + 1)"
+            },
+
+            "debuts": {
+              ".write": "newData.exists()",
               ".validate": "newData.isNumber() && (!data.exists() ? newData.val() === 1 : newData.val() === data.val() + 1)"
             },
 
             "profils": {
               "$profil": {
-                ".write": true,
+                ".write": "newData.exists()",
                 ".validate": "newData.isNumber() && (!data.exists() ? newData.val() === 1 : newData.val() === data.val() + 1)"
               }
             }
@@ -51,7 +58,7 @@
           ".read": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
 
           "$uid": {
-            ".write": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && auth.uid === $uid && (!newData.exists() || root.child('espaces').child($espace).child('membres').child(auth.uid).exists())",
             ".validate": "newData.hasChildren(['prenom'])"
           }
         },
@@ -60,7 +67,7 @@
           ".read": true,
 
           "$uid": {
-            ".write": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && auth.uid === $uid && (!newData.exists() || root.child('espaces').child($espace).child('membres').child(auth.uid).exists())",
             ".validate": "newData.hasChildren(['nom'])"
           }
         },

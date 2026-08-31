@@ -485,11 +485,31 @@ function bandeauEtat(ctx) {
        le moment où il faut savoir qu'il existe. */
     state.espace && enLigne && el('span', {
       class: 'etat__item',
-      title: 'Parcours terminés depuis la mise en ligne. Un ordre de grandeur : rien n’empêche quelqu’un de le gonfler.',
+      title: 'Parcours terminés depuis la mise en ligne, reprises comprises : « Refaire » compte un départ ET une arrivée, pour que le taux reste juste. Un ordre de grandeur — rien n’empêche quelqu’un de le gonfler.',
     }, [
       el('strong', { class: 'etat__valeur', text: String(stats?.total || 0) }),
       el('span', { class: 'etat__libelle', text: (stats?.total || 0) > 1 ? 'parcours terminés' : 'parcours terminé' }),
     ]),
+
+    /* Le taux d'achèvement : la seule chose que les compteurs sachent dire
+       sur la FORME du questionnaire, et pas seulement sur son audience.
+       Trop long, une couverture qui ne donne pas envie, une question qui
+       décourage — tout cela se voit ici et nulle part ailleurs.
+
+       Il n'apparaît qu'une fois des départs comptés : les questionnaires
+       mis en ligne avant ce compteur n'en ont pas, et afficher « 0 % »
+       sur une donnée absente vaudrait moins que se taire. La borne à
+       100 % couvre le cas de ceux-là — des arrivées sans départ. */
+    state.espace && enLigne && stats?.debuts > 0 && (() => {
+      const taux = Math.min(100, Math.round(((stats.total || 0) / stats.debuts) * 100));
+      return el('span', {
+        class: 'etat__item' + (taux < 50 ? ' etat__item--erreur' : ''),
+        title: `${stats.total || 0} parcours terminés sur ${stats.debuts} commencés.`,
+      }, [
+        el('strong', { class: 'etat__valeur', text: `${taux} %` }),
+        el('span', { class: 'etat__libelle', text: 'terminés' }),
+      ]);
+    })(),
   ]);
 }
 
@@ -517,40 +537,65 @@ const scheduleReach = debounce(() => {
 const UNDO_DEPTH = 40;
 const undoStack = [];
 
+/* Chaque entrée porte le questionnaire dont elle vient. Sans cette
+   estampille, un Ctrl+Z frappé dans un document réinstallait l'instantané
+   d'un AUTRE document : l'éditeur basculait sans prévenir, le `flush()` de
+   l'annulation enregistrait le document d'à côté, et la frappe en cours —
+   pas encore sortie de la sauvegarde différée de 500 ms — disparaissait
+   avec lui. La pile est partagée ; les gestes ne le sont pas. */
+function pushUndo(label, apply, quizId = state.quiz?.id ?? null) {
+  const step = { label, apply, quizId };
+  undoStack.push(step);
+  if (undoStack.length > UNDO_DEPTH) undoStack.shift();
+  return step;
+}
+
 function remember(label) {
-  if (!state.quiz) return;
+  if (!state.quiz) return null;
   const snapshot = structuredClone(state.quiz);
   const panel = state.panel;
-  pushUndo(label, () => {
+  return pushUndo(label, () => {
     state.quiz = snapshot;
     state.panel = panel;
     flush();
     renderTopbar();
     renderRail();
     renderPanel();
-  });
+  }, snapshot.id);
 }
 
-function pushUndo(label, apply) {
-  undoStack.push({ label, apply });
-  if (undoStack.length > UNDO_DEPTH) undoStack.shift();
+/* Défaire un geste PRÉCIS : celui que le bandeau propose. Il peut
+   appartenir à un questionnaire qu'on vient de quitter — supprimer un
+   questionnaire ferme le document et en ouvre un autre — d'où le passage
+   par la référence plutôt que par le sommet de la pile. */
+function undoStep(step) {
+  if (!step) return;
+  const at = undoStack.indexOf(step);
+  if (at >= 0) undoStack.splice(at, 1);
+  step.apply();
+  toast(`Annulé : ${step.label.toLowerCase()}.`);
 }
 
+/* Ctrl+Z : le geste le plus récent DU QUESTIONNAIRE OUVERT. Les entrées
+   des autres documents restent en pile — elles serviront si l'on y
+   revient — mais elles ne sont jamais appliquées ici. */
 function undo() {
-  const step = undoStack.pop();
-  if (!step) return toast('Rien à annuler.');
+  const courant = state.quiz?.id ?? null;
+  const at = undoStack.findLastIndex((step) => step.quizId === courant);
+  if (at < 0) return toast('Rien à annuler dans ce questionnaire.');
+  const [step] = undoStack.splice(at, 1);
   step.apply();
   return toast(`Annulé : ${step.label.toLowerCase()}.`);
 }
 
 /* Le geste destructeur : on l'exécute, et on propose le retour. */
 function undoable(label, mutate) {
-  remember(label);
+  const step = remember(label);
   mutate();
   flush();
   renderRail();
   renderPanel();
-  toast(label, { action: { label: 'Annuler', onClick: undo } });
+  toast(label, { action: { label: 'Annuler', onClick: () => undoStep(step) } });
 }
 
 /* --- Aperçu ---------------------------------------------------------------
@@ -818,13 +863,13 @@ function onClick(event) {
       if (!quiz) return undefined;
       const removed = structuredClone(quiz);
       const panel = state.panel;
-      pushUndo('Questionnaire supprimé', () => {
+      const step = pushUndo('Questionnaire supprimé', () => {
         store.saveDraft(removed);
         select(removed.id);
         state.panel = panel;
         renderRail();
         renderPanel();
-      });
+      }, removed.id);
       store.deleteDraft(quiz.id);
       state.quiz = null;
       const next = store.allDrafts()[0];
@@ -832,7 +877,7 @@ function onClick(event) {
       renderRail();
       renderPanel();
       renderTopbar();
-      toast(`« ${removed.title} » supprimé`, { action: { label: 'Annuler', onClick: undo } });
+      toast(`« ${removed.title} » supprimé`, { action: { label: 'Annuler', onClick: () => undoStep(step) } });
       return undefined;
     }
 
@@ -1268,6 +1313,13 @@ function monProfil() {
             el('strong', { text: 'Afficher mon nom publiquement' }),
             el('span', { class: 'field__hint', style: { display: 'block' }, text:
               'Décoché, rien de toi n’est lisible hors de l’équipe — la donnée n’est pas seulement masquée, elle n’est pas publiée. Coché, ton nom, ta fonction et ta photo deviennent visibles de tout visiteur, sur les questionnaires qui te créditent.' }),
+            /* Ce que la case promet et ce qu'elle fait ne sont pas tout à
+               fait la même chose, et l'écart est celui que la CNIL regarde :
+               « mon nom apparaît sous mes questionnaires » d'un côté, « la
+               fiche est lisible en bloc, sans compte, à une adresse stable »
+               de l'autre. Le dire ici, au moment de cocher. */
+            el('span', { class: 'field__hint', style: { display: 'block', marginTop: 'var(--s-2)' }, text:
+              'À savoir : ces informations deviennent alors lisibles par toute personne qui connaît le nom de l’espace, y compris en dehors d’un questionnaire. Décocher les efface — il n’en reste rien.' }),
           ]),
         ]),
       ]),
@@ -1902,6 +1954,11 @@ async function adopt(raw, label) {
      propre restauration, et le compte des remplacements mentirait. */
   flush();
   state.quiz = null;
+
+  /* Les instantanés d'avant l'import décrivent des questionnaires que
+     l'import vient peut-être de remplacer. Les défaire annulerait la
+     restauration elle-même. */
+  undoStack.length = 0;
 
   for (const quiz of entrants) {
     if (choix === 'variante' && store.getDraft(quiz.id)) {

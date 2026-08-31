@@ -154,7 +154,7 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-display);
-  color: var(--axis, var(--accent));
+  color: color-mix(in oklab, var(--axis, var(--accent)) 68%, var(--ink));
   line-height: 1;
   user-select: none;
 }
@@ -175,7 +175,22 @@
 }
 .tally__glyph {
   font-size: var(--t-md);
-  color: var(--axis, var(--accent));
+  /* La couleur d'axe posée en TEXTE se mélange à l'encre. Les huit accents
+     proposés sont calibrés pour un fond clair — « chacun passe le contraste
+     AA sur blanc », dit schema.js ; posés tels quels sur le fond sombre ils
+     tombent à 3,4:1. Mélanger vers `--ink` fonce un peu en thème clair et
+     éclaircit en thème sombre : une déclaration, les deux thèmes.
+
+     Le mélange est écrit ICI et non dans un jeton de foundation.css, et ce
+     n'est pas un oubli : la substitution d'une propriété personnalisée se
+     fait là où elle est DÉCLARÉE. Un `--axis-ink` posé sur `:root` y
+     résoudrait `var(--axis)` — absent à ce niveau — et rendrait à tout le
+     monde la même teinte de repli. Ce n'est pas une couleur en dur : tout
+     y vient de jetons.
+
+     Les fonds, filets et jauges gardent la couleur brute : sur eux c'est la
+     teinte qui compte, pas la lecture. */
+  color: color-mix(in oklab, var(--axis, var(--accent)) 68%, var(--ink));
   transition: transform var(--dur-base) var(--ease-spring);
 }
 .tally__count {

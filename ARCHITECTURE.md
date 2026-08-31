@@ -296,7 +296,57 @@ place dans un dépôt public.*
 
 ---
 
-## Cinq pièges payés comptant
+## Sept pièges payés comptant
+
+**`Object.assign(node.style, …)` ne pose pas les propriétés
+personnalisées.** `style['--axis'] = couleur` crée une propriété
+JavaScript ordinaire sur l'objet de style ; le moteur l'ignore, sans
+erreur ni avertissement. Il faut `setProperty()`.
+
+Ce silence a coûté toute une dimension du produit. Les axes ont une
+couleur dans le modèle, un sélecteur de couleur dans l'éditeur, une place
+dans le format d'export — et pas un pixel à l'écran : chaque `--axis`
+posé depuis un rendu était inerte, et tous les glyphes du kiosque, du
+parcours, du résultat et du backoffice retombaient sur la valeur de repli,
+`var(--accent)`. Huit axes, une seule couleur. Le défaut a survécu parce
+qu'il ne ressemblait pas à un défaut : l'interface restait cohérente,
+simplement monochrome. Seule la carte de résultat montrait les vraies
+couleurs, parce qu'elle peint sur un canvas et ne passe pas par le CSS —
+l'image exportée était donc plus colorée que le site qui l'avait produite.
+
+`el()` distingue désormais les deux chemins (`applyStyle`, dans `ui.js`).
+
+**Corollaire, payé dans la foulée.** Une fois les couleurs réellement
+appliquées, les huit accents proposés — calibrés pour un fond clair,
+`schema.js` le dit — tombaient à 3,4:1 sur le fond sombre. Une couleur
+d'axe posée en TEXTE se mélange donc à l'encre :
+`color-mix(in oklab, var(--axis) 68%, var(--ink))`. En thème clair l'encre
+est sombre et la teinte se fonce ; en thème sombre elle s'éclaircit. Les
+fonds, filets et jauges gardent la couleur brute — sur eux, c'est la
+teinte qui compte, pas la lecture.
+
+Ce mélange est écrit au point d'usage et non dans un jeton de
+`foundation.css`, et c'est le second piège du même jour : la substitution
+d'une propriété personnalisée se fait là où elle est **déclarée**. Un
+`--axis-ink` posé sur `:root` y résout `var(--axis)` — absent à ce
+niveau — et rend à tout le monde la même teinte de repli. La première
+version du correctif a reproduit exactement le défaut qu'elle corrigeait.
+
+**Une pile d'annulation ne se partage pas entre documents.** Les entrées de
+`undoStack` portaient un instantané du questionnaire, et rien d'autre. Un
+`Ctrl+Z` frappé dans un document réinstallait donc l'instantané du document
+précédent : l'éditeur basculait sans prévenir, le `flush()` de l'annulation
+enregistrait le questionnaire d'à côté, et la frappe en cours — pas encore
+sortie de la sauvegarde différée de 500 ms — disparaissait avec elle. Chaque
+entrée porte désormais l'identifiant du questionnaire dont elle vient, et
+`Ctrl+Z` ne remonte que la sienne.
+
+Le corollaire est ce qui rend la correction non triviale : vider la pile au
+changement de document aurait paru suffisant, et aurait cassé l'annulation
+d'une **suppression** — car supprimer un questionnaire ferme le document, et
+son bandeau « Annuler » doit survivre à cette fermeture. Un bandeau annule
+donc un geste *par référence* (`undoStep`), là où `Ctrl+Z` annule *le plus
+récent du document ouvert*. Deux consommateurs, deux règles.
 
 **Les listes s'imbriquent.** Les réponses vivent dans les questions, les
 recommandations dans les profils. Un `pointerdown` sur une poignée intérieure

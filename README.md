@@ -45,7 +45,7 @@ rien du tout. Une question accepte une seule réponse ou plusieurs.
 
 | Condition | Se déclenche quand |
 |---|---|
-| **Axe dominant** | cet axe est celui qui a le plus de points |
+| **Axe dominant** | cet axe a le plus de points, **à lui seul** |
 | **Palier sur un axe** | le score de cet axe tombe dans l'intervalle |
 | **Palier sur le total** | la somme de tous les axes tombe dans l'intervalle |
 | **Par défaut** | rien d'autre n'a matché (le filet de sécurité) |
@@ -53,6 +53,18 @@ rien du tout. Une question accepte une seule réponse ou plusieurs.
 Les profils sont examinés **de haut en bas** : le premier qui matche gagne.
 L'ordre dans l'éditeur *est* la priorité. Les « par défaut » passent toujours
 en dernier, quelle que soit leur place.
+
+**L'égalité n'est pas une domination.** Deux axes à la même hauteur ne
+déclenchent aucune règle « axe dominant » : le parcours descend jusqu'au
+« par défaut », qui est précisément le profil qu'on écrit pour ce cas — celui
+de l'indécis, de l'appétit qui ne tranche pas. Sur le questionnaire d'exemple,
+c'est près d'un parcours sur six.
+
+**Sans filet, un répondant peut ne rien obtenir.** Si aucune règle ne se
+déclenche et qu'aucun profil « par défaut » n'existe, le parcours l'affiche et
+s'arrête là. Il ne sert pas le premier profil venu : donner un résultat dont
+la condition est fausse serait mentir au répondant et cacher le trou à
+l'auteur. Le diagnostic signale l'absence de filet.
 
 Chaque profil porte ses recommandations : type d'œuvre, titre, auteur, année,
 une phrase de justification, un lien facultatif, et une couverture.

@@ -3,6 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- B4 — Défense en profondeur. Ce site exécute une charge utile venue
+       d'un fragment d'URL : si jamais un jour quelque chose échappait à
+       safeImage() ou à escapeHtml(), cette ligne reste entre l'injection et
+       son exécution.
+
+       Trois précautions dans le choix des directives :
+       · `frame-ancestors` est ABSENT, et il l'est exprès. Il est de toute
+         façon ignoré dans un <meta> — mais le poser dans un en-tête tuerait
+         le mode embarqué, dont toute la raison d'être est d'être encadré
+         par le site de quelqu'un d'autre.
+       · `img-src https:` accepte n'importe quelle image distante : c'est la
+         promesse faite aux auteurs, qui collent l'adresse d'une couverture.
+       · `connect-src` nomme les trois hôtes de l'espace partagé. Sans eux,
+         publier cesserait de fonctionner en silence. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'self';
+    object-src 'none';
+    frame-src 'none';
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: https:;
+    font-src 'self';
+    form-action 'self';
+    connect-src 'self' https://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;
+  ">
   <title>Backoffice — RecoHero</title>
   <meta name="robots" content="noindex">
   <meta name="color-scheme" content="light dark">
@@ -43,9 +69,15 @@
       <span class="topbar__spacer"></span>
       <span class="status" id="saveStatus"></span>
       <span class="topbar__actions" id="topActions">
-        <button class="btn btn--ghost btn--sm" type="button" data-act="test">▷&nbsp;<span>Tester</span></button>
-        <button class="btn btn--primary btn--sm" type="button" data-act="panel" data-id="publier">⤴&nbsp;<span>Diffuser</span></button>
-        <button class="btn btn--ghost btn--sm topbar__compte" type="button" data-act="compte" hidden>
+        <!-- Sous 48rem, admin.css masque le <span> du libellé. Le nom
+             accessible se calcule sur le contenu VISIBLE : sans aria-label,
+             il ne restait que « ▷ » et « ⤴ ». -->
+        <button class="btn btn--ghost btn--sm" type="button" data-act="test"
+                title="Tester le questionnaire" aria-label="Tester le questionnaire">▷&nbsp;<span>Tester</span></button>
+        <button class="btn btn--primary btn--sm" type="button" data-act="panel" data-id="publier"
+                title="Diffuser ce questionnaire" aria-label="Diffuser ce questionnaire">⤴&nbsp;<span>Diffuser</span></button>
+        <button class="btn btn--ghost btn--sm topbar__compte" type="button" data-act="compte"
+                aria-label="Mon compte et mon équipe" hidden>
           <span aria-hidden="true">👤</span>&nbsp;<span class="topbar__moi"></span>
         </button>
         <button class="btn btn--icon btn--quiet" type="button" data-act="aide" title="Raccourcis et gestes" aria-label="Raccourcis et gestes">?</button>

@@ -27,9 +27,32 @@ function fromBase64Url(text) {
   return bytes;
 }
 
-async function pipe(bytes, stream) {
-  const response = new Response(new Blob([bytes]).stream().pipeThrough(stream));
-  return new Uint8Array(await response.arrayBuffer());
+/* Une charge utile venue d'un lien est décompressée : sans borne, un
+   fragment de cinquante kilo-octets peut se déployer en dizaines de
+   méga-octets et figer l'onglet avant qu'on ait pu lire quoi que ce soit.
+   On lit donc par morceaux et on s'arrête net. Le plafond est large — un
+   questionnaire à images intégrées pèse lourd, et refuser un lien
+   légitime serait pire que le mal. */
+const PLAFOND_DECOMPRESSION = 8 * 1024 * 1024;
+
+async function pipe(bytes, stream, plafond = Infinity) {
+  const lecteur = new Blob([bytes]).stream().pipeThrough(stream).getReader();
+  const morceaux = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await lecteur.read();
+    if (done) break;
+    total += value.length;
+    if (total > plafond) {
+      await lecteur.cancel();
+      throw new Error('Ce lien se déploie sur une taille anormale : il n’a pas été ouvert.');
+    }
+    morceaux.push(value);
+  }
+  const sortie = new Uint8Array(total);
+  let position = 0;
+  for (const morceau of morceaux) { sortie.set(morceau, position); position += morceau.length; }
+  return sortie;
 }
 
 /* Le questionnaire est allégé avant encodage : les champs vides et les
@@ -82,7 +105,7 @@ export async function decode(payload) {
   const body = fromBase64Url(payload.slice(1));
   if (kind === GZIP) {
     if (!canCompress) throw new Error('Ce navigateur ne sait pas lire les liens compressés.');
-    const plain = await pipe(body, new DecompressionStream('gzip'));
+    const plain = await pipe(body, new DecompressionStream('gzip'), PLAFOND_DECOMPRESSION);
     return JSON.parse(new TextDecoder().decode(plain));
   }
   if (kind === PLAIN) return JSON.parse(new TextDecoder().decode(body));

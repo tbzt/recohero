@@ -69,7 +69,7 @@ export function allResults() {
 export function addResult(entry) {
   const list = read(KEY.results, []);
   list.unshift({ ...entry, at: Date.now() });
-  write(KEY.results, list.slice(0, MAX_RESULTS));
+  return write(KEY.results, list.slice(0, MAX_RESULTS));
 }
 
 export function clearResults() {
@@ -82,10 +82,13 @@ export function getSession(quizId) {
   return read(KEY.session, {})[quizId] || null;
 }
 
+/* Rend `false` si le navigateur a refusé. L'appelant décide quoi en
+   faire : embarqué dans le site d'un tiers, le refus est attendu et se
+   tait ; ailleurs, il coûte la reprise du parcours et mérite d'être dit. */
 export function saveSession(quizId, answers) {
   const map = read(KEY.session, {});
   map[quizId] = { answers, at: Date.now() };
-  write(KEY.session, map);
+  return write(KEY.session, map);
 }
 
 export function clearSession(quizId) {

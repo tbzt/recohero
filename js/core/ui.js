@@ -9,7 +9,7 @@ export function el(tag, props = {}, children = []) {
     if (key === 'class') node.className = value;
     else if (key === 'text') node.textContent = value;
     else if (key === 'html') node.innerHTML = value;
-    else if (key === 'style' && typeof value === 'object') Object.assign(node.style, value);
+    else if (key === 'style' && typeof value === 'object') applyStyle(node, value);
     else if (key.startsWith('on') && typeof value === 'function') {
       node.addEventListener(key.slice(2).toLowerCase(), value);
     } else node.setAttribute(key, value === true ? '' : value);
@@ -19,6 +19,25 @@ export function el(tag, props = {}, children = []) {
     node.append(child.nodeType ? child : document.createTextNode(String(child)));
   }
   return node;
+}
+
+/* Les propriétés personnalisées ne passent PAS par l'affectation directe :
+   `style['--axis'] = c` — ce que fait Object.assign — crée une propriété
+   JavaScript ordinaire que le moteur de style ignore, sans erreur ni
+   avertissement. Il faut setProperty().
+
+   Ce silence a coûté cher : chaque `--axis` posé depuis un rendu était
+   inerte, et TOUS les glyphes du produit retombaient sur `var(--accent)`.
+   Les axes ont une couleur dans le modèle, un sélecteur de couleur dans
+   l'éditeur, une place dans le format — et pas un pixel à l'écran. Seule
+   la carte de résultat les montrait, parce qu'elle peint sur un canvas et
+   ne passe pas par le CSS. */
+function applyStyle(node, declarations) {
+  for (const [prop, value] of Object.entries(declarations)) {
+    if (value == null) continue;
+    if (prop.startsWith('--')) node.style.setProperty(prop, String(value));
+    else node.style[prop] = value;
+  }
 }
 
 export function escapeHtml(text) {

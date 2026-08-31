@@ -118,9 +118,9 @@
   position: absolute;
   top: -2px;
   right: -2px;
-  min-width: 16px;
-  height: 16px;
-  font-size: 10px;
+  min-width: 18px;
+  height: 18px;
+  font-size: var(--t-xs);
   background: var(--surface);
 }
 /* Les deux colonnes sont des items de grille : leur minimum implicite est
@@ -255,7 +255,9 @@
 .rail__item__badge {
   flex: none;
   font-family: var(--font-mono);
-  font-size: 11px;
+  /* Le plancher du projet est 12 px, et il vaut aussi pour un compteur de
+     problèmes : c'est le signal d'alerte, pas une mention légale. */
+  font-size: var(--t-xs);
   color: var(--ink-faint);
 }
 /* Une pastille de section dit combien de problèmes s'y trouvent, et
@@ -336,8 +338,10 @@
 /* --- Nuancier d'accent -------------------------------------------------------- */
 .swatches { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
 .swatch {
-  width: 30px;
-  height: 30px;
+  /* --tap-sm, comme tout contrôle secondaire groupé : 30 px n'était une
+     dérogation nulle part justifiée. */
+  width: var(--tap-sm);
+  height: var(--tap-sm);
   border-radius: var(--r-full);
   border: 2px solid transparent;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
@@ -350,8 +354,8 @@
   transform: scale(1.12);
 }
 .swatch-input {
-  width: 46px;
-  height: 30px;
+  width: 52px;
+  height: var(--tap-sm);
   padding: 0;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-sm);
@@ -457,6 +461,16 @@
 .opt .input { min-height: var(--tap-sm); }
 
 .scoreset { display: flex; gap: var(--s-1); flex-wrap: wrap; justify-content: flex-end; }
+
+/* Au-delà de quatre axes, la rangée de pesées enroule : à huit axes sur un
+   écran de 320 px, elle occupait trois rangs et portait une ligne de réponse
+   à 222 px — soit 1 610 px pour une seule carte de question. Les pastilles
+   se resserrent donc, comme les glyphes de la carte de résultat se
+   resserrent au-delà de six. Le champ garde ses 28 px de haut : c'est la
+   cible tactile, elle ne se négocie pas. */
+.scoreset--dense { gap: 3px; }
+.scoreset--dense .scorechip { padding: 2px 1px 2px var(--s-1); }
+.scoreset--dense .scorechip__input { width: 1.75rem; }
 .scorechip {
   display: inline-flex;
   align-items: center;
@@ -469,7 +483,7 @@
 .scorechip__glyph {
   font-family: var(--font-display);
   font-size: var(--t-sm);
-  color: var(--axis, var(--accent));
+  color: color-mix(in oklab, var(--axis, var(--accent)) 68%, var(--ink));
   line-height: 1;
 }
 .scorechip__input {

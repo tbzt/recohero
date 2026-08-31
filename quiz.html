@@ -3,6 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- B4 — Défense en profondeur. Ce site exécute une charge utile venue
+       d'un fragment d'URL : si jamais un jour quelque chose échappait à
+       safeImage() ou à escapeHtml(), cette ligne reste entre l'injection et
+       son exécution.
+
+       Trois précautions dans le choix des directives :
+       · `frame-ancestors` est ABSENT, et il l'est exprès. Il est de toute
+         façon ignoré dans un <meta> — mais le poser dans un en-tête tuerait
+         le mode embarqué, dont toute la raison d'être est d'être encadré
+         par le site de quelqu'un d'autre.
+       · `img-src https:` accepte n'importe quelle image distante : c'est la
+         promesse faite aux auteurs, qui collent l'adresse d'une couverture.
+       · `connect-src` nomme les trois hôtes de l'espace partagé. Sans eux,
+         publier cesserait de fonctionner en silence. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'self';
+    object-src 'none';
+    frame-src 'none';
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: https:;
+    font-src 'self';
+    form-action 'self';
+    connect-src 'self' https://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;
+  ">
   <title>Questionnaire — RecoHero</title>
   <meta name="description" content="Réponds au questionnaire, récolte tes glyphes, repars avec tes recommandations.">
   <meta name="color-scheme" content="light dark">
@@ -20,9 +46,15 @@
     <div class="page quizbar__inner">
       <a class="btn btn--quiet btn--sm" href="index.html" id="exitLink">← Kiosque</a>
       <span class="quizbar__title" id="quizTitle"></span>
-      <div class="tally quizbar__tally" id="quizTally" aria-label="Ton compteur" hidden></div>
+        <!-- Région vivante : le compteur EST le retour du parcours. Il n'est
+           reconstruit que lorsque les scores changent (voir updateBar),
+           sans quoi chaque changement d'écran le ferait relire. -->
+      <div class="tally quizbar__tally" id="quizTally" aria-label="Votre compteur"
+           aria-live="polite" aria-atomic="true" hidden></div>
     </div>
-    <div class="progress"><div class="progress__fill" id="quizProgress"></div></div>
+    <!-- L'écho visuel de « Question 3 / 8 », qui est déjà dans le contenu.
+         Le doubler d'un role="progressbar" ferait tout annoncer deux fois. -->
+    <div class="progress" aria-hidden="true"><div class="progress__fill" id="quizProgress"></div></div>
   </header>
 
   <main class="stage" id="stage" tabindex="-1">

@@ -113,7 +113,9 @@
 }
 .quiz-card__go {
   margin-left: auto;
-  color: var(--card-accent);
+  /* Même raison que les glyphes d'axe : l'accent d'un questionnaire est choisi
+     par son auteur, sur fond clair. En texte, il se mélange à l'encre. */
+  color: color-mix(in oklab, var(--card-accent) 68%, var(--ink));
   font-weight: var(--fw-medium);
   transition: transform var(--dur-fast) var(--ease-out);
 }

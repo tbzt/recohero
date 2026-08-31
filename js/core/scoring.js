@@ -41,13 +41,25 @@ export function resolve(quiz, scores) {
   for (const result of [...ranked, ...fallbacks]) {
     if (matches(result.rule, scores)) return result;
   }
-  return quiz.results[0] || null;
+
+  /* Rien n'a matché : on rend `null`, et le parcours affiche son écran
+     « aucun profil ne correspond ». Servir `results[0]` — ce qui se
+     faisait ici — donnait au répondant un profil dont la condition est
+     explicitement FAUSSE, sans que rien ne le signale : ni à lui, ni à
+     l'auteur, dont l'écran d'échec restait alors du code mort. Un
+     questionnaire sans filet doit se voir, pas se rattraper en douce. */
+  return null;
 }
 
 function matches(rule, scores) {
   switch (rule.mode) {
     case 'dominant':
-      return scores.leaders.includes(rule.axis);
+      /* Un axe à égalité ne domine pas — c'est ce que dit le mot, et c'est
+         ce qu'attend l'auteur qui écrit un profil d'indécis. La règle
+         acceptait auparavant tout axe FIGURANT parmi les leaders : l'ex
+         æquo était donc tranché par l'ordre de la liste, et le profil
+         « par défaut » écrit pour ce cas-là ne sortait jamais. */
+      return scores.leaders.length === 1 && scores.leaders[0] === rule.axis;
     case 'range': {
       const value = scores.counts[rule.axis] ?? 0;
       return value >= rule.min && value <= rule.max;
@@ -145,13 +157,57 @@ export function proximite(quiz, scores, gagnant) {
 
 /* Un profil est-il atteignable ? Le backoffice s'en sert pour prévenir
    avant publication qu'une règle ne se déclenchera jamais.
-   On explore exhaustivement quand c'est petit, on échantillonne sinon. */
+   On explore exhaustivement quand c'est petit, on échantillonne sinon.
+
+   Le nombre de réponses possibles n'est PAS le nombre d'options : sur une
+   question à choix multiple, le répondant coche n'importe quelle
+   combinaison non vide, soit 2^n − 1. L'exploration n'essayait qu'une
+   option à la fois — un profil qu'on n'atteignait qu'en cochant deux cases
+   était donc annoncé « jamais atteint », et l'auteur envoyé réparer une
+   règle qui marchait. Un faux positif de diagnostic coûte plus cher qu'un
+   silence : il apprend à ignorer la pastille, y compris quand elle a
+   raison.                                                               */
+
+const PLAFOND_EXHAUSTIF = 20000;
+
+function nombreDeChoix(question) {
+  return question.type === 'multiple'
+    ? 2 ** question.options.length - 1
+    : question.options.length;
+}
+
+/* Les choix eux-mêmes. N'est appelé que sur la branche exhaustive, où le
+   plafond garantit qu'aucune question n'en porte des millions. */
+function choixPossibles(question) {
+  const ids = question.options.map((o) => o.id);
+  if (question.type !== 'multiple') return ids;
+  const combinaisons = [];
+  for (let masque = 1; masque < (1 << ids.length); masque += 1) {
+    combinaisons.push(ids.filter((_, i) => masque & (1 << i)));
+  }
+  return combinaisons;
+}
+
+/* Un choix au hasard, sans énumérer : chaque option est prise à pile ou
+   face, ce qui tire uniformément parmi les combinaisons — et on rejette
+   la seule que le parcours interdit, la sélection vide. */
+function choixAuHasard(question) {
+  if (question.type !== 'multiple') {
+    return question.options[Math.floor(Math.random() * question.options.length)].id;
+  }
+  let pris = [];
+  while (!pris.length) {
+    pris = question.options.filter(() => Math.random() < 0.5).map((o) => o.id);
+  }
+  return pris;
+}
 
 export function reachability(quiz) {
   const questions = quiz.questions.filter((q) => q.options.length);
   if (!questions.length || !quiz.results.length) return {};
 
-  const combos = questions.reduce((n, q) => n * q.options.length, 1);
+  const combos = questions.reduce((n, q) => n * nombreDeChoix(q), 1);
+  const exhaustive = combos <= PLAFOND_EXHAUSTIF;
   const hit = Object.fromEntries(quiz.results.map((r) => [r.id, false]));
 
   const record = (answers) => {
@@ -159,23 +215,22 @@ export function reachability(quiz) {
     if (result) hit[result.id] = true;
   };
 
-  if (combos <= 20000) {
+  if (exhaustive) {
+    const parQuestion = questions.map(choixPossibles);
     const walk = (index, answers) => {
       if (index === questions.length) return record(answers);
-      for (const option of questions[index].options) {
-        walk(index + 1, { ...answers, [questions[index].id]: option.id });
+      for (const choix of parQuestion[index]) {
+        walk(index + 1, { ...answers, [questions[index].id]: choix });
       }
     };
     walk(0, {});
   } else {
     for (let i = 0; i < 4000; i += 1) {
       const answers = {};
-      for (const q of questions) {
-        answers[q.id] = q.options[Math.floor(Math.random() * q.options.length)].id;
-      }
+      for (const q of questions) answers[q.id] = choixAuHasard(q);
       record(answers);
     }
   }
 
-  return { hit, exhaustive: combos <= 20000 };
+  return { hit, exhaustive };
 }

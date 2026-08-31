@@ -47,7 +47,27 @@
   text-overflow: ellipsis;
   max-width: 16rem;
 }
-.quizbar__tally { margin-left: auto; }
+/* Le compteur tient sur UNE ligne, quel que soit le nombre d'axes.
+   Il enroulait : à huit axes sur un écran de 375 px, le bandeau collant
+   passait de 56 à 156 px — 19 % de la fenêtre avalés avant la première
+   question. Il défile désormais horizontalement dans sa propre boîte,
+   et quiz.js n'en sert que huit, comme la carte de résultat. */
+.quizbar__tally {
+  margin-left: auto;
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 60%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  gap: var(--s-3);
+}
+.quizbar__tally::-webkit-scrollbar { display: none; }
+.quizbar__tally .tally__axis { flex: none; }
+/* Au-delà de six axes, les glyphes se resserrent plutôt que de pousser
+   le titre hors du bandeau. */
+.quizbar__tally.is-dense .tally__glyph { font-size: var(--t-base); }
+.quizbar__tally.is-dense { gap: var(--s-2); }
 .quizbar .progress {
   position: absolute;
   left: 0; right: 0; bottom: -1px;
@@ -58,6 +78,36 @@
 .quizbar { position: sticky; }
 @media (max-width: 34rem) {
   .quizbar__title { max-width: 8rem; font-size: var(--t-sm); }
+}
+
+/* --- Les points qui volent --------------------------------------------------
+   Le geste central du produit est de RÉCOLTER des signes. Jusqu'ici, choisir
+   une réponse faisait sauter un compteur en haut de l'écran, sans qu'on
+   voie le lien entre les deux : le point apparaissait, il ne venait de
+   nulle part. Il part maintenant de la réponse touchée et rejoint son axe.
+
+   C'est un supplément, jamais un socle : le compteur est déjà juste à
+   l'instant du clic, et la valeur au repos ne dépend d'aucune animation.
+   Si rien de tout cela ne s'exécute — onglet en arrière-plan, mouvement
+   réduit, navigateur ancien — le parcours est exactement le même. */
+
+.vol {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  overflow: clip;
+}
+.vol__point {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-xl);
+  line-height: 1;
+  color: color-mix(in oklab, var(--axis, var(--accent)) 68%, var(--ink));
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+  will-change: transform, opacity;
 }
 
 /* --- La scène -------------------------------------------------------------
@@ -127,6 +177,15 @@
   justify-content: center;
   gap: var(--s-3);
   margin-bottom: var(--s-6);
+}
+/* Sur la couverture, les axes se posent l'un après l'autre : c'est la
+   promesse du questionnaire — voilà ce qu'on va compter. */
+.cover__axis {
+  animation: cover-axis var(--dur-base) var(--ease-spring) both;
+}
+@keyframes cover-axis {
+  from { opacity: 0; transform: translateY(4px) scale(0.92); }
+  to   { opacity: 1; transform: none; }
 }
 .cover__axis {
   display: inline-flex;
@@ -366,6 +425,14 @@
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--s-3);
+  /* La feuille de score se dépose ligne à ligne, puis les recommandations
+     suivent : le résultat se lit dans l'ordre où il a été calculé, au lieu
+     d'apparaître d'un bloc. Le délai est posé en style inline par quiz.js. */
+  animation: score-in var(--dur-base) var(--ease-out) both;
+}
+@keyframes score-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 .score__label {
   display: inline-flex;
@@ -487,6 +554,8 @@
 /* La porte entrouverte. Volontairement en retrait : c'est une invitation
    à revenir, pas un second résultat qui concurrencerait le premier. */
 .presque {
+  animation: reco-in var(--dur-slow) var(--ease-out) both;
+  animation-delay: 320ms;
   margin-top: var(--s-6);
   padding: var(--s-4) var(--s-5);
   border: 1px dashed var(--line-strong);

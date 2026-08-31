@@ -233,11 +233,9 @@ export async function changerMotDePasse(motDePasse) {
 
 const INCR = { '.sv': { increment: 1 } };
 
-export async function compterParcours(espace, quizId, resultId) {
+async function incrementer(espace, quizId, corps) {
   if (!espace || !quizId) return;
   const url = `${DB}/espaces/${encodeURIComponent(espace)}/stats/${encodeURIComponent(quizId)}.json`;
-  const corps = { total: INCR };
-  if (resultId) corps.profils = { [resultId]: INCR };
   try {
     await fetch(url, {
       method: 'PATCH',
@@ -245,9 +243,24 @@ export async function compterParcours(espace, quizId, resultId) {
       body: JSON.stringify(corps),
     });
   } catch {
-    /* Un compteur qui échoue ne doit rien casser : le répondant a fini son
-       parcours, c'est ce qui compte. */
+    /* Un compteur qui échoue ne doit rien casser : le répondant est en
+       train de répondre, c'est ce qui compte. */
   }
+}
+
+/* Un parcours commencé. Sans lui, on comptait les arrivées sans compter
+   les départs : le taux d'achèvement — le seul chiffre qui dise si un
+   questionnaire est trop long, ou si sa couverture ne donne pas envie —
+   était inconnaissable. Même écriture anonyme, même règle d'incrément,
+   même absence de donnée personnelle : un nombre de plus. */
+export async function compterDebut(espace, quizId) {
+  return incrementer(espace, quizId, { debuts: INCR });
+}
+
+export async function compterParcours(espace, quizId, resultId) {
+  const corps = { total: INCR };
+  if (resultId) corps.profils = { [resultId]: INCR };
+  return incrementer(espace, quizId, corps);
 }
 
 export async function stats(espace) {
@@ -345,9 +358,20 @@ function path(espace, rest = '') {
   return `${DB}/espaces/${encodeURIComponent(espace)}/quizzes${rest}.json`;
 }
 
+/* Le jeton voyage en EN-TÊTE, pas en paramètre d'adresse. Une query string
+   se retrouve dans l'historique du navigateur, dans les en-têtes `Referer`
+   et dans les journaux de tout intermédiaire — exactement ce que share.js
+   évite avec soin pour les questionnaires (« le fragment, et non la
+   query »). Le même réflexe des deux côtés. */
 async function call(url, options = {}) {
   const auth = await token();
-  const response = await fetch(auth ? `${url}?auth=${auth}` : url, options);
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+    },
+  });
   if (response.status === 401) {
     throw new Error('Écriture refusée : ce compte n’est pas membre de cet espace.');
   }

@@ -37,7 +37,7 @@ export const ACCENTS = [
 ];
 
 export const RULE_MODES = [
-  { id: 'dominant', label: 'Axe dominant', help: "Le profil gagne si cet axe est celui qui a le plus de points." },
+  { id: 'dominant', label: 'Axe dominant', help: "Le profil gagne si cet axe a le plus de points, à lui seul. En cas d’égalité, la règle ne s’applique pas — c’est au « par défaut » de rattraper." },
   { id: 'range',    label: 'Palier sur un axe', help: "Le profil gagne si le score de cet axe est dans l'intervalle." },
   { id: 'total',    label: 'Palier sur le total', help: "Le profil gagne selon la somme de tous les axes." },
   { id: 'fallback', label: 'Par défaut', help: "Filet de sécurité : gagne si aucune autre règle n'a matché." },
@@ -328,7 +328,7 @@ export function diagnose(quiz) {
   });
 
   if (quiz.results.length && !quiz.results.some((r) => r.rule.mode === 'fallback')) {
-    warn('Aucun profil « par défaut » : un répondant pourrait ne rien obtenir.', 'resultats');
+    warn('Aucun profil « par défaut » : un répondant dont aucune règle ne se déclenche n’obtiendra aucun résultat. Une égalité entre deux axes suffit.', 'resultats');
   }
 
   return issues;
