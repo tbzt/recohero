@@ -165,6 +165,8 @@ function card(quiz, alaune = false, retard = 0) {
     href: avecEspace(`quiz.html?q=${encodeURIComponent(quiz.id)}`),
     style: { '--card-accent': quiz.accent, animationDelay: `${retard}ms` },
   }, [
+    /* Le signet : décoratif, donc masqué à la synthèse vocale. */
+    el('span', { class: 'quiz-card__signet', 'aria-hidden': 'true' }),
     alaune && el('span', { class: 'quiz-card__une', text: 'À la une' }),
     quiz.image && el('img', { class: 'quiz-card__cover', src: quiz.image, alt: '', loading: 'lazy' }),
     el('div', { class: 'quiz-card__top' }, [

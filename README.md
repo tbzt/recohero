@@ -410,6 +410,87 @@ publique du site.
 
 ---
 
+### Par affiche — dans les rayons
+
+Un questionnaire ne sert à rien s'il faut connaître son adresse. Backoffice →
+**Diffuser** → **🖼 Affiche à imprimer** compose une feuille A4 : l'accroche en
+grand, un QR code, et le temps que ça prend. On l'imprime, on la scotche près
+des romans policiers.
+
+Le QR code est dessiné par le projet lui-même — aucune bibliothèque, aucun
+service extérieur. L'adresse n'est donc envoyée à personne, et l'affiche se
+produit hors ligne, y compris depuis une clé USB.
+
+**Il faut que le questionnaire soit servi quelque part** : publié dans un
+espace, ou présent au kiosque du dépôt. Un brouillon local n'a pas d'adresse à
+mettre sur un mur — son contenu voyage dans le fragment de l'URL, et trois
+mille caractères ne rentrent ni dans un QR code ni sur une affiche. Le bouton
+le dit avant de produire quoi que ce soit.
+
+Le dialogue affiche l'adresse **en clair** sous l'image : c'est elle qui est
+dans le QR, personne ne peut la relire dans les modules, et une affiche qui
+pointe au mauvais endroit ne se découvre qu'une fois collée. Le même piège que
+le code d'intégration : une adresse en `localhost` est signalée en orange.
+
+L'affiche renvoie vers l'adresse **ordinaire** du questionnaire, pas vers le
+mode borne : qui scanne le fait avec son propre téléphone, et a donc droit à
+son historique et à sa carte de résultat.
+
+### Par une borne — une tablette dans la salle
+
+Les trois voies précédentes supposent quelqu'un devant son propre écran. La
+**borne** est l'autre situation : une tablette posée dans la bibliothèque, en
+libre accès, que personne ne surveille.
+
+Ajoutez `kiosque=1` à l'adresse du parcours :
+
+```
+quiz.html?q=<identifiant>&kiosque=1
+```
+
+Le questionnaire ne change pas d'un mot. Ce qui change, c'est ce qu'on fait de
+la trace et de l'attente.
+
+| | En temps normal | Sur une borne |
+|---|---|---|
+| Parcours interrompu | repris à la visite suivante | jamais repris |
+| Historique des résultats | conservé (60 derniers) | **rien n'est écrit** |
+| Carte de résultat, partage | proposés | retirés |
+| Sortie vers le kiosque | présente | retirée |
+| Cibles tactiles | 44 px | 56 px, réponses agrandies |
+| Compteurs de l'espace | comptés | **comptés aussi** |
+
+Les deux dernières lignes sont les moins évidentes et les plus importantes.
+
+**Rien ne reste, et ce n'est pas un détail.** Reprendre un parcours et garder
+un historique sont deux conforts sur un appareil personnel ; sur un poste
+partagé, ce sont des fuites — la personne suivante lirait ce que la précédente
+a obtenu. Le mode borne n'écrit donc ni l'un ni l'autre. Il n'y a rien à
+purger le soir : il n'y a jamais rien eu.
+
+**Les compteurs, eux, continuent.** Ce sont de vrais répondants, et ils ne
+disent ni qui, ni quand, ni depuis où — deux nombres. Les exclure fausserait
+la seule mesure que l'espace sache produire. Seuls les essais depuis l'éditeur
+ne comptent pas.
+
+**L'écran se rend.** Après un temps sans geste, le parcours revient à sa
+couverture et oublie les réponses. Sans cela, une borne passe sa journée sur
+le résultat de la première personne du matin. Le délai vaut 90 secondes, et se
+règle dans l'adresse — `?kiosque=45` pour quarante-cinq secondes, entre 15 et
+600. Une salle d'étude silencieuse et un hall de passage n'attendent pas
+pareil, et c'est le genre de réglage qu'on veut changer en réimprimant un QR
+code plutôt qu'en retouchant du code.
+
+Tout geste repousse l'échéance, y compris ceux qui ne passent pas par un
+doigt : une commande vocale ou un contacteur produisent un clic sans
+évènement de pointeur, et les oublier renverrait ces personnes-là — et elles
+seules — à la couverture en pleine réponse.
+
+Rien de tout cela n'est un réglage à mémoriser : le mode tient dans l'adresse,
+donc dans le QR code qu'on imprime.
+
+---
+
 ## L'édition au quotidien
 
 Un bandeau en tête de la colonne d'édition donne l'état du questionnaire —
@@ -547,6 +628,9 @@ Rien ne quitte le navigateur. Tout vit dans le `localStorage`, sous le préfixe
 Embarqué dans le site d'un autre (`embed=1`), rien ne change à cette liste —
 sauf que le navigateur peut refuser le stockage tiers. Le refus est encaissé
 sans erreur : `drafts`, `results` et `session` deviennent simplement muets.
+
+Sur une **borne** (`kiosque=1`), `results` et `session` ne sont pas écrits du
+tout. Ce n'est pas un nettoyage périodique — il n'y a rien à nettoyer.
 
 Il n'y a **aucun moyen de voir les réponses des autres** : c'est une
 conséquence directe du choix « pas de serveur ». Si ce besoin apparaît un

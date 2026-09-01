@@ -69,6 +69,17 @@ export function uid(prefix = 'x') {
   return `${prefix}-${Date.now().toString(36)}${counter.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/* Combien de temps ça prend, en minutes. Une affiche et un écran de départ
+   posent la même question — « est-ce que j'ai le temps ? » — et doivent y
+   répondre pareil, d'où le calcul ici plutôt qu'à deux endroits.
+
+   Vingt secondes par question : le temps de lire trois réponses évocatrices
+   et d'en choisir une, pas celui de cliquer. Jamais moins d'une minute —
+   annoncer « 0 minute » ne rassure personne. */
+export function dureeEstimee(quiz) {
+  return Math.max(1, Math.round((quiz.questions?.length || 0) * 20 / 60));
+}
+
 export function slugify(text, fallback = 'questionnaire') {
   const slug = String(text || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')

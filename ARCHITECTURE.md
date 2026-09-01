@@ -44,6 +44,8 @@ placés sous lui.
 | `core/views.js` | La vue d'une question, **partagée** par le parcours et l'aperçu du backoffice. | connaître l'état de l'un ou de l'autre |
 | `core/sortable.js` | Réordonner une liste au pointeur. | connaître ce qu'elle contient |
 | `core/card.js` | Dessiner la carte de résultat sur un canvas. | lire le DOM de la page |
+| `core/qr.js` | Encoder un texte en matrice de QR code. Fonctions **pures**. | savoir ce qu'il encode, ni où ça se dessine |
+| `core/affiche.js` | Dessiner l'affiche de rayon sur un canvas. | fabriquer l'adresse qu'elle porte |
 | `core/ui.js` | Les gestes d'interface : nœud, notification, copie, thème, réduction d'image, **et l'espace dans l'adresse**. | connaître le métier |
 
 ---
@@ -446,6 +448,42 @@ silencieux **par choix** : l'auteur n'y peut rien au moment où le répondant
 appuie sur le bouton.
 
 ---
+
+## Le QR code, écrit à la main
+
+`core/qr.js` encode un texte en matrice de modules. Trois cents lignes, aucune
+dépendance — parce qu'une bibliothèque de QR coûterait la promesse « ça tourne
+depuis une clé USB » pour une quarantaine de kilo-octets, et que la norme a
+trente ans : ce code ne bougera plus.
+
+**Le périmètre est étroit exprès.** Mode octet, correction de niveau M,
+versions 1 à 10 — 216 octets, soit n'importe quelle adresse de questionnaire.
+Le reste de la norme (numérique, alphanumérique, kanji, versions 11 à 40)
+serait du code que personne n'exécute. Le niveau M plutôt que L parce qu'une
+affiche se froisse et prend le soleil : M récupère 15 % du symbole, L
+seulement 7.
+
+**Ce qu'on ne peut pas scanner, on le démontre.** Un QR faux ressemble trait
+pour trait à un QR juste : le défaut ne se voit que devant un téléphone, trop
+tard. Quatre contrôles indépendants remplacent le scan, et chacun attrape une
+classe d'erreur que les autres laissent passer :
+
+| Contrôle | Ce qu'il attrape |
+|---|---|
+| Syndromes nuls (`syndromes()`, exportée pour ça) | une table de Galois ou un polynôme générateur faux |
+| Format et version comparés aux constantes de la norme | une division BCH fausse |
+| Aller-retour par un décodeur écrit séparément | le zigzag, l'entrelacement, le masquage |
+| Structure : module sombre, repères, synchronisation | un placement décalé, une transposition |
+
+Le dernier a payé. Le décodeur d'aller-retour disait « identique » alors que
+l'information de format écrivait **huit** bits en bas à gauche au lieu de
+sept — le huitième éteignant le module toujours sombre. Le lecteur de test
+portait le même décalage que le codeur, donc ils s'accordaient ; seul le
+contrôle du module sombre, qui ne dépend d'aucun des deux, l'a vu. Un vrai
+lecteur y serait tombé, puisque c'est dans le format qu'il prend le masque.
+
+**Un aller-retour ne prouve rien à lui seul quand le test partage le code du
+codeur.** C'est la leçon à garder si ce fichier doit évoluer.
 
 ## Le mode embarqué
 

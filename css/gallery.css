@@ -174,6 +174,30 @@
 }
 .quiz-card:hover .quiz-card__go { transform: translateX(3px); }
 
+/* Le signet qui dépasse. Un ruban pend du bord haut de chaque vignette ;
+   au survol il glisse d'un cran, comme un marque-page qu'on pousse. Il ne
+   remplace aucune information — c'est l'invitation à ouvrir.
+
+   Il descend vers l'intérieur plutôt que de dépasser vers le haut : la
+   vignette est en `overflow: hidden` pour tenir sa couverture dans ses
+   coins arrondis, et ce qui sort par le haut serait coupé. */
+/* Il vit dans la gouttière de gauche, pas dans le corps de la vignette :
+   la pastille d'emoji commence à `--s-5` du bord, et un signet posé là la
+   recouvrait sur les vignettes sans couverture. Il croise l'étiquette
+   « À la une » d'autant moins qu'elle est à droite. */
+.quiz-card__signet {
+  position: absolute;
+  top: 0;
+  left: var(--s-2);
+  z-index: var(--z-raised);
+  width: 14px;
+  height: 26px;
+  background: var(--card-accent);
+  clip-path: polygon(0 0, 100% 0, 100% 74%, 50% 100%, 0 74%);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.quiz-card:hover .quiz-card__signet { transform: translateY(6px); }
+
 /* --- Historique de résultats ----------------------------------------------- */
 .history { display: grid; gap: var(--s-2); }
 .history__row {

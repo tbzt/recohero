@@ -591,11 +591,26 @@ export function publier(quiz, ctx = {}) {
         ]),
       ]),
 
+      /* L'affiche est le chaînon entre le produit et le bâtiment : un
+         questionnaire ne sert à rien s'il faut connaître son adresse.
+         Elle vit ici, avec le lien, parce qu'elle n'est qu'une façon de
+         plus de le donner — celle qui se scotche près des rayons. */
+      el('div', { class: 'publish-step' }, [
+        el('span', { class: 'publish-step__num', text: '2' }),
+        el('div', {}, [
+          el('h3', { text: 'Par affiche — dans les rayons' }),
+          el('p', { text: 'Une feuille A4 à imprimer et à coller : l’accroche, un QR code, et le temps que ça prend. Il faut que le questionnaire soit servi quelque part — un brouillon local n’a pas d’adresse à mettre sur un mur.' }),
+          el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
+            el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'affiche', text: '🖼 Affiche à imprimer' }),
+          ]),
+        ]),
+      ]),
+
       /* Le fichier est ce qui circule entre auteurs : un lien se répond,
          un fichier se reprend et se modifie. C'est la seule voie qui
          transporte un questionnaire ÉDITABLE d'une personne à l'autre. */
       el('div', { class: 'publish-step' }, [
-        el('span', { class: 'publish-step__num', text: '2' }),
+        el('span', { class: 'publish-step__num', text: '3' }),
         el('div', {}, [
           el('h3', { text: 'Par fichier — pour se passer un modèle' }),
           el('p', { text: 'Le fichier JSON contient tout : questions, axes, profils, recommandations, images intégrées. Qui le reçoit l’ouvre dans son propre backoffice et le modifie à sa guise. C’est la voie pour partir du questionnaire de quelqu’un d’autre plutôt que de la page blanche.' }),

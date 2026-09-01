@@ -18,8 +18,9 @@ import { loadPublished, loadEspace, forgetEspace } from '../core/catalog.js';
 import * as remote from '../core/remote.js';
 import * as store from '../core/store.js';
 import { linkFor, encode } from '../core/share.js';
+import { toBlob } from '../core/card.js';
 import {
-  el, toast, copy, download, applyAccent, debounce, formatDate,
+  el, toast, copy, download, downloadBlob, applyAccent, debounce, formatDate,
   imageFromFile, formatBytes, IMAGE_LIMITS, espaceCourant, avecEspace, garderEspace,
 } from '../core/ui.js';
 
@@ -1059,6 +1060,7 @@ function onClick(event) {
     }
     case 'test':      return testRun();
     case 'copy-link': return copyLink();
+    case 'affiche':   return montrerAffiche();
     case 'embed':     return showEmbed();
     case 'remote-signin':    return showSignIn();
     case 'remote-signout':   return signOutRemote();
@@ -2307,6 +2309,153 @@ async function signOutRemote() {
   repaint();
 }
 
+/* --- L'envoi ------------------------------------------------------------------
+   Publier, c'est envoyer. La fiche se plie en avion et part.
+
+   C'est un SUPPLÉMENT, au sens strict du projet : la publication a déjà
+   abouti quand la surcouche apparaît, et le bandeau de confirmation dit ce
+   qui s'est passé. Si rien de tout ceci ne s'exécute, il ne manque rien.
+
+   Le mouvement réduit se lit ici plutôt qu'en CSS parce qu'il ne s'agit pas
+   d'atténuer une animation mais de ne pas construire un objet dont c'est
+   la seule raison d'être — même geste que les points qui volent dans le
+   parcours.                                                                */
+const MOUVEMENT_REDUIT = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+
+const ORI_MORCEAUX = [
+  { moitie: 'h', papier: 'ori-pan--h',  ink: 'ori-ink--pan-h',  pli: false },
+  { moitie: 'h', papier: 'ori-face--h', ink: 'ori-ink--face-h', pli: true },
+  { moitie: 'h', papier: 'ori-coin ori-coin--h', ink: 'ori-ink--coin-h', pli: true },
+  { moitie: 'b', papier: 'ori-pan--b',  ink: 'ori-ink--pan-b',  pli: false },
+  { moitie: 'b', papier: 'ori-face--b', ink: 'ori-ink--face-b', pli: true },
+  { moitie: 'b', papier: 'ori-coin ori-coin--b', ink: 'ori-ink--coin-b', pli: true },
+];
+
+function envolerLaFiche(titre) {
+  if (MOUVEMENT_REDUIT?.matches) return;
+
+  /* Chaque morceau de papier porte sa propre copie du titre, à la même
+     place : la découpe du morceau coupe donc le texte sur le pli, et
+     chaque fragment part avec son volet. */
+  const papier = ({ moitie, papier: forme, ink }) => el('div', { class: `ori-papier ${forme}` }, [
+    el('div', { class: `ori-ink ori-ink--${moitie} ${ink}` }, [
+      el('div', { class: 'ori-ink__corps' }, [
+        el('div', { class: 'ori-ink__titre', text: titre }),
+      ]),
+    ]),
+  ]);
+
+  const moitie = (cote) => {
+    const miens = ORI_MORCEAUX.filter((m) => m.moitie === cote);
+    return el('div', { class: `ori-moitie ori-moitie--${cote}` }, [
+      papier(miens.find((m) => !m.pli)),
+      el('div', { class: `ori-pli ori-pli--${cote}` }, miens.filter((m) => m.pli).map(papier)),
+      el('div', { class: `ori-voile ori-voile--${cote}` }),
+    ]);
+  };
+
+  const couche = el('div', { class: 'envoi', 'aria-hidden': 'true' }, [
+    el('div', { class: 'envoi__scene' }, [
+      el('div', { class: 'envoi__ombre' }),
+      el('div', { class: 'ori-feuille' }, [moitie('h'), moitie('b')]),
+    ]),
+  ]);
+  document.body.append(couche);
+
+  /* On attend la FIN de l'animation la plus longue plutôt qu'un délai
+     recopié à la main : une durée écrite deux fois finit toujours par
+     diverger. Un filet de sécurité retire la couche quoi qu'il arrive —
+     une animation ne progresse pas dans un onglet qui ne compose pas, et
+     sa promesse ne se résoudrait alors jamais. */
+  const feuille = couche.querySelector('.ori-feuille');
+  let retiree = false;
+  const retirer = () => { if (retiree) return; retiree = true; clearTimeout(secours); couche.remove(); };
+  const secours = setTimeout(retirer, 6000);
+  feuille.getAnimations?.().forEach((a) => a.finished.then(retirer, retirer));
+}
+
+/* --- L'affiche ----------------------------------------------------------------
+   Elle renvoie vers une adresse DURABLE, et c'est la seule condition. Un
+   brouillon local n'en a pas : son contenu voyage dans le fragment de l'URL,
+   et trois mille caractères ne rentrent pas dans un QR code — ni sur un mur.
+   On le dit avant, plutôt que de produire une affiche qui ne marchera pas. */
+async function montrerAffiche() {
+  flush();
+  const quiz = state.quiz;
+  if (!quiz) return undefined;
+
+  const servi = state.remote.some((q) => q.id === quiz.id)
+             || state.published.some((q) => q.id === quiz.id);
+  if (!servi) {
+    return toast('Publiez d’abord ce questionnaire : une affiche a besoin d’une adresse qui dure.', 'danger');
+  }
+
+  const adresse = new URL(
+    avecEspace(`quiz.html?q=${encodeURIComponent(quiz.id)}`, state.espace),
+    location.href,
+  ).toString();
+
+  let rendu;
+  try {
+    const { rendreAffiche } = await import('../core/affiche.js');
+    rendu = await rendreAffiche(quiz, adresse, {
+      structure: state.identite?.titre || '',
+      accroche: quiz.tagline || quiz.title,
+    });
+  } catch (err) {
+    return toast(`Affiche impossible à produire : ${err.message}`, 'danger');
+  }
+
+  const blob = await toBlob(rendu.canvas);
+  const fichier = `affiche-${slugify(quiz.title, 'questionnaire')}.png`;
+
+  rendu.canvas.className = 'cardview__canvas';
+  rendu.canvas.setAttribute('role', 'img');
+  rendu.canvas.setAttribute('aria-label', `Affiche pour « ${quiz.title} »`);
+
+  const dialog = el('dialog', { class: 'modal cardview' }, [
+    el('div', { class: 'modal__body' }, [
+      rendu.canvas,
+      /* L'adresse en clair sous l'image : c'est elle qui est dans le QR, et
+         personne ne peut la relire dans les modules. Une affiche qui pointe
+         au mauvais endroit ne se voit qu'une fois collée. */
+      el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-3)' } }, [
+        'Le QR code mène à ', el('code', { class: 'code', text: adresse }), '.',
+      ]),
+      localhostAlerte(adresse),
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', 'data-affiche': 'close', text: 'Fermer' }),
+      el('button', { class: 'btn btn--primary', type: 'button', 'data-affiche': 'save', text: '↓ Enregistrer le PNG' }),
+    ]),
+  ]);
+
+  dialog.addEventListener('click', (event) => {
+    const action = event.target.closest('[data-affiche]')?.dataset.affiche;
+    if (!action) return;
+    if (action === 'save') {
+      downloadBlob(fichier, blob);
+      toast('Affiche enregistrée. Format A4, à imprimer tel quel.');
+      return;
+    }
+    dismiss(dialog);
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  return undefined;
+}
+
+/* Le piège du travail en local, déjà connu du code d'intégration : une
+   adresse en localhost ne mène nulle part une fois l'affiche imprimée. */
+function localhostAlerte(adresse) {
+  if (!/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(adresse)) return null;
+  return el('p', { class: 'alerte', style: { marginTop: 'var(--s-2)' } }, [
+    'Cette adresse est locale : l’affiche ne marchera que sur cette machine. ',
+    'Reproduisez-la depuis l’adresse publique du site.',
+  ]);
+}
+
 async function publishRemote() {
   flush();
   if (!state.remoteSession) return showSignIn();
@@ -2320,6 +2469,11 @@ async function publishRemote() {
     state.quiz.rev = await remote.saveQuiz(state.espace, state.quiz);
     state.quiz.updatedBy = state.remoteSession.uid;
     flush();
+    /* L'envol part AVANT le rafraîchissement de l'espace : celui-ci
+       redessine le panneau, et le geste doit accompagner la publication,
+       pas la rattraper une seconde plus tard. La surcouche vit hors du
+       panneau, donc le redessin ne l'emporte pas. */
+    envolerLaFiche(state.quiz.title);
     await refreshEspace();
     toast(`« ${state.quiz.title} » est en ligne dans l’espace.`);
     repaint();

@@ -185,7 +185,46 @@ html.a-la-transition .view-enter { animation: none; }
 }
 
 /* --- Écran de couverture -------------------------------------------------- */
-.cover { text-align: center; }
+/* `isolation` n'est pas cosmétique ici : la lueur se pose en z-index négatif
+   pour passer DERRIÈRE le titre. Sans contexte d'empilement propre à la
+   couverture, ce -1 la ferait descendre sous le fond de la page, où elle
+   serait invisible — un élément positionné passe autrement toujours devant
+   ses voisins statiques, et la lueur laverait le texte. */
+.cover { position: relative; isolation: isolate; text-align: center; }
+
+/* La lumière de fin de journée. Elle ne dit rien, elle réchauffe : c'est
+   l'ambiance d'une salle de lecture avant qu'on ouvre le livre. Elle
+   s'éteint entièrement sous `--ambient`. */
+.cover__lueur {
+  position: absolute;
+  inset: -6rem -20% auto;
+  height: 26rem;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--ambient);
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 34%,
+    color-mix(in oklab, var(--accent) 16%, transparent),
+    transparent 70%);
+}
+.cover__mote {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  opacity: 0.3;
+  animation: mote var(--dur-ambient) var(--ease-in-out) infinite;
+}
+.cover__mote:nth-child(1) { top: 34%; left: 26%; animation-delay: 0s; }
+.cover__mote:nth-child(2) { top: 52%; left: 64%; animation-delay: 1.6s; }
+.cover__mote:nth-child(3) { top: 26%; left: 72%; animation-delay: 3.1s; }
+.cover__mote:nth-child(4) { top: 62%; left: 38%; animation-delay: 4.4s; }
+@keyframes mote {
+  0%, 100% { transform: none; opacity: 0.12; }
+  50%      { transform: translate(6px, -16px); opacity: 0.42; }
+}
+
 .cover__emoji {
   font-size: var(--t-4xl);
   line-height: 1;
@@ -280,6 +319,33 @@ html.a-la-transition .view-enter { animation: none; }
   justify-content: center;
   gap: var(--s-3);
 }
+
+/* --- Le mode borne ------------------------------------------------------------
+   Une tablette en libre accès, qu'on touche debout, souvent d'une main, et
+   parfois avec quelqu'un qui attend derrière. On ne redessine rien : on
+   élargit ce qui se touche et on grossit ce qui se lit.
+
+   `--tap` est relevé plutôt que les hauteurs des boutons un par un : les
+   composants le consomment déjà, donc la barre monte partout d'un coup, y
+   compris là où on n'y aurait pas pensé.                                  */
+.is-kiosque {
+  --tap: 56px;
+  --tap-sm: 48px;
+}
+.is-kiosque .option {
+  min-height: 76px;
+  padding: var(--s-4) var(--s-5);
+  font-size: var(--t-lg);
+}
+.is-kiosque .option__key { display: none; }   /* pas de clavier sur une borne */
+.is-kiosque .question__text { font-size: clamp(var(--t-xl), 5.4vw, var(--t-3xl)); }
+.is-kiosque .cover__title { font-size: clamp(var(--t-2xl), 7vw, var(--t-4xl)); }
+.is-kiosque .astuce__clavier { display: none; }
+/* La carte de résultat s'enregistre ou se partage : deux gestes qui n'ont
+   pas de sens sur une tablette qui n'appartient à personne. Le reste du
+   résultat — profil, score, prescriptions — est intact. */
+.is-kiosque [data-act="card"],
+.is-kiosque [data-act="share"] { display: none; }
 
 /* --- Question -------------------------------------------------------------- */
 .question { max-width: var(--content); margin-inline: auto; }
@@ -414,7 +480,54 @@ html.a-la-transition .view-enter { animation: none; }
 
 /* --- Résultat --------------------------------------------------------------- */
 .result { max-width: var(--content); margin-inline: auto; }
-.result__banner { text-align: center; margin-bottom: var(--s-7); }
+/* Même raison que la couverture : le halo passe en z-index négatif, donc il
+   faut un contexte d'empilement ici, sinon il plonge sous la page. */
+.result__banner { position: relative; isolation: isolate; text-align: center; margin-bottom: var(--s-7); }
+
+/* Le halo qui s'allume. Le profil ne s'affiche plus à froid : une lumière
+   chaude monte derrière lui, comme une lampe qu'on allume. C'est le moment
+   de récompense du parcours — un seul geste appuyé, pas dix petits.
+
+   Au repos, le résultat est exactement le même : le halo est un supplément
+   qui n'ajoute aucune information et n'en cache aucune. */
+.result__halo {
+  position: absolute;
+  inset: -4rem -12% auto;
+  height: 20rem;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 55% 50% at 50% 42%,
+    color-mix(in oklab, var(--accent) 26%, transparent),
+    transparent 68%);
+  animation: halo var(--dur-reveal) var(--ease-out) both;
+}
+@keyframes halo {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+/* Trois étincelles qui montent, une fois. Elles se retirent du document
+   toutes seules à la fin — `both` fige la dernière image, qui est
+   transparente. */
+.result__spark {
+  position: absolute;
+  top: 46%;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  opacity: 0;
+  z-index: -1;
+  animation: spark var(--dur-reveal) var(--ease-out) both;
+}
+.result__spark:nth-of-type(1) { left: 42%; animation-delay: 90ms; }
+.result__spark:nth-of-type(2) { left: 57%; animation-delay: 240ms; }
+.result__spark:nth-of-type(3) { left: 49%; animation-delay: 390ms; }
+@keyframes spark {
+  0%   { opacity: 0; transform: none; }
+  30%  { opacity: 0.7; }
+  100% { opacity: 0; transform: translateY(-34px); }
+}
 .result__kicker {
   font-size: var(--t-xs);
   letter-spacing: 0.14em;

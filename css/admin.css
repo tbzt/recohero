@@ -870,3 +870,235 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   border-radius: var(--r-md);
 }
 .danger-zone h3 { color: var(--danger); font-size: var(--t-base); margin-bottom: var(--s-1); }
+
+/* --- L'envoi : la fiche se plie en avion et part -----------------------------
+   Publier dépose le questionnaire dans l'espace. Le geste le dit : la fiche
+   se plie d'elle-même — les coins se rabattent sur l'axe, la feuille se
+   ferme en deux, les ailes s'ouvrent — puis elle s'en va.
+
+   Le pliage court sur l'axe LONG de la feuille, nez à droite : plié dans sa
+   largeur, le second pli sortait du papier et laissait dépasser une
+   languette. Une feuille se plie dans sa longueur, et un avion est long.
+
+   Trois règles ont dicté la structure, et les enfreindre casse tout :
+
+   1. `clip-path` fait retomber `transform-style` à plat. Les morceaux
+      découpés sont donc TOUS des feuilles de l'arbre ; les moitiés et le
+      second pli, qui doivent rester des contextes 3D, n'ont ni fond ni
+      découpe.
+   2. Chaque pli se pose une fraction de pixel plus près du regard que ce
+      qu'il recouvre. Deux plans exactement coplanaires scintillent l'un
+      dans l'autre.
+   3. Le `translateZ` précède la rotation dans la liste : posé après, il
+      s'inverserait avec le volet retourné et le pli passerait dessous.
+
+   Rien du produit n'en dépend : la publication a déjà eu lieu quand
+   l'animation démarre, et le bandeau de confirmation la dit. Sous
+   prefers-reduced-motion, app.js ne construit même pas la surcouche.    */
+
+.envoi {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.envoi__scene {
+  position: relative;
+  width: 150px;
+  height: 96px;
+  perspective: 620px;
+  perspective-origin: 34% 62%;
+  transform: scale(1.7);
+}
+
+/* L'ombre portée sur la table : elle rétrécit et s'efface quand la feuille
+   quitte le plan. C'est elle qui dit « ça décolle ». */
+.envoi__ombre {
+  position: absolute;
+  left: 6px; top: 8px;
+  width: 150px; height: 90px;
+  border-radius: 40% 40% 46% 46%;
+  background: var(--voile-fort);
+  filter: blur(9px);
+  transform-origin: 40% 70%;
+  animation: ori-ombre var(--dur-fold) cubic-bezier(0.4, 0, 0.3, 1) both;
+}
+@keyframes ori-ombre {
+  0%   { opacity: 0.42; transform: scale(1) translateY(0); }
+  41%  { opacity: 0.36; transform: scale(0.9) translateY(0); }
+  70%  { opacity: 0.24; transform: scale(0.76) translateY(6px); }
+  100% { opacity: 0; transform: scale(0.3) translateY(10px); }
+}
+
+.ori-feuille {
+  position: absolute;
+  left: 0; top: 0;
+  width: 150px; height: 96px;
+  transform-style: preserve-3d;
+  animation: ori-vol var(--dur-fold) linear both;
+}
+@keyframes ori-vol {
+  0%, 55% { transform: rotateX(0deg) rotateZ(0deg) scale(1); translate: 0 0; opacity: 1;
+            animation-timing-function: cubic-bezier(0.34, 0.06, 0.28, 1); }
+  70%     { transform: rotateX(44deg) rotateZ(-11deg) scale(0.97); translate: 2px -7px; opacity: 1;
+            animation-timing-function: cubic-bezier(0.32, 0, 0.66, 0.42); }
+  86%     { transform: rotateX(48deg) rotateZ(-19deg) scale(0.7); translate: 58px -52px; opacity: 0.92;
+            animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.6); }
+  100%    { transform: rotateX(52deg) rotateZ(-27deg) scale(0.32); translate: 150px -94px; opacity: 0; }
+}
+
+/* Les deux moitiés : aucun fond, aucune découpe — elles ne portent que la
+   charnière centrale et doivent rester des contextes 3D. */
+.ori-moitie {
+  position: absolute;
+  left: 0;
+  width: 150px; height: 48px;
+  transform-style: preserve-3d;
+}
+.ori-moitie--h { top: 0;    transform-origin: 50% 100%; animation: ori-moitie-h var(--dur-fold) linear both; }
+.ori-moitie--b { top: 48px; transform-origin: 50% 0%;   animation: ori-moitie-b var(--dur-fold) linear both; }
+
+@keyframes ori-moitie-h {
+  0%, 41%   { transform: translateZ(0) rotateX(0deg);
+              animation-timing-function: cubic-bezier(0.5, 0.02, 0.32, 1); }
+  57%       { transform: translateZ(2.4px) rotateX(180deg);
+              animation-timing-function: cubic-bezier(0.26, 0.72, 0.36, 1); }
+  70%, 100% { transform: translateZ(2.4px) rotateX(204deg); }
+}
+@keyframes ori-moitie-b {
+  0%, 55%   { transform: rotateX(0deg);
+              animation-timing-function: cubic-bezier(0.26, 0.72, 0.36, 1); }
+  70%, 100% { transform: rotateX(24deg); }
+}
+
+/* Le second pli : celui qui fait l'avion plutôt qu'un triangle. Il rabat le
+   bord oblique sur l'axe et affine le dard, en emportant le coin déjà
+   replié — d'où l'imbrication, comme le papier où un pli entraîne les
+   épaisseurs qu'il recouvre. */
+.ori-pli { position: absolute; inset: 0; transform-style: preserve-3d; }
+.ori-pli--h { transform-origin: 100% 100%; animation: ori-pli-h var(--dur-fold) cubic-bezier(0.5, 0.02, 0.32, 1) both; }
+.ori-pli--b { transform-origin: 100% 0;    animation: ori-pli-b var(--dur-fold) cubic-bezier(0.5, 0.02, 0.32, 1) both; }
+
+@keyframes ori-pli-h {
+  0%, 21%   { transform: translateZ(0) rotate3d(-0.9239, -0.3827, 0, 0deg); }
+  38%, 100% { transform: translateZ(1.2px) rotate3d(-0.9239, -0.3827, 0, 180deg); }
+}
+@keyframes ori-pli-b {
+  0%, 24%   { transform: translateZ(0) rotate3d(0.9239, -0.3827, 0, 0deg); }
+  41%, 100% { transform: translateZ(1.2px) rotate3d(0.9239, -0.3827, 0, 180deg); }
+}
+
+/* Les morceaux de papier : des feuilles, découpées au clip-path. */
+.ori-papier { position: absolute; inset: 0; background: var(--surface); }
+
+/* Le décalage anti-crénelage PROLONGE l'arête du pli au-delà du coin ; il ne
+   déplace pas le coin. Déplacer le coin inclinait le bord du pan et ouvrait
+   une fente d'un pixel sur toute la ligne de pli. */
+.ori-pan--h { clip-path: polygon(23% -2.3%, 102.1% 101%, -1% 101%, -1% -2.3%); }
+.ori-pan--b { clip-path: polygon(23% 102.3%, 102.1% -1%, -1% -1%, -1% 102.3%); }
+.ori-face--h { clip-path: polygon(68% 0, 22.7% 0, 100% 100%); }
+.ori-face--b { clip-path: polygon(68% 100%, 22.7% 100%, 100% 0); }
+.ori-coin { transform-origin: 84% 50%; }
+.ori-coin--h { clip-path: polygon(100% 0, 68% 0, 100% 100%); animation: ori-coin-h var(--dur-fold) cubic-bezier(0.48, 0.03, 0.34, 1) both; }
+.ori-coin--b { clip-path: polygon(100% 100%, 68% 100%, 100% 0); animation: ori-coin-b var(--dur-fold) cubic-bezier(0.48, 0.03, 0.34, 1) both; }
+
+/* La teinte bascule à l'instant précis où le volet passe de chant : le
+   papier n'a alors plus d'épaisseur visible, la coupure ne se voit pas. */
+@keyframes ori-coin-h {
+  0%, 4%    { transform: translateZ(0) rotate3d(-1, -1, 0, 0deg); }
+  12.4%     { background: var(--surface); }
+  12.6%     { background: linear-gradient(122deg, var(--verso-hi), var(--verso)); }
+  21%, 100% { transform: translateZ(0.6px) rotate3d(-1, -1, 0, 180deg);
+              background: linear-gradient(122deg, var(--verso-hi), var(--verso)); }
+}
+@keyframes ori-coin-b {
+  0%, 7%    { transform: translateZ(0) rotate3d(1, -1, 0, 0deg); }
+  15.4%     { background: var(--surface); }
+  15.6%     { background: linear-gradient(238deg, var(--verso-hi), var(--verso)); }
+  24%, 100% { transform: translateZ(0.6px) rotate3d(1, -1, 0, 180deg);
+              background: linear-gradient(238deg, var(--verso-hi), var(--verso)); }
+}
+.ori-face--h { animation: ori-verso-h var(--dur-fold) linear both; }
+.ori-face--b { animation: ori-verso-b var(--dur-fold) linear both; }
+@keyframes ori-verso-h {
+  0%, 29.4%   { background: var(--surface); }
+  29.6%, 100% { background: linear-gradient(112deg, var(--verso-hi), var(--verso)); }
+}
+@keyframes ori-verso-b {
+  0%, 32.4%   { background: var(--surface); }
+  32.6%, 100% { background: linear-gradient(248deg, var(--verso-hi), var(--verso)); }
+}
+
+/* Le relief. À plat sur la table, la feuille est éclairée uniformément et
+   rien ne doit la voiler ; c'est en se redressant que les deux ailes
+   cessent de recevoir la même lumière. Cet écart, plus que la perspective,
+   est ce qui fait lire un objet et non une découpe. Chaque voile épouse la
+   silhouette finale de son aile — celle du pan fixe, le second pli
+   retombant à l'intérieur. */
+.ori-voile {
+  position: absolute; inset: 0;
+  opacity: 0;
+  animation: ori-voile var(--dur-fold) ease both;
+}
+.ori-voile--h {
+  clip-path: polygon(23% -2.3%, 102.1% 101%, -1% 101%, -1% -2.3%);
+  background: linear-gradient(104deg, transparent, var(--voile-faible));
+  transform: translateZ(-2.6px);
+}
+.ori-voile--b {
+  clip-path: polygon(23% 102.3%, 102.1% -1%, -1% -1%, -1% 102.3%);
+  background: linear-gradient(76deg, var(--voile-fort), var(--voile-faible));
+  transform: translateZ(2.6px);
+}
+@keyframes ori-voile {
+  0%, 55%   { opacity: 0; }
+  72%, 100% { opacity: 1; }
+}
+
+/* Le titre se plie avec le papier ---------------------------------------------
+   Il ne s'efface pas poliment avant le pli : chaque morceau porte sa propre
+   copie du texte, à la même place. La découpe du morceau coupe donc le
+   texte exactement sur le pli, et chaque fragment bascule avec son volet.
+
+   Les morceaux se chevauchent d'un pixel pour masquer l'anticrénelage, mais
+   l'encre est découpée au trait EXACT : deux fragments de texte superposés
+   se renforceraient et laisseraient une trace sombre en travers des
+   lettres.                                                                */
+.ori-ink { position: absolute; inset: 0; }
+.ori-ink__corps { position: absolute; left: 11px; width: 122px; }
+.ori-ink--h .ori-ink__corps { top: 12px; }
+.ori-ink--b .ori-ink__corps { top: -36px; }
+.ori-ink__titre {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: 0.82rem;
+  line-height: 1.15;
+  color: var(--ink);
+  /* Trois lignes au plus : un titre long ne doit pas déborder de la feuille. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ori-ink--pan-h { clip-path: polygon(22.73% 0, 100% 100%, 0 100%, 0 0); }
+.ori-ink--pan-b { clip-path: polygon(100% 0, 22.73% 100%, 0 100%, 0 0); }
+
+/* Chaque fragment disparaît quand son volet passe de chant — même instant
+   que la bascule de teinte du papier, donc invisible. Les pans fixes gardent
+   leur texte jusqu'à ce que la feuille se ferme : c'est là que l'imprimé se
+   retrouve à l'intérieur. */
+.ori-ink { animation-duration: var(--dur-fold); animation-fill-mode: both; animation-timing-function: linear; }
+.ori-ink--coin-h { animation-name: ori-ink-ch; }
+.ori-ink--coin-b { animation-name: ori-ink-cb; }
+.ori-ink--face-h { animation-name: ori-ink-fh; }
+.ori-ink--face-b { animation-name: ori-ink-fb; }
+.ori-ink--pan-h,
+.ori-ink--pan-b  { animation-name: ori-ink-pan; }
+
+@keyframes ori-ink-ch  { 0%, 12.4% { opacity: 1; } 12.6%, 100% { opacity: 0; } }
+@keyframes ori-ink-cb  { 0%, 15.4% { opacity: 1; } 15.6%, 100% { opacity: 0; } }
+@keyframes ori-ink-fh  { 0%, 29.4% { opacity: 1; } 29.6%, 100% { opacity: 0; } }
+@keyframes ori-ink-fb  { 0%, 32.4% { opacity: 1; } 32.6%, 100% { opacity: 0; } }
+@keyframes ori-ink-pan { 0%, 48.9% { opacity: 1; } 49.1%, 100% { opacity: 0; } }

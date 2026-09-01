@@ -8,7 +8,7 @@
 import { resolveQuiz } from './core/catalog.js';
 import { vitrines as chargerVitrines, compterParcours, compterDebut } from './core/remote.js';
 import { tally, resolve, proximite } from './core/scoring.js';
-import { RECO_TYPES, slugify } from './core/schema.js';
+import { RECO_TYPES, slugify, dureeEstimee } from './core/schema.js';
 import { questionView } from './core/views.js';
 import * as store from './core/store.js';
 import { linkFor } from './core/share.js';
@@ -18,6 +18,10 @@ import { el, paragraphs, escapeHtml, applyAccent, toast, copy, downloadBlob, ave
 const params = new URLSearchParams(location.search);
 const isTest = params.has('test');
 const isEmbed = params.has('embed');
+/* Le mode borne : une tablette posée dans la bibliothèque, en libre accès.
+   Il ne change pas le questionnaire, il change ce qu'on fait de la trace —
+   voir § « Le mode borne » plus bas. */
+const isKiosque = params.has('kiosque');
 const espace = params.get('espace');
 
 /* Le kiosque d'origine, celui du dépôt ou celui d'un espace : toute sortie
@@ -71,9 +75,13 @@ async function boot() {
     if (isTest) dom.exit.textContent = '← Retour au backoffice';
     garderEspace();
     if (isEmbed) wireEmbed();
+    if (isKiosque) wireKiosque();
 
+    /* Sur une borne, il n'y a pas de « plus tard » : le parcours en cours
+       appartient à la personne devant l'écran, et la suivante doit trouver
+       la couverture, pas les réponses de quelqu'un d'autre. */
     const saved = store.getSession(quiz.id);
-    if (saved && !isTest) state.answers = saved.answers || {};
+    if (saved && !isTest && !isKiosque) state.answers = saved.answers || {};
 
     render();
     window.addEventListener('keydown', onKey);
@@ -302,6 +310,12 @@ function renderCover() {
   const resumable = Object.keys(state.answers).length > 0;
 
   return el('section', { class: 'cover' }, [
+    /* La lumière de fin de journée : une lueur chaude et quelques grains
+       qui dérivent, derrière le titre. Purement décoratif — masqué aux
+       lecteurs d'écran, éteint sous `--ambient`, et rien du parcours n'en
+       dépend. */
+    el('div', { class: 'cover__lueur', 'aria-hidden': 'true' },
+      [0, 1, 2, 3].map(() => el('span', { class: 'cover__mote' }))),
     quiz.image
       ? el('img', { class: 'cover__image', src: quiz.image, alt: '' })
       : el('div', { class: 'cover__emoji', text: quiz.emoji || '✦' }),
@@ -326,9 +340,13 @@ function renderCover() {
       }),
     ]),
     signature(quiz),
+    /* La durée d'abord : « huit questions » ne dit pas si on a le temps, et
+       c'est la seule chose que se demande quelqu'un qui hésite devant une
+       tablette — ou devant une affiche, qui annonce la même estimation. */
     el('p', {
       class: 'cover__meta',
-      text: `${quiz.questions.length} question${quiz.questions.length > 1 ? 's' : ''} · `
+      text: `environ ${dureeEstimee(quiz)} minute${dureeEstimee(quiz) > 1 ? 's' : ''} · `
+          + `${quiz.questions.length} question${quiz.questions.length > 1 ? 's' : ''} · `
           + `${quiz.results.length} profil${quiz.results.length > 1 ? 's' : ''} possible`
           + `${quiz.results.length > 1 ? 's' : ''}`,
     }),
@@ -408,8 +426,12 @@ function renderResult() {
     /* Une fois par parcours terminé, jamais en mode test : compter les
        essais de l'auteur fausserait la seule chose que le compteur sait
        dire. L'appel n'est pas attendu — le résultat s'affiche d'abord. */
+    /* La borne compte, elle : ce sont de vrais répondants. Seuls les essais
+       de l'auteur fausseraient la mesure. */
     if (espace && !isTest) compterParcours(espace, quiz.id, profile?.id);
-    if (!isTest && profile) {
+    /* L'historique, en revanche, n'a rien à faire sur un poste partagé : il
+       montrerait à la personne suivante ce que la précédente a obtenu. */
+    if (!isTest && !isKiosque && profile) {
       store.addResult({
         quizId: quiz.id, quizTitle: quiz.title, quizEmoji: quiz.emoji,
         accent: quiz.accent, resultTitle: profile.title,
@@ -440,6 +462,12 @@ function renderResult() {
 
   const node = el('section', { class: 'result' }, [
     el('div', { class: 'result__banner' }, [
+      /* Le halo qui s'allume derrière le profil, et trois étincelles.
+         Décoratif : le résultat se lit exactement pareil sans eux. */
+      el('div', { class: 'result__halo', 'aria-hidden': 'true' }),
+      el('span', { class: 'result__spark', 'aria-hidden': 'true' }),
+      el('span', { class: 'result__spark', 'aria-hidden': 'true' }),
+      el('span', { class: 'result__spark', 'aria-hidden': 'true' }),
       el('p', { class: 'result__kicker', text: quiz.title }),
       profile.image && el('img', { class: 'result__image', src: profile.image, alt: '' }),
       el('h1', { class: 'result__title', text: profile.title }),
@@ -675,7 +703,7 @@ function restart() {
 let refusSignale = false;
 
 function persist() {
-  if (isTest) return;
+  if (isTest || isKiosque) return;
   const ok = store.saveSession(state.quiz.id, state.answers);
   if (ok || refusSignale || isEmbed) return;
   refusSignale = true;
@@ -700,6 +728,88 @@ function persist() {
    Rien n'est désactivé par ailleurs. Le stockage tiers est bloqué par Safari
    et cloisonné par Chrome : store.js encaisse le refus sans broncher, la
    reprise de parcours et l'historique cessent simplement d'exister.       */
+
+/* --- Le mode borne -------------------------------------------------------------
+   `?kiosque=1` : une tablette posée dans la bibliothèque, que personne ne
+   surveille. Le questionnaire ne change pas d'un mot ; ce qui change, c'est
+   ce qu'on fait de la trace et de l'attente.
+
+   Trois choses, et trois seulement.
+
+   RIEN NE RESTE. Ni parcours repris, ni historique de résultats : sur un
+   poste partagé, ces deux conforts deviennent une fuite — la personne
+   suivante lirait ce que la précédente a obtenu. Les compteurs de l'espace,
+   eux, continuent : ce sont de vrais répondants, et ils ne disent ni qui ni
+   quand.
+
+   L'ÉCRAN SE REND. Après un temps sans geste, le parcours revient à sa
+   couverture et oublie les réponses. Sans cela, une borne passe sa journée
+   sur le résultat de la première personne du matin.
+
+   ON NE S'ÉCHAPPE PAS. La sortie vers le kiosque disparaît, comme en mode
+   embarqué : un usager n'a pas à se retrouver ailleurs, et l'équipe n'a pas
+   à retrouver la tablette sur une autre page.
+
+   Rien de tout ceci n'est un réglage à mémoriser : le mode tient dans
+   l'adresse, donc dans le QR code qu'on imprime.                          */
+
+/* Le délai se règle dans l'adresse : `?kiosque=1` pour la valeur par défaut,
+   `?kiosque=45` pour quarante-cinq secondes. Une salle d'étude silencieuse et
+   un hall de passage n'attendent pas pareil, et c'est le genre de réglage
+   qu'on veut pouvoir changer en réimprimant un QR code plutôt qu'en
+   retouchant du code. Hors bornes raisonnables, on retombe sur la valeur par
+   défaut : une borne qui se rend au bout d'une seconde ne servirait
+   personne, et une qui attend une heure ne se rend jamais. */
+const KIOSQUE_DEFAUT = 90;
+const KIOSQUE_MIN = 15;
+const KIOSQUE_MAX = 600;
+
+function delaiDeRepos() {
+  const demande = Number.parseInt(params.get('kiosque'), 10);
+  const valide = Number.isFinite(demande) && demande >= KIOSQUE_MIN && demande <= KIOSQUE_MAX;
+  return (valide ? demande : KIOSQUE_DEFAUT) * 1000;
+}
+
+const KIOSQUE_REPOS = delaiDeRepos();
+let kiosqueMinuteur = 0;
+
+function wireKiosque() {
+  document.documentElement.classList.add('is-kiosque');
+  dom.exit.remove();
+
+  /* On écoute en phase de CAPTURE, sur le document : un geste avalé plus
+     bas — le balayage qui annule son propre clic, par exemple — reste un
+     signe de vie et doit repousser l'échéance.
+
+     `click` et `focusin` ne font pas doublon avec les événements de
+     pointeur, et les oublier a un coût précis : une commande vocale, un
+     contacteur ou certaines activations de lecteur d'écran produisent un
+     clic SANS `pointerdown`. Sans ces deux-là, ces personnes-là — et elles
+     seules — se faisaient renvoyer à la couverture en pleine réponse. */
+  for (const geste of ['pointerdown', 'keydown', 'wheel', 'touchstart', 'click', 'focusin']) {
+    document.addEventListener(geste, repousserRepos, { capture: true, passive: true });
+  }
+  repousserRepos();
+}
+
+function repousserRepos() {
+  clearTimeout(kiosqueMinuteur);
+  kiosqueMinuteur = setTimeout(rendreLEcran, KIOSQUE_REPOS);
+}
+
+/* Déjà sur la couverture et rien de commencé : il n'y a rien à rendre, et
+   remettre la vue à zéro toutes les 90 secondes ferait clignoter une borne
+   que personne ne regarde. */
+function rendreLEcran() {
+  if (state.step < 0 && !Object.keys(state.answers).length) return repousserRepos();
+  state.answers = {};
+  state.finished = false;
+  state.step = -1;
+  state.direction = 'back';
+  store.clearSession(state.quiz.id);
+  render();
+  return repousserRepos();
+}
 
 const EMBED_TARGET = '*';
 let firstPaint = true;
