@@ -5,7 +5,7 @@
    par un data-bind : aucun gestionnaire en ligne dans le HTML.
    ========================================================================== */
 
-import { PANELS } from './panels.js';
+import { PANELS, poidsHorsEchelle } from './panels.js';
 import {
   makeQuiz, makeAxis, makeQuestion, makeOption, makeResult, makeReco,
   normalize, diagnose, uid, slugify, safeImage, imageWeight,
@@ -59,6 +59,10 @@ const state = {
   folded: new Set(),    /* cartes repliées : questions et profils */
   focused: null,        /* question sous le curseur, pour l'aperçu */
   previewOpen: true,
+  /* Les pesées se posent en mots par défaut. Le mode au point près reste à
+     un clic, et devient le seul disponible sur un questionnaire dont les
+     valeurs sortent de l'échelle simple. */
+  poidsFins: false,
 };
 
 const dom = {};
@@ -364,6 +368,35 @@ function renderRail() {
       ]))),
     ]),
 
+    /* Une entrée qui porte son nom. Vitrine, corbeille, identité du kiosque,
+       fréquentation et équipe décrivent l'ESPACE, pas le document ouvert —
+       et ils ne s'atteignaient que par le bouton de compte, dont le seul
+       indice est le prénom de la personne connectée. Rien n'y disait « c'est
+       ici que se règle le kiosque de l'équipe », et un réflexe appris dans
+       d'autres outils ne s'invente pas.
+
+       Le bouton de compte reste : mot de passe et déconnexion relèvent bien
+       de la personne. Mais le kiosque a désormais sa porte, à son nom, au
+       même endroit que le reste de la navigation. */
+    state.espace && state.remoteSession && el('div', {}, [
+      el('div', { class: 'rail__head' }, [el('h2', { text: 'Mon espace' })]),
+      el('div', { class: 'rail__list' }, [
+        el('button', {
+          class: 'rail__item', type: 'button', 'data-act': 'compte',
+          title: `Kiosque, vitrine, corbeille et équipe de « ${state.espace} »`,
+        }, [
+          el('span', { class: 'rail__item__emoji', text: '🗄' }),
+          el('span', { class: 'rail__item__label' }, [
+            el('span', { style: { display: 'block' }, text: state.identite?.titre || state.espace }),
+            el('span', { class: 'rail__item__signature', text: 'kiosque, vitrine, corbeille, équipe' }),
+          ]),
+          state.corbeille.length
+            ? el('span', { class: 'rail__item__badge', text: String(state.corbeille.length) })
+            : null,
+        ]),
+      ]),
+    ]),
+
     state.quiz && el('div', {}, [
       el('div', { class: 'rail__head' }, [el('h2', { text: 'Sections' })]),
       el('div', { class: 'rail__list' }, PANELS.map((panel) => el('button', {
@@ -459,6 +492,7 @@ async function renderPanel() {
   const ctx = {
     reach: state.reach, expanded: state.expanded,
     previewOpen: state.previewOpen, folded: state.folded,
+    poidsFins: state.poidsFins, poidsHorsEchelle: poidsHorsEchelle(state.quiz),
   };
   if (panel.id === 'publier') {
     ctx.linkSize = (await encode(state.quiz)).length + 40;
@@ -1041,6 +1075,10 @@ function onClick(event) {
     case 'export-one':    return exportOne(id);
     case 'preview-toggle': {
       state.previewOpen = !state.previewOpen;
+      return renderPanel();
+    }
+    case 'poids-mode': {
+      state.poidsFins = !state.poidsFins;
       return renderPanel();
     }
     case 'opt-image': {

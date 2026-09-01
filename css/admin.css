@@ -515,6 +515,26 @@
 }
 .scorechip__input::-webkit-outer-spin-button,
 .scorechip__input::-webkit-inner-spin-button { opacity: 0.35; }
+/* La pesée en mots. Elle porte le nom de ce qu'elle règle, donc elle est
+   plus large qu'un champ de deux chiffres — et c'est le prix assumé :
+   `scoreset` sait déjà passer à la ligne, et sous 48 rem la rangée occupe
+   déjà toute la largeur de la réponse. */
+.scorechip__select {
+  min-height: 28px;
+  padding: 0 var(--s-1);
+  border: none;
+  background: transparent;
+  font-size: var(--t-xs);
+  color: var(--ink);
+  cursor: pointer;
+  /* La flèche native mange dix pixels pour rien sur une pastille : le
+     survol et le focus disent déjà que c'est actionnable. */
+  appearance: none;
+  text-align: center;
+  text-align-last: center;
+}
+.scoreset--dense .scorechip__select { font-size: var(--t-xs); padding: 0 2px; }
+
 .scorechip:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);

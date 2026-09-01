@@ -194,11 +194,84 @@ export function axes(quiz) {
 
 /* --- 3. Questions ------------------------------------------------------------ */
 
+/* --- Une pesée -----------------------------------------------------------------
+   Ce qu'une réponse révèle d'un axe. C'était un champ numérique de -9 à 9 :
+   un geste de tableur, répété des dizaines de fois par questionnaire, alors
+   que la personne qui l'exécute écrit des questions, pas des formules. Elle
+   sait dire « cette réponse trahit beaucoup de curiosité » ; elle n'a aucune
+   raison de savoir si cela vaut 2 ou 5.
+
+   Quatre niveaux nommés, donc, et l'échelle est celle qu'on connaît par
+   cœur : un peu, beaucoup, à fond. Le tiret vaut zéro — il se lit d'un coup
+   d'œil sur une rangée d'axes, là où le mot « rien » se relit.
+
+   Les valeurs internes ne changent pas d'un iota : ce sont les mêmes entiers,
+   dans le même champ, lus par le même `apply()`. Seule la façon de les poser
+   change. Un questionnaire écrit avant ceci s'ouvre sans conversion, et un
+   auteur qui veut du point près récupère son champ numérique d'un clic.    */
+
+const INTENSITES = [
+  { value: '0', label: '—' },
+  { value: '1', label: 'un peu' },
+  { value: '2', label: 'beaucoup' },
+  { value: '3', label: 'à fond' },
+];
+
+export function poidsHorsEchelle(quiz) {
+  return quiz.questions.some((q) => q.options.some((o) =>
+    Object.values(o.scores).some((v) => v < 0 || v > 3)));
+}
+
+function pesee(question, option, axis, rang, ctx) {
+  const valeur = option.scores[axis.id] || 0;
+  const bind = `score:${question.id}:${option.id}:${axis.id}`;
+  const nom = `${axis.label} pour la réponse ${rang + 1}`;
+
+  /* Le mot « points » n'apparaît que dans le mode qui en montre. Ailleurs on
+     parle de ce que la réponse révèle, parce que c'est ce que l'auteur pense
+     en la posant. */
+  const controle = ctx.poidsFins || ctx.poidsHorsEchelle
+    ? el('input', {
+        class: 'scorechip__input', type: 'number', min: '-9', max: '9', step: '1',
+        'data-bind': bind, value: String(valeur),
+        'aria-label': `Points ${nom}`,
+      })
+    : el('select', {
+        class: 'scorechip__select', 'data-bind': bind,
+        'aria-label': `Ce que cette réponse révèle — ${nom}`,
+      }, INTENSITES.map((n) => el('option', {
+        value: n.value, selected: n.value === String(valeur) ? '' : null, text: n.label,
+      })));
+
+  return el('span', {
+    class: 'scorechip' + (valeur !== 0 ? ' is-set' : ''),
+    style: { '--axis': axis.color }, title: axis.label,
+  }, [
+    el('span', { class: 'scorechip__glyph', text: axis.glyph }),
+    controle,
+  ]);
+}
+
 export function questions(quiz, ctx = {}) {
   return el('section', { class: 'panel' }, [
-    head('Questions', "Une question par écran. Les points de chaque réponse se règlent à droite, un compteur par axe.", [
+    head('Questions', "Une question par écran. À droite de chaque réponse, ce qu'elle révèle — un réglage par axe.", [
+      /* Hors échelle, la bascule n'a pas de sens : on ne propose pas un
+         mode qui ne saurait pas afficher ce qui est déjà écrit. */
+      !ctx.poidsHorsEchelle && el('button', {
+        class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'poids-mode',
+        title: ctx.poidsFins
+          ? 'Revenir aux intensités'
+          : 'Régler au point près, de -9 à 9',
+        text: ctx.poidsFins ? '⚖ Intensités' : '⚖ Points',
+      }),
       foldAll('questions', quiz.questions, ctx),
       el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'q-add', text: '+ Question' }),
+    ]),
+
+    ctx.poidsHorsEchelle && el('p', { class: 'panel__hint' }, [
+      'Ce questionnaire contient des pesées hors de l’échelle simple — au-delà de trois, ',
+      'ou négatives. Elles restent réglables au point près ; l’échelle en mots les ',
+      'trahirait plutôt que de les afficher.',
     ]),
 
     /* L'aperçu se remplit depuis app.js et se met à jour à la frappe, sans
@@ -290,18 +363,8 @@ function questionCard(quiz, question, index, ctx = {}) {
               }),
               input(`option:${question.id}:${option.id}:text`, option.text,
                 { placeholder: `Réponse ${j + 1}`, 'aria-label': `Réponse ${j + 1}` }),
-              el('span', { class: 'scoreset' + (quiz.axes.length > 4 ? ' scoreset--dense' : '') }, quiz.axes.map((axis) => el('span', {
-                class: 'scorechip' + ((option.scores[axis.id] || 0) !== 0 ? ' is-set' : ''),
-                style: { '--axis': axis.color }, title: axis.label,
-              }, [
-                el('span', { class: 'scorechip__glyph', text: axis.glyph }),
-                el('input', {
-                  class: 'scorechip__input', type: 'number', min: '-9', max: '9', step: '1',
-                  'data-bind': `score:${question.id}:${option.id}:${axis.id}`,
-                  value: String(option.scores[axis.id] || 0),
-                  'aria-label': `Points ${axis.label} pour la réponse ${j + 1}`,
-                }),
-              ]))),
+              el('span', { class: 'scoreset' + (quiz.axes.length > 4 ? ' scoreset--dense' : '') },
+                quiz.axes.map((axis) => pesee(question, option, axis, j, ctx))),
               el('span', { class: 'editor-card__tools' }, [
                 el('button', {
                   class: 'btn btn--icon btn--quiet' + (option.image ? ' is-on' : ''),
