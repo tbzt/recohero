@@ -109,8 +109,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.tab.is-active /* Qui a publié, quand, en quelle version. Sous le titre, en retrait :
-   c'est un renseignement, pas une étiquette. */
 /* Une ligne de vitrine masquée : présente, éditable, mais visiblement
    hors de la page d'accueil. */
 .sheet__row.is-masque { opacity: 0.6; }
@@ -125,7 +123,12 @@
   white-space: nowrap;
 }
 
-.rail__item__badge { color: var(--accent-ink); border-color: currentColor; }
+/* Qui a publié, quand, en quelle version. Sous le titre, en retrait : c'est
+   un renseignement, pas une étiquette. */
+/* Sur l'onglet ACTIF seulement : là le fond est l'accent, et la pastille doit
+   virer à l'encre inverse. Ailleurs — dans le rail — ce sélecteur avait perdu
+   son préfixe et peignait toutes les pastilles en blanc sur fond clair. */
+.tab.is-active .rail__item__badge { color: var(--accent-ink); border-color: currentColor; }
 
 /* Sur un onglet réduit, la pastille se pose en coin plutôt que de
    s'ajouter à la largeur : deux sections en défaut ne doivent pas voler
@@ -945,24 +948,22 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   place-items: center;
   pointer-events: none;
 }
+/* La scène épouse la carte réelle : ses dimensions et sa position viennent
+   du DOM, posées en ligne par app.js. Rien ici ne présume d'une taille. */
 .envoi__scene {
-  position: relative;
-  width: 150px;
-  height: 96px;
-  perspective: 620px;
+  position: fixed;
+  perspective: 1400px;
   perspective-origin: 34% 62%;
-  transform: scale(1.7);
 }
 
 /* L'ombre portée sur la table : elle rétrécit et s'efface quand la feuille
    quitte le plan. C'est elle qui dit « ça décolle ». */
 .envoi__ombre {
   position: absolute;
-  left: 6px; top: 8px;
-  width: 150px; height: 90px;
+  inset: 4% 0 -4% 2%;
   border-radius: 40% 40% 46% 46%;
   background: var(--voile-fort);
-  filter: blur(9px);
+  filter: blur(14px);
   transform-origin: 40% 70%;
   animation: ori-ombre var(--dur-fold) cubic-bezier(0.4, 0, 0.3, 1) both;
 }
@@ -973,10 +974,17 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   100% { opacity: 0; transform: scale(0.3) translateY(10px); }
 }
 
+/* Le pivot ne fait que coucher le repère quand la carte est debout. Il doit
+   rester un contexte 3D, sans quoi tout le pliage retombe à plat. */
+.ori-pivot {
+  position: absolute;
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+}
+
 .ori-feuille {
   position: absolute;
-  left: 0; top: 0;
-  width: 150px; height: 96px;
+  inset: 0;
   transform-style: preserve-3d;
   animation: ori-vol var(--dur-fold) linear both;
 }
@@ -992,14 +1000,14 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
 
 /* Les deux moitiés : aucun fond, aucune découpe — elles ne portent que la
    charnière centrale et doivent rester des contextes 3D. */
+/* Hauteur et position posées en ligne : elles valent la moitié de la carte. */
 .ori-moitie {
   position: absolute;
-  left: 0;
-  width: 150px; height: 48px;
+  left: 0; right: 0;
   transform-style: preserve-3d;
 }
-.ori-moitie--h { top: 0;    transform-origin: 50% 100%; animation: ori-moitie-h var(--dur-fold) linear both; }
-.ori-moitie--b { top: 48px; transform-origin: 50% 0%;   animation: ori-moitie-b var(--dur-fold) linear both; }
+.ori-moitie--h { top: 0; transform-origin: 50% 100%; animation: ori-moitie-h var(--dur-fold) linear both; }
+.ori-moitie--b { transform-origin: 50% 0%; animation: ori-moitie-b var(--dur-fold) linear both; }
 
 @keyframes ori-moitie-h {
   0%, 41%   { transform: translateZ(0) rotateX(0deg);
@@ -1031,19 +1039,19 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   41%, 100% { transform: translateZ(1.2px) rotate3d(0.9239, -0.3827, 0, 180deg); }
 }
 
-/* Les morceaux de papier : des feuilles, découpées au clip-path. */
-.ori-papier { position: absolute; inset: 0; background: var(--surface); }
+/* Les morceaux de papier. Chacun porte un CLONE de la vraie carte, que sa
+   découpe tranche : c'est la carte elle-même qui se plie, pas une feuille
+   qui la représente. Le fond reste peint dessous, pour que le verso d'un
+   volet retourné ne soit pas transparent. */
+.ori-papier { position: absolute; inset: 0; background: var(--surface); overflow: hidden; }
+.ori-copie { position: absolute; left: 0; }
+.ori-copie > * { margin: 0 !important; }
 
 /* Le décalage anti-crénelage PROLONGE l'arête du pli au-delà du coin ; il ne
    déplace pas le coin. Déplacer le coin inclinait le bord du pan et ouvrait
    une fente d'un pixel sur toute la ligne de pli. */
-.ori-pan--h { clip-path: polygon(23% -2.3%, 102.1% 101%, -1% 101%, -1% -2.3%); }
-.ori-pan--b { clip-path: polygon(23% 102.3%, 102.1% -1%, -1% -1%, -1% 102.3%); }
-.ori-face--h { clip-path: polygon(68% 0, 22.7% 0, 100% 100%); }
-.ori-face--b { clip-path: polygon(68% 100%, 22.7% 100%, 100% 0); }
-.ori-coin { transform-origin: 84% 50%; }
-.ori-coin--h { clip-path: polygon(100% 0, 68% 0, 100% 100%); animation: ori-coin-h var(--dur-fold) cubic-bezier(0.48, 0.03, 0.34, 1) both; }
-.ori-coin--b { clip-path: polygon(100% 100%, 68% 100%, 100% 0); animation: ori-coin-b var(--dur-fold) cubic-bezier(0.48, 0.03, 0.34, 1) both; }
+.ori-coin--h { animation: ori-coin-h var(--dur-fold) cubic-bezier(0.48, 0.03, 0.34, 1) both; }
+.ori-coin--b { animation: ori-coin-b var(--dur-fold) cubic-bezier(0.48, 0.03, 0.34, 1) both; }
 
 /* La teinte bascule à l'instant précis où le volet passe de chant : le
    papier n'a alors plus d'épaisseur visible, la coupure ne se voit pas. */
@@ -1084,12 +1092,10 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   animation: ori-voile var(--dur-fold) ease both;
 }
 .ori-voile--h {
-  clip-path: polygon(23% -2.3%, 102.1% 101%, -1% 101%, -1% -2.3%);
   background: linear-gradient(104deg, transparent, var(--voile-faible));
   transform: translateZ(-2.6px);
 }
 .ori-voile--b {
-  clip-path: polygon(23% 102.3%, 102.1% -1%, -1% -1%, -1% 102.3%);
   background: linear-gradient(76deg, var(--voile-fort), var(--voile-faible));
   transform: translateZ(2.6px);
 }

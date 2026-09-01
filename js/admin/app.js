@@ -2447,45 +2447,141 @@ async function signOutRemote() {
    parcours.                                                                */
 const MOUVEMENT_REDUIT = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
-const ORI_MORCEAUX = [
-  { moitie: 'h', papier: 'ori-pan--h',  ink: 'ori-ink--pan-h',  pli: false },
-  { moitie: 'h', papier: 'ori-face--h', ink: 'ori-ink--face-h', pli: true },
-  { moitie: 'h', papier: 'ori-coin ori-coin--h', ink: 'ori-ink--coin-h', pli: true },
-  { moitie: 'b', papier: 'ori-pan--b',  ink: 'ori-ink--pan-b',  pli: false },
-  { moitie: 'b', papier: 'ori-face--b', ink: 'ori-ink--face-b', pli: true },
-  { moitie: 'b', papier: 'ori-coin ori-coin--b', ink: 'ori-ink--coin-b', pli: true },
-];
+/* La géométrie du pliage, calculée sur les dimensions RÉELLES de la carte.
 
-function envolerLaFiche(titre) {
-  if (MOUVEMENT_REDUIT?.matches) return;
+   Elle était figée en pourcentages dans le CSS, pour une feuille de
+   150 × 96. Une carte de backoffice n'a ni cette taille ni ce rapport, et
+   un pli à 45° n'est à 45° que si les unités des deux axes sont égales :
+   tout se recalcule donc à partir de la largeur et de la demi-hauteur.
 
-  /* Chaque morceau de papier porte sa propre copie du titre, à la même
-     place : la découpe du morceau coupe donc le texte sur le pli, et
-     chaque fragment part avec son volet. */
-  const papier = ({ moitie, papier: forme, ink }) => el('div', { class: `ori-papier ${forme}` }, [
-    el('div', { class: `ori-ink ori-ink--${moitie} ${ink}` }, [
-      el('div', { class: 'ori-ink__corps' }, [
-        el('div', { class: 'ori-ink__titre', text: titre }),
+   `L` est la largeur, `h` la demi-hauteur — la moitié qui se replie. Le
+   premier pli rabat un carré de côté `h` ; le second suit la bissectrice,
+   qui sort du papier à `L − 2,414 h` (la cotangente de 22,5°).
+
+   D'où la seule condition : il faut `L > 2,414 h`, c'est-à-dire une carte
+   plus large que 1,21 fois sa hauteur. En dessous, le second pli sortirait
+   du papier — on ne plie pas, plutôt que de plier faux.              */
+const ORI_COT_225 = 2.4142;
+
+function oriGeometrie(L, H) {
+  const h = H / 2;
+  const pc = (x, total) => `${(x / total) * 100}%`;
+  const xCoin = L - h;                    /* où le pli 1 coupe le bord haut  */
+  const xPli2 = L - ORI_COT_225 * h;      /* où le pli 2 coupe le bord haut  */
+
+  /* Le décalage anti-crénelage PROLONGE l'arête au-delà du coin ; il ne
+     déplace pas le coin, sous peine d'ouvrir une fente sur le pli. */
+  const d = 1.2;
+  const ax = xPli2 + 0.3827 * d;
+  const ay = -0.9239 * d;
+  const bx = L + ORI_COT_225 * 2;
+  const by = h + 2;
+
+  return {
+    h,
+    coinH: `polygon(100% 0, ${pc(xCoin, L)} 0, 100% 100%)`,
+    coinB: `polygon(100% 100%, ${pc(xCoin, L)} 100%, 100% 0)`,
+    faceH: `polygon(${pc(xCoin, L)} 0, ${pc(xPli2, L)} 0, 100% 100%)`,
+    faceB: `polygon(${pc(xCoin, L)} 100%, ${pc(xPli2, L)} 100%, 100% 0)`,
+    panH: `polygon(${pc(ax, L)} ${pc(ay, h)}, ${pc(bx, L)} ${pc(by, h)}, -1% 101%, -1% ${pc(ay, h)})`,
+    panB: `polygon(${pc(ax, L)} ${pc(h - ay, h)}, ${pc(bx, L)} ${pc(h - by, h)}, -1% -1%, -1% ${pc(h - ay, h)})`,
+    origineCoin: `${pc(L - h / 2, L)} 50%`,
+  };
+}
+
+/* Chaque morceau porte un CLONE de la vraie carte, posé à la même place :
+   la découpe du morceau tranche donc la carte sur le pli, et chaque
+   fragment part avec son volet. C'est la carte elle-même qui se plie —
+   une feuille de papier qui la représenterait ne serait qu'une image. */
+function envolerLaFiche(carte) {
+  if (MOUVEMENT_REDUIT?.matches || !carte) return;
+
+  const rect = carte.getBoundingClientRect();
+  const L = Math.round(rect.width);
+  const H = Math.round(rect.height);
+  if (!L || !H) return;
+
+  /* UNE FEUILLE SE PLIE DANS SA LONGUEUR, quelle que soit son orientation.
+     Le pliage est décrit une seule fois, dans un repère toujours couché —
+     largeur `Lw`, hauteur `Lh` — et c'est le repère qui pivote quand la
+     carte est haute. Les cartes de ce backoffice le sont presque toutes :
+     celle de l'espace fait 328 × 488. Décrire deux pliages symétriques
+     aurait doublé la géométrie et les occasions de la faire diverger.
+
+     Le clone, lui, tourne en sens inverse : le papier bascule, la carte
+     reste droite. C'est bien elle qu'on voit se plier, pas une image
+     couchée sur le côté. */
+  const debout = H > L;
+  const Lw = debout ? H : L;
+  const Lh = debout ? L : H;
+  if (Lw <= ORI_COT_225 * (Lh / 2)) return;   /* trop carrée pour ce pli */
+
+  const g = oriGeometrie(Lw, Lh);
+
+  const copie = (cote) => {
+    const clone = carte.cloneNode(true);
+    /* Un clone traîne les identifiants de l'original et ses champs restent
+       atteignables au clavier. On les neutralise : cette carte-là n'est
+       plus qu'une image de papier. */
+    clone.removeAttribute('id');
+    for (const n of clone.querySelectorAll('[id]')) n.removeAttribute('id');
+    return el('div', {
+      class: 'ori-copie',
+      style: {
+        width: `${L}px`,
+        height: `${H}px`,
+        top: cote === 'h' ? '0' : `${-g.h}px`,
+        ...(debout ? { transformOrigin: '0 0', transform: `translate(0, ${L}px) rotate(-90deg)` } : {}),
+      },
+    }, [clone]);
+  };
+
+  const papier = (cote, forme, clip, extra = '') => el('div', {
+    class: `ori-papier ${forme}${extra ? ` ${extra}` : ''}`,
+    style: { clipPath: clip },
+  }, [copie(cote)]);
+
+  const moitie = (cote) => el('div', {
+    class: `ori-moitie ori-moitie--${cote}`,
+    style: { height: `${g.h}px`, ...(cote === 'b' ? { top: `${g.h}px` } : {}) },
+  }, [
+    papier(cote, `ori-pan--${cote}`, cote === 'h' ? g.panH : g.panB),
+    el('div', { class: `ori-pli ori-pli--${cote}` }, [
+      papier(cote, `ori-face--${cote}`, cote === 'h' ? g.faceH : g.faceB),
+      papier(cote, `ori-coin--${cote}`, cote === 'h' ? g.coinH : g.coinB, 'ori-coin'),
+    ]),
+    el('div', {
+      class: `ori-voile ori-voile--${cote}`,
+      style: { clipPath: cote === 'h' ? g.panH : g.panB },
+    }),
+  ]);
+
+  const couche = el('div', { class: 'envoi', 'aria-hidden': 'true', inert: '' }, [
+    el('div', {
+      class: 'envoi__scene',
+      style: { left: `${rect.left}px`, top: `${rect.top}px`, width: `${L}px`, height: `${H}px` },
+    }, [
+      el('div', { class: 'envoi__ombre' }),
+      /* Le pivot porte l'orientation, la feuille garde son animation : deux
+         transformations sur le même élément se seraient écrasées. */
+      el('div', {
+        class: 'ori-pivot',
+        style: {
+          width: `${Lw}px`, height: `${Lh}px`,
+          left: `${(L - Lw) / 2}px`, top: `${(H - Lh) / 2}px`,
+          ...(debout ? { transform: 'rotate(90deg)' } : {}),
+        },
+      }, [
+        el('div', { class: 'ori-feuille' }, [moitie('h'), moitie('b')]),
       ]),
     ]),
   ]);
-
-  const moitie = (cote) => {
-    const miens = ORI_MORCEAUX.filter((m) => m.moitie === cote);
-    return el('div', { class: `ori-moitie ori-moitie--${cote}` }, [
-      papier(miens.find((m) => !m.pli)),
-      el('div', { class: `ori-pli ori-pli--${cote}` }, miens.filter((m) => m.pli).map(papier)),
-      el('div', { class: `ori-voile ori-voile--${cote}` }),
-    ]);
-  };
-
-  const couche = el('div', { class: 'envoi', 'aria-hidden': 'true' }, [
-    el('div', { class: 'envoi__scene' }, [
-      el('div', { class: 'envoi__ombre' }),
-      el('div', { class: 'ori-feuille' }, [moitie('h'), moitie('b')]),
-    ]),
-  ]);
+  /* L'origine du pli des coins dépend de la carte : elle se pose après
+     coup, sur les deux volets. */
   document.body.append(couche);
+  for (const coin of couche.querySelectorAll('.ori-coin')) {
+    coin.style.transformOrigin = g.origineCoin;
+  }
 
   /* On attend la FIN de l'animation la plus longue plutôt qu'un délai
      recopié à la main : une durée écrite deux fois finit toujours par
@@ -2759,9 +2855,13 @@ async function publishRemote() {
     flush();
     /* L'envol part AVANT le rafraîchissement de l'espace : celui-ci
        redessine le panneau, et le geste doit accompagner la publication,
-       pas la rattraper une seconde plus tard. La surcouche vit hors du
-       panneau, donc le redessin ne l'emporte pas. */
-    envolerLaFiche(state.quiz.title);
+       pas la rattraper une seconde plus tard.
+
+       C'est la carte qui porte le bouton qui s'envole — celle qui parle de
+       l'espace où l'on vient de publier. La surcouche en est un calque posé
+       à sa place exacte : le panneau peut se redessiner dessous, elle ne
+       bouge pas, et l'original réapparaît à mesure que la copie s'éloigne. */
+    envolerLaFiche(dom.panel.querySelector('[data-act="remote-publish"]')?.closest('.card'));
     await refreshEspace();
     toast(`« ${state.quiz.title} » est en ligne dans l’espace.`);
     repaint();
