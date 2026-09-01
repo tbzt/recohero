@@ -88,15 +88,11 @@ export async function signIn(email, password) {
       body: JSON.stringify({ email, password, returnSecureToken: true }),
     });
   } catch {
-    /* Même hôte, même blocage possible qu'ailleurs — et ici c'est la porte
-       d'entrée : sans ce message, on cherche un mot de passe faux là où c'est
-       le réseau qui refuse. */
+    /* Ici c'est la porte d'entrée : sans ce message, on cherche un mot de
+       passe faux là où la requête n'est jamais partie. */
     const err = new Error(
-      'Ce poste n’a pas pu joindre le service de comptes Firebase '
-      + '(identitytoolkit.googleapis.com). Ce n’est pas ton mot de passe : la '
-      + 'requête n’est jamais partie. Un bloqueur de publicité, un antivirus '
-      + 'qui inspecte le HTTPS ou le filtre du réseau en sont les causes '
-      + 'habituelles.',
+      'Le service de comptes Firebase n’a pas répondu — ce n’est donc pas ton '
+      + `mot de passe. ${await pourquoiInjoignable()}`,
     );
     err.code = 'RESEAU';
     throw err;
@@ -161,18 +157,56 @@ async function token() {
    ce n'est pas d'avoir un compte, c'est de figurer dans les membres de
    l'espace ; et cette liste-là, les règles la gardent.                  */
 
-/* Les comptes et la base ne vivent PAS sur le même hôte : les comptes sur
-   `identitytoolkit.googleapis.com`, la base sur `…firebasedatabase.app`. Une
-   médiathèque derrière un filtre, un bloqueur de publicité ou un antivirus
-   qui inspecte le HTTPS peut très bien joindre l'un et pas l'autre — et
-   plusieurs listes de filtrage courantes visent `googleapis.com`.
+/* --- Quand le service de comptes ne répond pas -----------------------------
+   Les comptes et la base ne vivent PAS sur le même hôte : les comptes sur
+   `identitytoolkit.googleapis.com`, la base sur `…firebasedatabase.app`. L'un
+   peut être joignable et pas l'autre.
 
-   Quand cela arrive, `fetch` ne rend pas une réponse : il lève. Le message
-   du navigateur — « NetworkError when attempting to fetch resource » — ne dit
-   ni quel hôte, ni que le reste du produit fonctionne encore. On le remplace
-   par ce qu'il faut savoir, et on marque l'erreur d'un code que l'appelant
-   peut reconnaître : une porte fermée par le réseau n'appelle pas la même
-   conduite qu'une adresse déjà prise.                                     */
+   Le navigateur, lui, ne dit rien d'utile. Un POST vers cet hôte porte un
+   `Content-Type: application/json`, ce qui n'est pas une requête « simple » :
+   le navigateur envoie d'abord un contrôle préalable (OPTIONS). Si ce
+   contrôle est refusé, la vraie requête ne part jamais et Firefox rapporte
+   « NetworkError », code d'état null. Refus de clé, filtre réseau, bloqueur :
+   les trois donnent exactement la même trace.
+
+   D'où cette sonde. Un GET nu, sans en-tête ajouté, EST une requête simple :
+   pas de contrôle préalable, et le corps de la réponse reste lisible là où le
+   POST échouait à l'aveugle. Si la clé refuse ce domaine, elle le dit — avec
+   le nom du domaine à autoriser.
+
+   Le coût est nul en marche normale : la sonde ne part que sur échec.     */
+
+const SONDE = `https://identitytoolkit.googleapis.com/v1/projects?key=${API_KEY}`;
+
+async function pourquoiInjoignable() {
+  let corps = '';
+  try {
+    const r = await fetch(SONDE);
+    if (r.ok) {
+      /* La clé accepte ce domaine et l'hôte répond : ce n'est donc ni la clé
+         ni le réseau en bloc. Reste ce qui distingue les deux requêtes — le
+         contrôle préalable du POST. */
+      return 'La clé accepte pourtant ce domaine et le service répond. '
+        + 'C’est donc le contrôle préalable (OPTIONS) de la requête qui est '
+        + 'refusé : un bloqueur de publicité, un antivirus qui inspecte le '
+        + 'HTTPS ou le filtre du réseau en sont les causes habituelles.';
+    }
+    corps = await r.text();
+  } catch {
+    return 'La sonde elle-même n’aboutit pas : cet hôte est injoignable depuis '
+      + 'ce poste. Un bloqueur de publicité, un antivirus qui inspecte le HTTPS '
+      + 'ou le filtre du réseau en sont les causes habituelles.';
+  }
+
+  if (/API_KEY_HTTP_REFERRER_BLOCKED|are blocked/i.test(corps)) {
+    return `La clé d’API refuse les requêtes venant de « ${location.origin} ». `
+      + 'Dans la console Google Cloud → API et services → Identifiants, ouvre la '
+      + 'clé du navigateur et ajoute ce domaine à ses restrictions de référent '
+      + 'HTTP. Attention : ce réglage-là est distinct des « domaines autorisés » '
+      + 'de Firebase Authentication, et c’est celui-ci qui bloque.';
+  }
+  return `Le service de comptes a répondu une erreur : ${corps.replace(/\s+/g, ' ').slice(0, 200)}`;
+}
 async function appelIdentityToolkit(url, corps) {
   let response;
   try {
@@ -183,10 +217,7 @@ async function appelIdentityToolkit(url, corps) {
     });
   } catch {
     const err = new Error(
-      'Ce poste n’a pas pu joindre le service de comptes Firebase '
-      + '(identitytoolkit.googleapis.com). La base de données, elle, répond : '
-      + 'c’est donc cet hôte-là qui est bloqué — souvent par un bloqueur de '
-      + 'publicité, un antivirus qui inspecte le HTTPS, ou le filtre du réseau.',
+      `Le service de comptes Firebase n’a pas répondu. ${await pourquoiInjoignable()}`,
     );
     err.code = 'RESEAU';
     throw err;
