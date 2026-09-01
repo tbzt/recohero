@@ -36,6 +36,24 @@
    navigation. Le laisser afficherait les mêmes listes deux fois. L'écran
    prend donc toute la largeur — ce qui convient à un tableau de bord, quand
    17 rem de colonne conviennent à une navigation de document. */
+/* Le pied d'actions d'un panneau transactionnel — la vitrine. Il colle au bas
+   de la fenêtre : une liste de quinze questionnaires à réordonner dépasse
+   l'écran, et un bouton « Enregistrer » qu'il faut aller chercher tout en bas
+   se fait oublier. Le fond est opaque, sans quoi les lignes défilantes
+   passeraient dessous en transparence. */
+.panel__actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  margin-top: var(--s-5);
+  padding-block: var(--s-3);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
 .admin-shell.est-espace { grid-template-columns: 1fr; }
 .admin-shell.est-espace > .rail { display: none; }
 

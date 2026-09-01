@@ -702,6 +702,7 @@ function renderEspace() {
     equipe: contenuEquipe,
     reglages: contenuReglages,
     frequentation: contenuFrequentation,
+    vitrine: contenuVitrine,
   };
   const construire = panneaux[state.ongletEspace];
   if (construire) {
@@ -709,22 +710,10 @@ function renderEspace() {
     return;
   }
 
-  /* Vitrine et fréquentation gardent leur fenêtre pour l'instant : elles
-     portent leur propre état — un brouillon d'ordre qu'on enregistre, des
-     filtres — et les convertir demande plus qu'un déplacement de noeuds. La
-     porte reste ouverte plutôt que condamnée. */
-  const relais = { vitrine: ouvrirPresentation }[state.ongletEspace];
-  const onglet = ongletsEspace().find((o) => o.id === state.ongletEspace);
-  dom.panel.replaceChildren(el('section', { class: 'panel' }, [
-    el('div', { class: 'empty' }, [
-      el('div', { class: 'empty__icon', text: onglet?.emoji || '✦' }),
-      el('p', { text: `${onglet?.label} s’ouvre encore dans une fenêtre — son panneau arrive.` }),
-      el('div', { class: 'row', style: { justifyContent: 'center', marginTop: 'var(--s-4)' } }, [
-        el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'onglet-ouvrir', text: 'Ouvrir' }),
-      ]),
-    ]),
-  ]));
-  state.relaisEspace = relais;
+  /* Les cinq onglets ont leur panneau : plus rien ne se replie dans une
+     fenêtre. Un onglet inconnu ramène à l'accueil plutôt qu'à un écran vide. */
+  state.ongletEspace = 'questionnaires';
+  dom.panel.replaceChildren(...panneauQuestionnaires());
 }
 
 async function renderPanel() {
@@ -1338,10 +1327,12 @@ function onClick(event) {
     case 'compte':           return monCompte();
     case 'espace':           return reglagesEspace();
     case 'mon-profil':       return monProfil();
-    case 'onglet-espace':
-      state.ongletEspace = ongletsEspace().some((o) => o.id === id) ? id : 'questionnaires';
+    case 'onglet-espace': {
+      const vise = ongletsEspace().some((o) => o.id === id) ? id : 'questionnaires';
+      if (vise !== 'vitrine' && !quitterLaVitrine()) return undefined;
+      state.ongletEspace = vise;
       return allerA('espace');
-    case 'onglet-ouvrir':    return state.relaisEspace?.();
+    }
     case 'retour-espace':    return allerA('espace');
     case 'symbole':          return ouvrirSymboles(id);
     case 'inviter':          return inviter();
@@ -1359,7 +1350,9 @@ function onClick(event) {
     case 'frequentation':
       state.ongletEspace = 'frequentation';
       return allerA('espace');
-    case 'vitrine':          return ouvrirPresentation();
+    case 'vitrine':
+      state.ongletEspace = 'vitrine';
+      return allerA('espace');
     case 'export-espace': return exportEspace();
     case 'export-drafts': return exportDrafts();
     case 'export-one':    return exportOne(id);
@@ -2714,9 +2707,33 @@ function tauxGlobalItem(taux) {
    Le glisser-déposer est celui de l'éditeur (`sortable.js`), et les flèches
    ↑↓ restent à côté : c'est le chemin clavier, il ne disparaît pas.      */
 
-function ouvrirPresentation() {
-  if (!state.remoteSession) return showSignIn();
-  if (!state.remote.length) return toast('Cet espace n’a aucun questionnaire en ligne.', 'danger');
+/* La vitrine est la seule des cinq à porter une TRANSACTION : on réordonne,
+   on masque, on épingle — et rien ne part au kiosque avant « Enregistrer ».
+   Réordonner ce que voient les usagers n'est pas une frappe au clavier, ça se
+   décide ; l'enregistrement continu de l'éditeur de questionnaire serait ici
+   un contresens.
+
+   D'où un pied d'actions collant plutôt qu'un pied de fenêtre, et une
+   confirmation si l'on quitte l'onglet sans avoir enregistré. Une fenêtre
+   modale retenait au moins tant qu'on ne l'avait pas fermée ; un panneau qui
+   perdrait le travail en silence serait une régression.
+
+   Le panneau est construit UNE fois et gardé : `renderPanel()` s'exécute à
+   chaque repeinte, et le rebâtir jetterait le brouillon à la première. */
+function contenuVitrine() {
+  if (!state.remoteSession) {
+    return [el('section', { class: 'panel' }, [el('div', { class: 'empty' }, [
+      el('div', { class: 'empty__icon', text: '▦' }),
+      el('p', { text: 'Il faut être connecté à un espace pour régler sa vitrine.' }),
+    ])])];
+  }
+  if (!state.remote.length) {
+    return [el('section', { class: 'panel' }, [el('div', { class: 'empty' }, [
+      el('div', { class: 'empty__icon', text: '▦' }),
+      el('p', { text: 'Cet espace n’a aucun questionnaire en ligne : il n’y a pas encore de vitrine à ranger.' }),
+    ])])];
+  }
+  if (state.vitrinePanneau) return [state.vitrinePanneau];
 
   /* On travaille sur une copie : tant qu'on n'a pas enregistré, le kiosque
      ne bouge pas. */
@@ -2727,17 +2744,30 @@ function ouvrirPresentation() {
     sections: new Map(state.presentation.sections),
   };
 
-  const corps = el('div', { class: 'modal__body stack' });
+  const corps = el('div', { class: 'stack' });
   const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Enregistrer' });
-  const dialog = el('dialog', { class: 'modal sheet' }, [
+  const etat = el('span', { class: 'field__hint' });
+  const panneau = el('section', { class: 'panel' }, [
+    el('div', { class: 'section__head' }, [el('h2', { text: 'Vitrine du kiosque' })]),
     corps,
-    el('div', { class: 'modal__actions' }, [
+    el('div', { class: 'panel__actions' }, [
       el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-vitrine': 'defaut', text: 'Rendre l’ordre alphabétique' }),
       el('span', { class: 'section__spacer' }),
-      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler', onClick: () => dismiss(dialog) }),
+      etat,
+      el('button', {
+        class: 'btn btn--quiet', type: 'button', text: 'Annuler',
+        onClick: () => { state.vitrineSale = false; oublierVitrine(); repaint(); },
+      }),
       valider,
     ]),
   ]);
+
+  /* Un brouillon modifié se signale : sans cela, le pied ressemble à celui
+     d'un écran déjà à jour, et on quitte sans y penser. */
+  const salir = () => {
+    state.vitrineSale = true;
+    etat.textContent = 'Modifications non enregistrées';
+  };
 
   const dessiner = () => {
     const parId = new Map(state.remote.map((q) => [q.id, q]));
@@ -2825,7 +2855,7 @@ function ouvrirPresentation() {
     brouillon.ordre.splice(vers, 0, brouillon.ordre.splice(de, 1)[0]);
   };
 
-  dialog.addEventListener('click', async (event) => {
+  panneau.addEventListener('click', async (event) => {
     const cible = event.target.closest('[data-vitrine]');
     if (!cible) return;
     const { vitrine, id } = cible.dataset;
@@ -2835,23 +2865,23 @@ function ouvrirPresentation() {
       /* Un questionnaire masqué ne peut pas être à la une : les deux se
          contrediraient à l'écran, et c'est le masque qui gagnerait. */
       if (brouillon.masques.has(id) && brouillon.epingle === id) brouillon.epingle = null;
-      return dessiner();
+      salir(); return dessiner();
     }
     if (vitrine === 'une') {
       brouillon.epingle = brouillon.epingle === id ? null : id;
       if (brouillon.epingle) brouillon.masques.delete(brouillon.epingle);
-      return dessiner();
+      salir(); return dessiner();
     }
-    if (vitrine === 'monter') { deplacer(id, -1); return dessiner(); }
-    if (vitrine === 'descendre') { deplacer(id, 1); return dessiner(); }
-    if (vitrine === 'section-ouvrir') { brouillon.sections.set(id, ''); return dessiner(); }
-    if (vitrine === 'section-retirer') { brouillon.sections.delete(id); return dessiner(); }
+    if (vitrine === 'monter') { deplacer(id, -1); salir(); return dessiner(); }
+    if (vitrine === 'descendre') { deplacer(id, 1); salir(); return dessiner(); }
+    if (vitrine === 'section-ouvrir') { brouillon.sections.set(id, ''); salir(); return dessiner(); }
+    if (vitrine === 'section-retirer') { brouillon.sections.delete(id); salir(); return dessiner(); }
     if (vitrine === 'defaut') {
       brouillon.ordre = [...state.remote].sort((a, b) => a.title.localeCompare(b.title, 'fr')).map((q) => q.id);
       brouillon.masques = new Set();
       brouillon.epingle = null;
       brouillon.sections = new Map();
-      return dessiner();
+      salir(); return dessiner();
     }
     return undefined;
   });
@@ -2863,6 +2893,7 @@ function ouvrirPresentation() {
     const champ = event.target.closest('[data-vitrine-titre]');
     if (!champ) return;
     brouillon.sections.set(champ.dataset.vitrineTitre, champ.value);
+    salir();
   });
 
   valider.addEventListener('click', async () => {
@@ -2870,7 +2901,10 @@ function ouvrirPresentation() {
     try {
       await remote.enregistrerPresentation(state.espace, presentationPourLaBase(brouillon));
       await refreshEspace();
-      dismiss(dialog, () => { toast('La vitrine du kiosque est enregistrée.'); repaint(); });
+      state.vitrineSale = false;
+      oublierVitrine();
+      toast('La vitrine du kiosque est enregistrée.');
+      repaint();
     } catch (err) {
       valider.disabled = false;
       toast(err.message, 'danger');
@@ -2878,10 +2912,17 @@ function ouvrirPresentation() {
   });
 
   dessiner();
-  dialog.addEventListener('close', () => dialog.remove());
-  document.body.append(dialog);
-  dialog.showModal();
-  return undefined;
+  state.vitrinePanneau = panneau;
+  return [panneau];
+}
+
+/* Jeter le panneau gardé : au prochain passage, il se reconstruit sur les
+   données fraîches. Appelé après enregistrement, après abandon, et chaque
+   fois que l'espace est rechargé — un brouillon d'ordre bâti sur une liste
+   périmée rangerait des questionnaires qui n'existent plus. */
+function oublierVitrine() {
+  state.vitrinePanneau = null;
+  state.vitrineSale = false;
 }
 
 /* L'ordre à éditer : celui qui est enregistré, complété par ce qui a été
@@ -3015,6 +3056,19 @@ async function showEmbed() {
 
 function repaint() { flush(); renderRail(); renderPanel(); }
 
+/* Quitter la vitrine avec des modifications en attente demande confirmation.
+   La fenêtre modale d'avant retenait tant qu'on ne l'avait pas fermée ; un
+   panneau qu'on quitte d'un clic sur un onglet n'a pas ce garde-fou naturel,
+   il faut le poser. */
+function quitterLaVitrine() {
+  if (state.ongletEspace !== 'vitrine' || !state.vitrineSale) return true;
+  const partir = window.confirm(
+    'La vitrine a des modifications non enregistrées. Les abandonner ?',
+  );
+  if (partir) oublierVitrine();
+  return partir;
+}
+
 /* Changer de niveau redessine AUSSI le bandeau : c'est lui qui porte le fil
    d'Ariane et le retour, et `repaint()` ne s'en occupe pas — il a été écrit
    pour un backoffice qui n'avait qu'un seul écran. */
@@ -3026,6 +3080,9 @@ function allerA(vue) {
 
 async function refreshEspace() {
   forgetEspace();
+  /* Le brouillon de vitrine est bâti sur `state.remote` : le garder après un
+     rechargement rangerait des questionnaires qui ont pu disparaître. */
+  oublierVitrine();
   state.remote = await loadEspace(state.espace);
   await releverLAppartenance();
   [state.profils, state.vitrines, state.stats, state.identite, state.corbeille] = await Promise.all([
