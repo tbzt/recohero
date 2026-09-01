@@ -539,7 +539,15 @@
    à 222 px — soit 1 610 px pour une seule carte de question. Les pastilles
    se resserrent donc, comme les glyphes de la carte de résultat se
    resserrent au-delà de six. Le champ garde ses 28 px de haut : c'est la
-   cible tactile, elle ne se négocie pas. */
+   cible tactile, elle ne se négocie pas.
+
+   Depuis que la palette en autorise dix, le pire cas a été remesuré au même
+   320 px : cinq rangs, 294 px par réponse. Le coût reste proportionnel — pas
+   de débordement latéral, cible tactile intacte — et il n'y a pas de
+   troisième palier de densité. La largeur d'une pastille tient au sélecteur
+   de pesée (58 px sur 79), pas au glyphe : la resserrer encore tronquerait
+   des libellés pour gagner un rang, dans le seul cas où un écran de 320 px
+   rencontre dix axes. */
 .scoreset--dense { gap: 3px; }
 .scoreset--dense .scorechip { padding: 2px 1px 2px var(--s-1); }
 .scoreset--dense .scorechip__input { width: 1.75rem; }

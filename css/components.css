@@ -175,7 +175,7 @@
 }
 .tally__glyph {
   font-size: var(--t-md);
-  /* La couleur d'axe posée en TEXTE se mélange à l'encre. Les huit accents
+  /* La couleur d'axe posée en TEXTE se mélange à l'encre. Les dix accents
      proposés sont calibrés pour un fond clair — « chacun passe le contraste
      AA sur blanc », dit schema.js ; posés tels quels sur le fond sombre ils
      tombent à 3,4:1. Mélanger vers `--ink` fonce un peu en thème clair et

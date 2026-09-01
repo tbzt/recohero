@@ -30,10 +30,29 @@ export const GLYPHS = [
 ];
 
 /* Palette d'accents retenus : chacun passe le contraste AA sur blanc en
-   texte, et supporte du texte blanc en pastille.                        */
+   texte, et supporte du texte blanc en pastille.
+
+   DIX, et le compte n'est pas décoratif : un axe reçoit ACCENTS[i % n], si
+   bien qu'une palette de huit donnait au neuvième axe la couleur du premier.
+   Or dans le compteur, la couleur EST l'identité de l'axe — deux axes de la
+   même teinte, c'est un compteur qu'on ne peut plus lire.
+
+   Les deux derniers ne sont pas choisis à l'œil. Les huit premiers laissaient
+   trois trous de teinte : 288° (pourpre), 79° (jaune-vert) et 147° (vert
+   printemps). Les candidats du troisième trou se sont révélés confusables —
+   un sapin #2F6B4F tombe à ΔE 17 du sarcelle voisin — d'où les deux
+   premiers. Mesuré : contraste sur blanc 5,00:1 pour les deux, et écart
+   ΔE 43 (pourpre) et 21 (jaune-vert) de leur plus proche voisin.
+
+   Un repère pour lire ces nombres : la paire la plus serrée des huit
+   d'origine, #C8452B et #B4531E, est à ΔE 15 et vit en production depuis
+   toujours. Les deux ajouts sont donc plus séparés que ce que la palette
+   tolérait déjà. Et la couleur n'est jamais seule à distinguer un axe : le
+   glyphe le fait aussi, ce qui vaut mieux pour qui distingue mal les
+   teintes.                                                              */
 export const ACCENTS = [
-  '#C8452B', '#B4531E', '#8A6D1F', '#3F7A3A',
-  '#2C7A78', '#2E6BA8', '#5B4EA8', '#A03A72',
+  '#C8452B', '#B4531E', '#8A6D1F', '#3F7A3A', '#2C7A78',
+  '#2E6BA8', '#5B4EA8', '#A03A72', '#A23ADE', '#687620',
 ];
 
 export const RULE_MODES = [

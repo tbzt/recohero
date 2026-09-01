@@ -177,7 +177,7 @@ export async function renderResultCard(quiz, profile, scores) {
   }
 
   /* La feuille de score : ce qui distingue ce questionnaire d'un sondage. */
-  const axes = quiz.axes.slice(0, 8);
+  const axes = quiz.axes.slice(0, 10);
   if (axes.length && y + 148 <= FLOOR) {
     const boxH = 96;
     ctx.fillStyle = soft;
@@ -185,7 +185,9 @@ export async function renderResultCard(quiz, profile, scores) {
     ctx.fill();
 
     const slot = (W - PAD * 2) / axes.length;
-    const glyphSize = axes.length > 6 ? 32 : 40;
+    /* Trois paliers : à dix axes le créneau tombe à 90 px, et un glyphe de
+       32 px y frôlerait son voisin. */
+    const glyphSize = axes.length > 8 ? 28 : axes.length > 6 ? 32 : 40;
     axes.forEach((axis, i) => {
       const cx = PAD + slot * i + slot / 2;
       ctx.textAlign = 'center';

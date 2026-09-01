@@ -2979,7 +2979,10 @@ function envolerLaFiche(carte) {
    en silence, à trois. C'est la seule qu'on insiste pour poser.           */
 
 const AXES_MIN = 2;
-const AXES_MAX = 6;
+/* Dix, soit la palette entière. Au-delà, deux axes partageraient une
+   couleur ; l'éditeur, lui, n'a jamais posé de plafond — l'assistant n'est
+   qu'un point de départ, et rien n'empêche d'en ajouter ensuite. */
+const AXES_MAX = 10;
 
 function assistantCreation() {
   const choix = { type: 'livre', titre: '', axes: ['', '', ''] };

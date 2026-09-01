@@ -198,9 +198,11 @@ function updateBar() {
   dom.progress.style.width = `${Math.round(ratio * 100)}%`;
 
   const scores = tally(quiz, state.answers);
-  /* Huit au plus, comme la carte de résultat — et resserrés au-delà de six.
-     Le bandeau est collant : ce qu'il prend, le parcours ne l'a plus. */
-  const montres = quiz.axes.slice(0, 8);
+  /* Dix au plus, comme la carte de résultat — et resserrés au-delà de six.
+     Le bandeau est collant : ce qu'il prend, le parcours ne l'a plus. Il
+     défile horizontalement dans sa propre boîte, c'est ce qui lui permet
+     d'en porter dix sans repousser le titre. */
+  const montres = quiz.axes.slice(0, 10);
   dom.tally.classList.toggle('is-dense', montres.length > 6);
 
   /* Le compteur est une région vivante : le reconstruire à chaque rendu
