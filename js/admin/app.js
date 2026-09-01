@@ -573,6 +573,10 @@ function nomDeLEspace() {
 
 function renderTabbar(bySection) {
   if (!dom.tabbar) return;
+  /* Au niveau de l'espace, ces onglets ne sont pas un pis-aller de petit
+     écran : le rail y est masqué, ils sont la seule navigation. Le CSS a
+     besoin de le savoir pour les afficher à toute largeur. */
+  dom.tabbar.classList.toggle('est-espace', state.vue === 'espace');
 
   if (state.vue === 'espace') {
     dom.tabbar.replaceChildren(...ongletsEspace().map((o) => el('button', {

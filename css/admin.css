@@ -31,11 +31,6 @@
   align-items: start;
   padding-block: var(--s-5) var(--s-8);
 }
-/* Au niveau de l'espace, le rail n'a plus rien à dire : les listes de
-   questionnaires sont devenues le panneau lui-même, et les onglets portent la
-   navigation. Le laisser afficherait les mêmes listes deux fois. L'écran
-   prend donc toute la largeur — ce qui convient à un tableau de bord, quand
-   17 rem de colonne conviennent à une navigation de document. */
 /* Le pied d'actions d'un panneau transactionnel — la vitrine. Il colle au bas
    de la fenêtre : une liste de quinze questionnaires à réordonner dépasse
    l'écran, et un bouton « Enregistrer » qu'il faut aller chercher tout en bas
@@ -54,6 +49,11 @@
   border-top: 1px solid var(--line);
 }
 
+/* Au niveau de l'espace, le rail n'a plus rien à dire : les listes de
+   questionnaires sont devenues le panneau lui-même, et les onglets portent la
+   navigation. Le laisser afficherait les mêmes listes deux fois. L'écran
+   prend donc toute la largeur — ce qui convient à un tableau de bord, quand
+   17 rem de colonne conviennent à une navigation de document. */
 .admin-shell.est-espace { grid-template-columns: 1fr; }
 .admin-shell.est-espace > .rail { display: none; }
 
@@ -66,23 +66,34 @@
   .panel, .admin-shell > div { order: 1; }
 }
 
-/* --- Barre d'onglets (petits écrans seulement) -------------------------------
-   Elle remplace le bloc « Sections » du rail, devenu hors d'atteinte une
-   fois celui-ci passé sous le panneau. */
-.tabbar { display: none; }
+/* --- Barre d'onglets ---------------------------------------------------------
+   Dans un questionnaire, elle ne sert que sur petit écran : elle remplace le
+   bloc « Sections » du rail, devenu hors d'atteinte une fois celui-ci passé
+   sous le panneau.
+
+   Au niveau de l'ESPACE, c'est autre chose : le rail y est masqué — ses
+   listes sont devenues le panneau — et ces onglets sont donc la seule
+   navigation de l'écran. Ils doivent s'afficher à toute largeur. Sans cette
+   règle, un grand écran montrait le panneau « Questionnaires » et plus aucun
+   chemin vers l'équipe, la vitrine ou la fréquentation. Les onglets étaient
+   bien dans le document, et un clic par script les atteignait ; ils étaient
+   simplement invisibles. */
+.tabbar {
+  position: sticky;
+  top: 60px;
+  z-index: var(--z-sticky);
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-4);
+  background: color-mix(in oklab, var(--bg) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  display: none;
+}
+.tabbar.est-espace { display: flex; }
+.tabbar:empty { display: none; }
 
 @media (max-width: 62rem) {
-  .tabbar {
-    position: sticky;
-    top: 60px;
-    z-index: var(--z-sticky);
-    display: flex;
-    gap: var(--s-1);
-    padding: var(--s-2) var(--s-4);
-    background: color-mix(in oklab, var(--bg) 92%, transparent);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--line);
-  }
+  .tabbar { display: flex; }
   .tabbar:empty { display: none; }
   /* Le rail garde ses autres blocs, mais plus la navigation de section :
      elle ferait doublon avec les onglets, à un écran de distance. */
