@@ -533,6 +533,17 @@ function resultCard(quiz, result, index, ctx) {
             'aria-label': 'Où trouver cette œuvre', maxlength: '80',
           }),
           input(`reco:${result.id}:${reco.id}:link`, reco.link, { placeholder: 'https://… (facultatif)', 'aria-label': 'Lien', type: 'url' }),
+          /* Le coup de cœur assumé. Il se présente à part au répondant —
+             « et parce qu'on y tient » — plutôt que de se faire passer pour
+             une conséquence du calcul. Dire qu'une reco sort du cadre vaut
+             mieux que de laisser croire qu'elle en découle. */
+          el('label', { class: 'sheet__row' + (reco.confiance ? ' is-active' : '') }, [
+            el('input', {
+              type: 'checkbox', 'data-act': 'confiance', 'data-id': `${result.id}|${reco.id}`,
+              ...(reco.confiance ? { checked: true } : {}),
+            }),
+            el('span', { class: 'sheet__label', text: 'Coup de cœur — proposé en plus, hors calcul' }),
+          ]),
           imageField('Couverture', `reco:${result.id}:${reco.id}:image`, reco.image, 'thumb'),
         ]))),
         el('div', { class: 'row', style: { marginTop: 'var(--s-2)' } }, [
@@ -604,11 +615,11 @@ function espaceCard(ctx) {
               /* Ce qui concerne l'espace entier, et non ce questionnaire :
                  son apparence publique, et ce qu'on en a retiré. */
               el('div', { class: 'row', style: { marginTop: 'var(--s-4)' } }, [
-                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'compte',
-                  text: '⚙ Réglages de l’espace' }),
+                el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'espace',
+                  text: '🗄 Réglages de l’espace' }),
               ]),
               el('p', { class: 'field__hint', text:
-                'L’identité du kiosque, sa vitrine, sa corbeille, sa fréquentation et l’équipe : tout cela concerne l’espace entier et non ce questionnaire. On y accède aussi par le bouton du compte, dans la barre du haut — même sans questionnaire ouvert.' }),
+                'L’identité du kiosque, sa vitrine, sa corbeille, sa fréquentation et qui peut y publier : tout cela concerne l’espace entier et non ce questionnaire. « Mon espace », dans le rail, y mène en toutes circonstances — même sans questionnaire ouvert.' }),
 
               /* Une règle de base de données absente ne se voit nulle part :
                  l'espace a exactement la même apparence, protégé ou non.

@@ -448,16 +448,32 @@ function renderResult() {
     ]);
   }
 
+  /* Le calcul d'un côté, le coup de cœur de l'autre. Une œuvre glissée
+     « parce qu'on y tient » n'a pas la même autorité qu'une œuvre que les
+     réponses ont désignée : les mélanger ferait passer un choix personnel
+     pour une conséquence, et abîmerait la confiance dans les deux. */
+  const calculees = profile.recos.filter((r) => !r.confiance);
+  const coeur = profile.recos.filter((r) => r.confiance);
+  const retard = quiz.axes.length * 55 + 90;
+
   const recosNode = el('section', { class: 'recos' }, [
     el('div', { class: 'recos__head' }, [
       el('h2', { text: 'À lire, voir, écouter' }),
-      el('span', { class: 'pill pill--accent', text: `${profile.recos.length} reco${profile.recos.length > 1 ? 's' : ''}` }),
+      el('span', { class: 'pill pill--accent', text: `${calculees.length} reco${calculees.length > 1 ? 's' : ''}` }),
     ]),
     /* Les recos entrent APRÈS la feuille de score : le résultat se lit
        dans l'ordre où il a été établi — voilà ce que vous avez récolté,
        voilà donc ce qu'on vous propose. */
     el('div', { class: 'recos__list' },
-      profile.recos.map((reco, i) => renderReco(reco, i, quiz.axes.length * 55 + 90))),
+      calculees.map((reco, i) => renderReco(reco, i, retard))),
+
+    coeur.length && el('div', { class: 'recos__coeur' }, [
+      el('p', { class: 'recos__coeur__intro', text: coeur.length > 1
+        ? 'Et parce qu’on y tient, quoi qu’en dise le compteur :'
+        : 'Et parce qu’on y tient, quoi qu’en dise le compteur :' }),
+      el('div', { class: 'recos__list' },
+        coeur.map((reco, i) => renderReco(reco, calculees.length + i, retard))),
+    ]),
   ]);
 
   const node = el('section', { class: 'result' }, [
@@ -514,6 +530,7 @@ function renderResult() {
     indicesNode(quiz, profile),
 
     profile.recos.length ? recosNode : null,
+
 
     presqueNode(quiz, scores, profile),
 

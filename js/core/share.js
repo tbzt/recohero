@@ -87,6 +87,7 @@ function slim(quiz) {
         link: c.link || undefined,
         image: c.image || undefined,
         location: c.location || undefined,
+        confiance: c.confiance || undefined,
       })),
     })),
   };

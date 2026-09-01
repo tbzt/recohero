@@ -382,7 +382,7 @@ function renderRail() {
       el('div', { class: 'rail__head' }, [el('h2', { text: 'Mon espace' })]),
       el('div', { class: 'rail__list' }, [
         el('button', {
-          class: 'rail__item', type: 'button', 'data-act': 'compte',
+          class: 'rail__item', type: 'button', 'data-act': 'espace',
           title: `Kiosque, vitrine, corbeille et équipe de « ${state.espace} »`,
         }, [
           el('span', { class: 'rail__item__emoji', text: '🗄' }),
@@ -481,7 +481,7 @@ async function renderPanel() {
           'ils ne dépendent pas du questionnaire ouvert.',
         ]),
         state.espace && state.remoteSession && el('div', { class: 'row', style: { justifyContent: 'center', marginTop: 'var(--s-3)' } }, [
-          el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'compte', text: `⚙ Réglages de « ${state.espace} »` }),
+          el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'espace', text: `🗄 ${state.identite?.titre || state.espace}` }),
         ]),
       ]),
     ]));
@@ -889,7 +889,9 @@ function onClick(event) {
   /* Les champs sont pilotés par data-bind, pas par data-act — sauf la case
      à cocher des crédits, dont le clic EST l'action. */
   if (!trigger) return;
-  if (trigger.tagName === 'INPUT' && trigger.dataset.act !== 'crediter') return;
+  /* Les champs sont pilotés par data-bind, pas par data-act — sauf les cases
+     à cocher, dont le clic EST l'action. */
+  if (trigger.tagName === 'INPUT' && !['crediter', 'confiance'].includes(trigger.dataset.act)) return;
   const { act, id } = trigger.dataset;
   const [ownerId, childId] = (id || '').split('|');
   const quiz = state.quiz;
@@ -1046,6 +1048,14 @@ function onClick(event) {
       return renderPanel();
     }
     case 'quiz-menu': return openQuizSheet();
+    case 'confiance': {
+      const result = byId(quiz.results, ownerId);
+      const reco = result && byId(result.recos, childId);
+      if (!reco) return undefined;
+      remember('Coup de cœur modifié');
+      reco.confiance = !reco.confiance;
+      return structural();
+    }
     case 'crediter': {
       const liste = new Set(quiz.auteurs || []);
       liste.has(id) ? liste.delete(id) : liste.add(id);
@@ -1054,7 +1064,8 @@ function onClick(event) {
       return structural();
     }
     case 'aide':             return afficherRaccourcis();
-    case 'compte':           return parametresCompte();
+    case 'compte':           return monCompte();
+    case 'espace':           return reglagesEspace();
     case 'mon-profil':       return monProfil();
     case 'inviter':          return inviter();
     case 'membre-retirer':   return retirerMembre(id);
@@ -1271,11 +1282,79 @@ function afficherRaccourcis() {
    questionnaire : qui je suis, mon mot de passe, qui d'autre a accès, et
    la sortie. Ces choses ne dépendent pas du questionnaire ouvert, et
    n'avaient donc rien à faire dans le panneau qui sert à le diffuser. */
-function parametresCompte() {
-  const moi = state.remoteSession?.uid;
-  if (!moi) return;
+/* --- Deux objets, deux feuilles ------------------------------------------------
+   L'espace et le compte étaient réglés dans la même fenêtre : elle
+   s'intitulait « Espace « maupassant » » et contenait « Mot de passe ». Ce
+   sont pourtant deux objets sans rapport — l'un appartient à l'équipe et
+   survit à tous ses membres, l'autre appartient à une personne et la suit
+   d'un espace à l'autre. Les mêler apprenait à chercher les réglages du
+   kiosque derrière son propre nom, et rendait illisible ce qu'on partage.
+
+   La coupure suit la propriété, pas la commodité :
+
+     ESPACE — identité du kiosque, vitrine, corbeille, fréquentation, ÉQUIPE.
+              Qui peut publier ici est une propriété du lieu, pas de moi.
+     COMPTE — mon profil, mon mot de passe, mon identifiant, ma déconnexion.
+
+   Chacune a sa porte : « Mon espace » dans le rail, le bouton nominatif dans
+   la barre. Aucune des deux ne renvoie à l'autre — s'il faut un renvoi,
+   c'est que la coupure est fausse.                                        */
+
+function feuille(titre, sousTitre, contenu, actions) {
+  const dialog = el('dialog', { class: 'modal sheet' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: titre }),
+      sousTitre && el('p', { class: 'panel__hint', text: sousTitre }),
+      ...contenu,
+    ]),
+    el('div', { class: 'modal__actions' }, actions),
+  ]);
+  dialog.addEventListener('click', (event) => {
+    const cible = event.target.closest('[data-act], [data-sheet]');
+    if (!cible) return;
+    /* La feuille se referme dans tous les cas : ce qu'on ouvre ensuite a sa
+       propre fenêtre, et deux modales empilées ne se referment jamais
+       proprement. */
+    const action = cible.closest('[data-act]');
+    dismiss(dialog, () => { if (action) onClick(event); });
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  return dialog;
+}
+
+/* Ce qui appartient à la personne. Rien de l'espace n'y figure : le même
+   compte peut servir dans plusieurs espaces, et ce profil-là les suit tous. */
+function monCompte() {
+  if (!state.remoteSession) return undefined;
+  const moi = state.remoteSession.uid;
   const monP = state.profils?.[moi];
   const monNom = (monP && [monP.prenom, monP.nom].filter(Boolean).join(' ')) || null;
+
+  return feuille('Mon compte', state.remoteSession.email, [
+    el('div', { class: 'row' }, [
+      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'mon-profil',
+        text: monNom ? `👤 ${monNom}` : '👤 Renseigner mon profil' }),
+      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'mon-mot-de-passe', text: '🔒 Mot de passe' }),
+      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'copier-uid', text: '⧉ Mon identifiant' }),
+    ]),
+    !monNom && el('p', { class: 'field__hint', text:
+      'Sans profil, tes collègues te voient comme un identifiant technique — dans les messages de conflit, par exemple.' }),
+    el('p', { class: 'field__hint', style: { marginTop: 'var(--s-4)' }, text:
+      'Ce profil te suit d’un espace à l’autre. Le rendre public se décide espace par espace, au moment de créditer un questionnaire.' }),
+  ], [
+    el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-act': 'remote-signout', text: 'Se déconnecter' }),
+    el('span', { class: 'section__spacer' }),
+    el('button', { class: 'btn btn--quiet', type: 'button', 'data-sheet': 'close', text: 'Fermer' }),
+  ]);
+}
+
+/* Ce qui appartient à l'équipe. L'équipe elle-même en fait partie : qui peut
+   publier ici décrit le lieu, pas la personne connectée. */
+function reglagesEspace() {
+  const moi = state.remoteSession?.uid;
+  if (!moi) return undefined;
 
   const ligne = (m) => {
     const p = state.profils?.[m.uid];
@@ -1299,22 +1378,21 @@ function parametresCompte() {
     ]);
   };
 
-  const dialog = el('dialog', { class: 'modal sheet' }, [
-    el('div', { class: 'modal__body stack' }, [
-      el('h2', { text: `Espace « ${state.espace} »` }),
-      el('p', { class: 'panel__hint', text: `Connecté comme ${state.remoteSession.email}.` }),
+  /* L'équipe se compte toujours au moins à un : la personne connectée en
+     fait partie, sans quoi elle ne serait pas là. Un « 0 membre » affiché à
+     quelqu'un qui est manifestement membre ne décrit pas l'équipe, il décrit
+     une liste qu'on n'a pas su lire. */
+  const nombre = Math.max(1, state.membres.length);
+  const listeLue = state.membres.length > 0;
 
-      /* Tout ce qui concerne l'ESPACE, et non le questionnaire ouvert.
-         C'était rangé dans le panneau « Diffuser », qui ne s'affiche que
-         lorsqu'un questionnaire est ouvert : une personne arrivant sur un
-         navigateur neuf, sans brouillon local, n'avait donc aucun chemin
-         vers l'identité du kiosque, sa vitrine, sa corbeille ni ses
-         compteurs. Le compte, lui, est atteignable depuis la barre en
-         toutes circonstances. */
-      el('span', { class: 'field__label', text: 'Le kiosque de l’équipe' }),
+  return feuille(
+    state.identite?.titre || `Espace « ${state.espace} »`,
+    state.identite ? `Espace « ${state.espace} »` : null,
+    [
+      el('span', { class: 'field__label', text: 'Le kiosque' }),
       el('div', { class: 'row' }, [
         el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'identite-espace',
-          text: state.identite ? `✦ ${state.identite.titre}` : '✦ Personnaliser le kiosque' }),
+          text: state.identite ? '✦ Apparence' : '✦ Personnaliser le kiosque' }),
         el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'vitrine',
           text: state.presentation.masques.size ? `▦ Vitrine · ${state.presentation.masques.size} masqué${state.presentation.masques.size > 1 ? 's' : ''}` : '▦ Vitrine' }),
         el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'corbeille',
@@ -1325,44 +1403,20 @@ function parametresCompte() {
       !state.identite && el('p', { class: 'field__hint', text:
         'Sans identité, le kiosque de cet espace affiche la marque RecoHero à vos usagers — son nom, son accroche et son pied de page.' }),
 
-      el('span', { class: 'field__label', style: { marginTop: 'var(--s-4)' }, text: 'Moi' }),
-
-      el('div', { class: 'row' }, [
-        el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'mon-profil',
-          text: monNom ? `👤 ${monNom}` : '👤 Renseigner mon profil' }),
-        el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'mon-mot-de-passe', text: 'Mot de passe' }),
-        el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'copier-uid', text: 'Mon identifiant' }),
-      ]),
-      !monNom && el('p', { class: 'field__hint', text:
-        'Sans profil, tes collègues te voient comme un identifiant technique — dans les messages de conflit, par exemple.' }),
-
-      el('div', { class: 'section__head', style: { marginTop: 'var(--s-4)', marginBottom: 'var(--s-3)' } }, [
-        el('h3', { style: 'font-size:var(--t-base)', text: `Équipe — ${state.membres.length} membre${state.membres.length > 1 ? 's' : ''}` }),
+      el('div', { class: 'section__head', style: { marginTop: 'var(--s-5)', marginBottom: 'var(--s-3)' } }, [
+        el('h3', { style: 'font-size:var(--t-base)', text: `Qui peut publier ici — ${nombre} membre${nombre > 1 ? 's' : ''}` }),
         el('span', { class: 'section__spacer' }),
         el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'inviter', text: '+ Inviter' }),
       ]),
-      el('div', { class: 'sheet__list' }, state.membres.map(ligne)),
+      listeLue
+        ? el('div', { class: 'sheet__list' }, state.membres.map(ligne))
+        : el('p', { class: 'alerte', text:
+            'La liste des membres n’a pas pu être lue. Tu es bien membre — sans quoi tu ne serais pas connecté à cet espace — mais la branche « membres » n’a rien renvoyé. Ce n’est pas une équipe vide : c’est une lecture qui a échoué.' }),
       el('p', { class: 'field__hint', text:
-        'Inviter crée le compte et envoie un courriel : la personne choisit son mot de passe elle-même. Retirer quelqu’un lui ôte le droit de publier, sans supprimer son compte.' }),
-    ]),
-    el('div', { class: 'modal__actions' }, [
-      el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-act': 'remote-signout', text: 'Se déconnecter' }),
-      el('span', { class: 'section__spacer' }),
-      el('button', { class: 'btn btn--quiet', type: 'button', 'data-sheet': 'close', text: 'Fermer' }),
-    ]),
-  ]);
-
-  dialog.addEventListener('click', (event) => {
-    const cible = event.target.closest('[data-act], [data-sheet]');
-    if (!cible) return;
-    /* Le dialogue se referme dans tous les cas : ce qu'on ouvre ensuite —
-       profil, mot de passe, invitation — a sa propre fenêtre, et deux
-       modales empilées ne se referment jamais proprement. */
-    const action = cible.closest('[data-act]');
-    dismiss(dialog, () => { if (action) onClick(event); });
-  });
-  dialog.addEventListener('close', () => dialog.remove());
-  document.body.append(dialog);
+        'Inviter crée le compte et envoie un courriel : la personne choisit son mot de passe elle-même. Retirer quelqu’un lui ôte le droit de publier ici, sans supprimer son compte ni le retirer d’un autre espace.' }),
+    ],
+    [el('button', { class: 'btn btn--quiet', type: 'button', 'data-sheet': 'close', text: 'Fermer' })],
+  );
   dialog.showModal();
 }
 

@@ -741,6 +741,22 @@ html.a-la-transition .view-enter { animation: none; }
 
 /* La porte entrouverte. Volontairement en retrait : c'est une invitation
    à revenir, pas un second résultat qui concurrencerait le premier. */
+/* Le coup de cœur, séparé de ce que le calcul a produit. Un filet et une
+   phrase suffisent : il ne doit pas avoir l'air plus important que le
+   résultat, seulement d'une autre nature. */
+.recos__coeur {
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px dashed var(--accent-line);
+}
+.recos__coeur__intro {
+  font-size: var(--t-sm);
+  color: var(--ink-muted);
+  font-family: var(--font-display);
+  font-style: italic;
+  margin-bottom: var(--s-3);
+}
+
 /* --- Ce qui a pesé ------------------------------------------------------------
    Discret par construction : ce sont les propres mots du répondant qu'on lui
    rend, pas une démonstration. Le bloc s'efface devant le profil qui le

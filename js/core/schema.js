@@ -127,7 +127,7 @@ export function makeQuestion(axes = []) {
    chaque ajout, puis de le corriger vingt fois. */
 export function makeReco(type = 'livre') {
   const sur = RECO_TYPES.some((t) => t.id === type) ? type : 'livre';
-  return { id: uid('reco'), type: sur, title: '', creator: '', year: '', note: '', link: '', image: '', location: '' };
+  return { id: uid('reco'), type: sur, title: '', creator: '', year: '', note: '', link: '', image: '', location: '', confiance: false };
 }
 
 export function makeResult(axes = [], type = 'livre') {
@@ -250,6 +250,13 @@ export function normalize(raw) {
                conventions, et « Jeunesse · R MAN » se lit aussi bien que
                deux cases dont une resterait vide la moitié du temps. */
             location: String(c.location || '').slice(0, 80),
+            /* Le coup de cœur qui ne découle pas du calcul. Un
+               bibliothécaire veut pouvoir glisser une œuvre parce qu'il y
+               tient, pas parce qu'un axe l'a désignée — et le dire au
+               répondant plutôt que de la faire passer pour un résultat.
+               C'est de l'éditorial, pas du score : rien dans scoring.js ne
+               le lit. */
+            confiance: c.confiance === true,
           })),
       };
     });
