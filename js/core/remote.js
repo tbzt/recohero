@@ -80,11 +80,27 @@ export function signOut() {
 }
 
 export async function signIn(email, password) {
-  const response = await fetch(SIGN_IN, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, returnSecureToken: true }),
-  });
+  let response;
+  try {
+    response = await fetch(SIGN_IN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    });
+  } catch {
+    /* Même hôte, même blocage possible qu'ailleurs — et ici c'est la porte
+       d'entrée : sans ce message, on cherche un mot de passe faux là où c'est
+       le réseau qui refuse. */
+    const err = new Error(
+      'Ce poste n’a pas pu joindre le service de comptes Firebase '
+      + '(identitytoolkit.googleapis.com). Ce n’est pas ton mot de passe : la '
+      + 'requête n’est jamais partie. Un bloqueur de publicité, un antivirus '
+      + 'qui inspecte le HTTPS ou le filtre du réseau en sont les causes '
+      + 'habituelles.',
+    );
+    err.code = 'RESEAU';
+    throw err;
+  }
   const body = await response.json();
   if (!response.ok) throw new Error(readable(body?.error?.message?.split(' ')[0]));
 
@@ -145,12 +161,36 @@ async function token() {
    ce n'est pas d'avoir un compte, c'est de figurer dans les membres de
    l'espace ; et cette liste-là, les règles la gardent.                  */
 
+/* Les comptes et la base ne vivent PAS sur le même hôte : les comptes sur
+   `identitytoolkit.googleapis.com`, la base sur `…firebasedatabase.app`. Une
+   médiathèque derrière un filtre, un bloqueur de publicité ou un antivirus
+   qui inspecte le HTTPS peut très bien joindre l'un et pas l'autre — et
+   plusieurs listes de filtrage courantes visent `googleapis.com`.
+
+   Quand cela arrive, `fetch` ne rend pas une réponse : il lève. Le message
+   du navigateur — « NetworkError when attempting to fetch resource » — ne dit
+   ni quel hôte, ni que le reste du produit fonctionne encore. On le remplace
+   par ce qu'il faut savoir, et on marque l'erreur d'un code que l'appelant
+   peut reconnaître : une porte fermée par le réseau n'appelle pas la même
+   conduite qu'une adresse déjà prise.                                     */
 async function appelIdentityToolkit(url, corps) {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(corps),
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corps),
+    });
+  } catch {
+    const err = new Error(
+      'Ce poste n’a pas pu joindre le service de comptes Firebase '
+      + '(identitytoolkit.googleapis.com). La base de données, elle, répond : '
+      + 'c’est donc cet hôte-là qui est bloqué — souvent par un bloqueur de '
+      + 'publicité, un antivirus qui inspecte le HTTPS, ou le filtre du réseau.',
+    );
+    err.code = 'RESEAU';
+    throw err;
+  }
   const data = await response.json();
   if (!response.ok) {
     const code = String(data?.error?.message || '').split(' ')[0];

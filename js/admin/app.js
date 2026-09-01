@@ -1626,7 +1626,6 @@ function reglagesEspace() {
     ],
     [el('button', { class: 'btn btn--quiet', type: 'button', 'data-sheet': 'close', text: 'Fermer' })],
   );
-  dialog.showModal();
 }
 
 
@@ -1853,23 +1852,38 @@ function inviter() {
         repaint();
       });
     } catch (err) {
-      if (err.code === 'EMAIL_EXISTS') {
-        /* Le cas le plus banal — un collègue déjà inscrit dans un autre
-           espace — était le plus pénible : il fallait lui réclamer vingt-huit
-           caractères par un autre canal et les recopier sans faute. On dépose
-           l'invitation à son adresse, il la trouvera en se connectant. */
+      /* Deux échecs très différents mènent au même recours.
+
+         EMAIL_EXISTS : le cas le plus banal — un collègue déjà inscrit dans
+         un autre espace — était le plus pénible, il fallait lui réclamer
+         vingt-huit caractères par un autre canal.
+
+         RESEAU : ce poste ne joint pas le service de comptes. Or déposer une
+         invitation n'en a PAS besoin — c'est une écriture dans la base, qui
+         répond. Échouer ici reviendrait à refuser le seul geste encore
+         possible sous prétexte qu'un autre est impossible. */
+      if (err.code === 'EMAIL_EXISTS' || err.code === 'RESEAU') {
+        const bloque = err.code === 'RESEAU';
         info.hidden = true;
         try {
           await remote.inviterParCourriel(state.espace, adresse, state.remoteSession.uid);
           await refreshEspace();
           dismiss(dialog, () => {
-            toast(`Invitation déposée pour ${adresse}.`);
+            /* On ne laisse pas croire que tout s'est bien passé quand une
+               moitié a échoué : sans service de comptes, ni la création ni
+               le courriel n'ont eu lieu, et l'invitation ne servira qu'à
+               quelqu'un qui a déjà un compte. */
+            toast(bloque
+              ? `Invitation déposée pour ${adresse}. Aucun compte n’a pu être créé ni aucun courriel envoyé depuis ce poste : elle ne servira que si cette personne a déjà un compte RecoHero.`
+              : `Invitation déposée pour ${adresse}.`, bloque ? { duration: 9000 } : '');
             repaint();
           });
           return;
         } catch (secondErr) {
-          erreur.textContent = `Cette adresse a déjà un compte, et l’invitation n’a pas pu être déposée : ${secondErr.message} `
-            + 'Tu peux encore l’ajouter directement en collant son identifiant dans le second champ.';
+          erreur.textContent = bloque
+            ? `${err.message} L’invitation n’a pas pu être déposée non plus : ${secondErr.message}`
+            : `Cette adresse a déjà un compte, et l’invitation n’a pas pu être déposée : ${secondErr.message} `
+              + 'Tu peux encore l’ajouter directement en collant son identifiant dans le second champ.';
           uidChamp.focus();
         }
       } else {
