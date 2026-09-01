@@ -437,9 +437,15 @@ function branche(espace, nom, rest = '') {
   return `${DB}/espaces/${encodeURIComponent(espace)}/${nom}${rest}.json`;
 }
 
+/* La lecture de `membres` REMONTE son erreur, au lieu de rendre une liste
+   vide. Les deux cas se ressemblaient et ne veulent pas dire la même chose :
+   une liste vide décrit une équipe, un refus décrit quelqu'un qui n'est pas
+   encore de la maison. Confondre les deux faisait dire au backoffice « tu es
+   bien membre » à qui ne l'était pas. `gerants` reste tolérant : son absence
+   ne coûte qu'une couronne à côté d'un nom.                             */
 export async function membres(espace) {
   const [liste, gerants] = await Promise.all([
-    call(branche(espace, 'membres')).catch(() => null),
+    call(branche(espace, 'membres')),
     call(branche(espace, 'gerants')).catch(() => null),
   ]);
   const proteges = new Set(Object.keys(gerants || {}));
@@ -456,6 +462,113 @@ export async function ajouterMembre(espace, uid) {
 
 export async function retirerMembre(espace, uid) {
   return call(branche(espace, 'membres', `/${encodeURIComponent(uid)}`), { method: 'DELETE' });
+}
+
+/* --- Les deux portes -------------------------------------------------------
+   Jusqu'ici, inviter quelqu'un qui avait DÉJÀ un compte demandait son
+   identifiant — une chaîne de vingt-huit caractères, à lui réclamer par un
+   autre canal, à recopier sans faute. Une invitation ne devrait pas coûter
+   ça.
+
+   Deux portes, donc, et elles ne s'ouvrent pas dans le même sens :
+
+     invitations  l'équipe pose une adresse, la personne se sert. C'est
+                  l'équipe qui décide, la personne n'a qu'à venir.
+
+     attente      la personne se signale, l'équipe valide. C'est la
+                  personne qui demande, l'équipe qui décide.
+
+   Ce qui tient l'ensemble, c'est `email_verified`. N'importe qui peut créer
+   un compte Firebase avec n'importe quelle adresse : sans cette
+   vérification, poser une invitation pour « direction@mediatheque.fr »
+   reviendrait à laisser entrer le premier qui aurait l'idée de s'inscrire
+   sous ce nom. La règle l'exige, et c'est elle qui fait la différence entre
+   une invitation et une porte ouverte.
+
+   Et « à valider » vit dans sa PROPRE branche, pas comme une valeur dans
+   `membres` : toutes les règles de l'espace testent `membres/<uid>.exists()`.
+   Un compte en attente rangé dans `membres` existerait — donc publierait.
+   La séparation n'est pas du rangement, c'est le contrôle lui-même.     */
+
+/* Une clé Realtime Database ne peut pas contenir de point ; l'adresse en est
+   pleine. La règle fait la même substitution de son côté — les deux calculs
+   doivent rester d'accord, c'est pourquoi il n'y en a qu'un ici.        */
+export function clefCourriel(email) {
+  return String(email || '').trim().toLowerCase().replace(/\./g, ',');
+}
+
+/* Le jeton d'identité PORTE déjà `email_verified` — c'est exactement le
+   champ que lit la règle. Le décoder coûte moins qu'un aller-retour vers
+   `accounts:lookup`, et surtout on lit ce que la base lira, pas une
+   réponse d'une autre requête qui pourrait diverger. La signature n'est pas
+   vérifiée, et n'a pas à l'être : on ne s'accorde aucun droit ici, on
+   prépare seulement un message juste pour la personne. C'est la base qui
+   tranche.                                                              */
+function charge(jeton) {
+  try {
+    const b64 = jeton.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const octets = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(octets));
+  } catch {
+    return null;
+  }
+}
+
+export async function courrielVerifie() {
+  const jeton = await token();
+  if (!jeton) return false;
+  return charge(jeton)?.email_verified === true;
+}
+
+export async function envoyerCourrielVerification() {
+  const idToken = await token();
+  if (!idToken) throw new Error('Il faut être connecté.');
+  return appelIdentityToolkit(OOB, { requestType: 'VERIFY_EMAIL', idToken });
+}
+
+export async function invitations(espace) {
+  return (await call(branche(espace, 'invitations')).catch(() => null)) || {};
+}
+
+export async function inviterParCourriel(espace, email, par) {
+  return call(branche(espace, 'invitations', `/${encodeURIComponent(clefCourriel(email))}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ par, le: Date.now() }),
+  });
+}
+
+export async function annulerInvitation(espace, email) {
+  return call(branche(espace, 'invitations', `/${encodeURIComponent(clefCourriel(email))}`), { method: 'DELETE' });
+}
+
+/* Ma propre invitation. La règle n'autorise cette lecture qu'à qui porte
+   l'adresse et l'a vérifiée : un refus n'est donc pas une panne, c'est la
+   réponse « rien pour toi ». */
+export async function monInvitation(espace, email) {
+  if (!espace || !email) return null;
+  return call(branche(espace, 'invitations', `/${encodeURIComponent(clefCourriel(email))}`)).catch(() => null);
+}
+
+export async function demanderAcces(espace, uid, corps) {
+  return call(branche(espace, 'attente', `/${encodeURIComponent(uid)}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...corps, le: Date.now() }),
+  });
+}
+
+export async function demandes(espace) {
+  return (await call(branche(espace, 'attente')).catch(() => null)) || {};
+}
+
+export async function maDemande(espace, uid) {
+  if (!espace || !uid) return null;
+  return call(branche(espace, 'attente', `/${encodeURIComponent(uid)}`)).catch(() => null);
+}
+
+export async function retirerDemande(espace, uid) {
+  return call(branche(espace, 'attente', `/${encodeURIComponent(uid)}`), { method: 'DELETE' });
 }
 
 function path(espace, rest = '') {
@@ -565,10 +678,17 @@ async function call(url, options = {}) {
     /* Le corps distingue les deux refus, et il n'y a plus lieu de deviner :
        « Permission denied » vient des règles, donc de l'appartenance ;
        « Unauthorized request. » vient du jeton lui-même. */
-    throw new Error(jetonRefuse(corps)
+    const err = new Error(jetonRefuse(corps)
       ? `La base n’a pas accepté la session de ${qui}. Reconnecte-toi.`
       : `Refusé par les règles pour ${qui}. Ce compte ne figure pas dans les membres de cet espace, `
         + 'ou la règle interdit cette écriture.');
+    /* La base a répondu, et elle a dit non. À distinguer d'un appel qui
+       n'aboutit pas : « tu n'es pas membre » et « le réseau est tombé » se
+       ressemblent depuis l'appelant, et se disent très différemment à
+       quelqu'un qui attend d'entrer. */
+    err.refus = true;
+    err.regles = !jetonRefuse(corps);
+    throw err;
   }
   if (!response.ok) throw new Error(`La base a répondu ${response.status}.`);
   return response.status === 204 ? null : response.json();

@@ -45,6 +45,10 @@ const state = {
   espace: null,         /* le nom de l'espace partagé, s'il y en a un */
   guardActive: null,    /* la règle anti-écrasement répond-elle ? null = pas su */
   membres: [],          /* l'équipe de l'espace, lisible des seuls membres */
+  membre: null,         /* suis-je de l'équipe ? null = pas encore su */
+  invitations: {},      /* adresses conviées, en attente d'être réclamées */
+  demandes: {},         /* comptes qui demandent à entrer, en attente d'un avis */
+  monEntree: null,      /* { invitation, demande, verifie } quand je ne suis pas membre */
   profils: {},          /* leurs profils, lisibles de l'équipe seule */
   vitrines: {},         /* ce que chacun a choisi de rendre public */
   identite: null,       /* l'apparence publique du kiosque de l'espace */
@@ -295,6 +299,45 @@ function signature(quiz) {
   return parts.join(' · ');
 }
 
+function railBadge() {
+  const enAttente = Object.keys(state.demandes || {}).length;
+  if (enAttente) {
+    return el('span', { class: 'rail__item__badge', title: `${enAttente} demande${enAttente > 1 ? 's' : ''} d’accès`, text: String(enAttente) });
+  }
+  if (state.corbeille.length) return el('span', { class: 'rail__item__badge', text: String(state.corbeille.length) });
+  return null;
+}
+
+/* Les trois états de quelqu'un qui frappe à la porte. On n'en montre qu'un,
+   celui où il en est, avec le seul geste qui l'avance.                   */
+function entrerDansLEspace() {
+  const e = state.monEntree || {};
+  const item = (emoji, titre, signature, act) => el('button', {
+    class: 'rail__item', type: 'button', ...(act ? { 'data-act': act } : { disabled: true }),
+  }, [
+    el('span', { class: 'rail__item__emoji', text: emoji }),
+    el('span', { class: 'rail__item__label' }, [
+      el('span', { style: { display: 'block' }, text: titre }),
+      el('span', { class: 'rail__item__signature', text: signature }),
+    ]),
+  ]);
+
+  if (e.invitation && e.verifie) {
+    return [item('✉️', 'Rejoindre cet espace', 'une invitation t’y attend', 'entrer-rejoindre')];
+  }
+  /* Invité, mais l'adresse n'est pas vérifiée. La règle l'exige, et pour une
+     bonne raison : sans elle, n'importe qui s'inscrivant sous l'adresse
+     conviée entrerait. On ne peut donc pas passer outre — mais on peut dire
+     exactement ce qui manque, plutôt que de refuser sans expliquer. */
+  if (e.invitation) {
+    return [item('📮', 'Vérifie ton adresse', 'l’invitation t’attend derrière', 'entrer-verifier')];
+  }
+  if (e.demande) {
+    return [item('⏳', 'Demande envoyée', 'l’équipe doit encore l’accepter', null)];
+  }
+  return [item('🔔', 'Demander l’accès', 'un membre de l’équipe décidera', 'entrer-demander')];
+}
+
 function renderRail() {
   const drafts = store.allDrafts();
   const draftIds = new Set(drafts.map((q) => q.id));
@@ -378,7 +421,7 @@ function renderRail() {
        Le bouton de compte reste : mot de passe et déconnexion relèvent bien
        de la personne. Mais le kiosque a désormais sa porte, à son nom, au
        même endroit que le reste de la navigation. */
-    state.espace && state.remoteSession && el('div', {}, [
+    state.espace && state.remoteSession && state.membre !== false && el('div', {}, [
       el('div', { class: 'rail__head' }, [el('h2', { text: 'Mon espace' })]),
       el('div', { class: 'rail__list' }, [
         el('button', {
@@ -390,11 +433,20 @@ function renderRail() {
             el('span', { style: { display: 'block' }, text: state.identite?.titre || state.espace }),
             el('span', { class: 'rail__item__signature', text: 'kiosque, vitrine, corbeille, équipe' }),
           ]),
-          state.corbeille.length
-            ? el('span', { class: 'rail__item__badge', text: String(state.corbeille.length) })
-            : null,
+          /* Une demande d'accès attend une décision ; la corbeille attend
+             seulement qu'on s'en souvienne. Quand les deux ont quelque chose
+             à dire, c'est la décision qui prend la pastille. */
+          railBadge(),
         ]),
       ]),
+    ]),
+
+    /* Connecté, mais pas de cette maison. L'écran ne montrait alors qu'un
+       backoffice sans droits, et la feuille d'équipe affirmait « tu es bien
+       membre » — le contraire de ce qu'il fallait dire. */
+    state.espace && state.remoteSession && state.membre === false && el('div', {}, [
+      el('div', { class: 'rail__head' }, [el('h2', { text: 'Cet espace' })]),
+      el('div', { class: 'rail__list' }, entrerDansLEspace()),
     ]),
 
     state.quiz && el('div', {}, [
@@ -1069,6 +1121,12 @@ function onClick(event) {
     case 'mon-profil':       return monProfil();
     case 'inviter':          return inviter();
     case 'membre-retirer':   return retirerMembre(id);
+    case 'demande-valider':  return validerDemande(id);
+    case 'demande-refuser':  return refuserDemande(id);
+    case 'invitation-annuler': return annulerInvitation(id);
+    case 'entrer-rejoindre': return rejoindreLEspace();
+    case 'entrer-demander':  return demanderLAcces();
+    case 'entrer-verifier':  return verifierMonCourriel();
     case 'copier-uid':       return copierUid();
     case 'mon-mot-de-passe': return changerMonMotDePasse();
     case 'identite-espace':  return editerIdentite();
@@ -1352,6 +1410,70 @@ function monCompte() {
 
 /* Ce qui appartient à l'équipe. L'équipe elle-même en fait partie : qui peut
    publier ici décrit le lieu, pas la personne connectée. */
+/* Les deux files d'attente : ceux qu'on a conviés et qui ne sont pas encore
+   venus, ceux qui se sont présentés et attendent un avis. Elles ne
+   s'affichent que si elles ont quelque chose à dire — une équipe de trois
+   personnes qui n'invite jamais ne doit pas lire deux titres vides à chaque
+   ouverture.                                                             */
+function filesDAttente() {
+  const conviees = Object.entries(state.invitations || {});
+  const presentees = Object.entries(state.demandes || {});
+  if (!conviees.length && !presentees.length) return [];
+
+  const titre = (texte) => el('h3', {
+    style: 'font-size:var(--t-base);margin-top:var(--s-5);margin-bottom:var(--s-2)', text: texte,
+  });
+
+  const bloc = [];
+
+  if (presentees.length) {
+    bloc.push(titre(`Demandes d’accès — ${presentees.length}`));
+    bloc.push(el('div', { class: 'sheet__list' }, presentees.map(([uid, d]) => el('div', { class: 'sheet__row' }, [
+      el('span', { class: 'sheet__emoji', text: '🔔' }),
+      el('span', { class: 'sheet__label' }, [
+        el('span', { text: d?.prenom || 'Sans nom' }),
+        el('span', { class: 'field__hint', style: { display: 'block' }, text: d?.courriel || uid }),
+      ]),
+      el('button', {
+        class: 'btn btn--sm btn--primary', type: 'button',
+        'data-act': 'demande-valider', 'data-id': uid, text: 'Accepter',
+      }),
+      el('button', {
+        class: 'btn btn--icon btn--quiet', type: 'button',
+        'data-act': 'demande-refuser', 'data-id': uid,
+        title: 'Refuser cette demande', text: '✕',
+      }),
+    ]))));
+    bloc.push(el('p', { class: 'field__hint', text:
+      'Accepter donne le droit de publier dans cet espace. L’adresse affichée est celle du compte, vérifiée par la base — pas un nom que la personne aurait saisi.' }));
+  }
+
+  if (conviees.length) {
+    bloc.push(titre(`Invitations en attente — ${conviees.length}`));
+    bloc.push(el('div', { class: 'sheet__list' }, conviees.map(([clef, inv]) => el('div', { class: 'sheet__row' }, [
+      el('span', { class: 'sheet__emoji', text: '✉️' }),
+      el('span', { class: 'sheet__label' }, [
+        /* La clé est l'adresse dont les points sont devenus des virgules :
+           on la remet à l'endroit pour l'afficher. */
+        el('span', { text: clef.replace(/,/g, '.') }),
+        el('span', { class: 'field__hint', style: { display: 'block' },
+          /* `le` est formaté seulement s'il est vraiment une date : sur une
+             valeur inattendue, Intl lève et emporterait la feuille entière. */
+          text: `conviée par ${nommer(inv?.par)}${Number.isFinite(inv?.le) ? ` · ${formatDate(inv.le)}` : ''}` }),
+      ]),
+      el('button', {
+        class: 'btn btn--icon btn--quiet', type: 'button',
+        'data-act': 'invitation-annuler', 'data-id': clef,
+        title: 'Retirer cette invitation', text: '✕',
+      }),
+    ]))));
+    bloc.push(el('p', { class: 'field__hint', text:
+      'Une invitation attend que la personne se connecte avec cette adresse et l’ait vérifiée. Tant qu’elle n’est pas réclamée, elle ne donne aucun droit.' }));
+  }
+
+  return bloc;
+}
+
 function reglagesEspace() {
   const moi = state.remoteSession?.uid;
   if (!moi) return undefined;
@@ -1411,9 +1533,12 @@ function reglagesEspace() {
       listeLue
         ? el('div', { class: 'sheet__list' }, state.membres.map(ligne))
         : el('p', { class: 'alerte', text:
-            'La liste des membres n’a pas pu être lue. Tu es bien membre — sans quoi tu ne serais pas connecté à cet espace — mais la branche « membres » n’a rien renvoyé. Ce n’est pas une équipe vide : c’est une lecture qui a échoué.' }),
+            'La liste des membres n’a pas pu être lue. Ce n’est pas une équipe vide : c’est une lecture qui a échoué. Recharge la page — si le message revient, la base ne répond pas.' }),
+
+      ...filesDAttente(),
+
       el('p', { class: 'field__hint', text:
-        'Inviter crée le compte et envoie un courriel : la personne choisit son mot de passe elle-même. Retirer quelqu’un lui ôte le droit de publier ici, sans supprimer son compte ni le retirer d’un autre espace.' }),
+        'Inviter quelqu’un sans compte crée le sien et lui envoie un courriel : il choisit son mot de passe lui-même. Inviter une adresse qui a déjà un compte y dépose une invitation, que la personne réclame à sa prochaine connexion. Retirer quelqu’un lui ôte le droit de publier ici, sans supprimer son compte ni le retirer d’un autre espace.' }),
     ],
     [el('button', { class: 'btn btn--quiet', type: 'button', 'data-sheet': 'close', text: 'Fermer' })],
   );
@@ -1462,6 +1587,11 @@ function autriceAuHasard() {
    public. Faute de profil, l'identifiant tronqué — dit comme tel plutôt
    que déguisé en nom.                                                   */
 function nommer(uid) {
+  /* Un identifiant manquant se dit ; il ne fait pas tomber le panneau qui
+     l'affichait. Les règles exigent le champ, mais une donnée écrite à la
+     main depuis la console n'en sait rien — et un utilitaire d'affichage
+     n'est pas le bon endroit pour découvrir ça. */
+  if (!uid) return 'quelqu’un dont l’identifiant manque';
   const p = state.profils?.[uid];
   if (!p) return `un compte sans profil (${uid.slice(0, 8)}…)`;
   return [p.prenom, p.nom].filter(Boolean).join(' ') || `un compte (${uid.slice(0, 8)}…)`;
@@ -1640,8 +1770,24 @@ function inviter() {
       });
     } catch (err) {
       if (err.code === 'EMAIL_EXISTS') {
-        erreur.textContent = 'Cette adresse a déjà un compte. Demande-lui son identifiant et colle-le dans le second champ — rien ici ne permet de le retrouver.';
-        uidChamp.focus();
+        /* Le cas le plus banal — un collègue déjà inscrit dans un autre
+           espace — était le plus pénible : il fallait lui réclamer vingt-huit
+           caractères par un autre canal et les recopier sans faute. On dépose
+           l'invitation à son adresse, il la trouvera en se connectant. */
+        info.hidden = true;
+        try {
+          await remote.inviterParCourriel(state.espace, adresse, state.remoteSession.uid);
+          await refreshEspace();
+          dismiss(dialog, () => {
+            toast(`Invitation déposée pour ${adresse}.`);
+            repaint();
+          });
+          return;
+        } catch (secondErr) {
+          erreur.textContent = `Cette adresse a déjà un compte, et l’invitation n’a pas pu être déposée : ${secondErr.message} `
+            + 'Tu peux encore l’ajouter directement en collant son identifiant dans le second champ.';
+          uidChamp.focus();
+        }
       } else {
         erreur.textContent = err.message;
       }
@@ -1676,6 +1822,133 @@ async function retirerMembre(uid) {
         },
       },
     });
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+}
+
+/* Accepter quelqu'un, c'est deux écritures : le droit d'abord, la file
+   ensuite. Dans cet ordre — si la seconde échoue, la personne est entrée et
+   sa demande traîne, ce qui se répare d'un clic. L'ordre inverse effacerait
+   la demande sans donner le droit, et il ne resterait plus trace de rien à
+   quoi se raccrocher.                                                    */
+async function validerDemande(uid) {
+  try {
+    await remote.ajouterMembre(state.espace, uid);
+    await remote.retirerDemande(state.espace, uid).catch(() => {});
+    await refreshEspace();
+    repaint();
+    toast(`${nommer(uid)} peut publier dans cet espace.`);
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+}
+
+async function refuserDemande(uid) {
+  const garde = state.demandes?.[uid];
+  try {
+    await remote.retirerDemande(state.espace, uid);
+    await refreshEspace();
+    repaint();
+    /* Refuser ne dit rien à la personne — la base n'envoie pas de courriel
+       et nous n'avons pas de serveur pour le faire. Autant l'écrire : croire
+       qu'un refus a été notifié, c'est laisser quelqu'un attendre. */
+    toast('Demande écartée. Elle n’en sera pas avertie.', {
+      action: garde && {
+        label: 'Annuler',
+        onClick: async () => {
+          await remote.demanderAcces(state.espace, uid, garde).catch(() => {});
+          await refreshEspace();
+          repaint();
+        },
+      },
+    });
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+}
+
+async function annulerInvitation(clef) {
+  try {
+    await remote.annulerInvitation(state.espace, clef.replace(/,/g, '.'));
+    await refreshEspace();
+    repaint();
+    toast('Invitation retirée.');
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+}
+
+/* --- Entrer, quand on n'est pas encore de la maison ------------------------ */
+
+async function rejoindreLEspace() {
+  try {
+    await remote.ajouterMembre(state.espace, state.remoteSession.uid);
+    await remote.annulerInvitation(state.espace, state.remoteSession.email).catch(() => {});
+    await refreshEspace();
+    repaint();
+    toast('Te voilà chez toi.');
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+}
+
+/* Une demande arrive chez des gens qui ne savent pas forcément qui vous
+   êtes. Un identifiant de vingt-huit caractères ne le leur dira pas : on
+   demande un prénom, une fois, et c'est tout ce qu'on demande.          */
+function demanderLAcces() {
+  const { uid, email } = state.remoteSession;
+  const invitee = autriceAuHasard();
+  const champ = el('input', {
+    class: 'input', value: state.profils?.[uid]?.prenom || '',
+    placeholder: invitee.prenom,
+  });
+  const erreur = el('p', { class: 'alerte', hidden: true });
+  const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Envoyer la demande' });
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: `Demander l’accès à « ${state.espace} »` }),
+      el('p', { class: 'panel__hint', text:
+        `L’équipe verra ta demande en ouvrant l’espace, avec ton prénom et ton adresse (${email}). Elle accepte, ou non — et si elle refuse, tu n’en seras pas averti.` }),
+      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Ton prénom' }), champ]),
+      erreur,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
+      valider,
+    ]),
+  ]);
+
+  valider.addEventListener('click', async () => {
+    const prenom = champ.value.trim();
+    if (!prenom) { champ.focus(); return; }
+    valider.disabled = true;
+    erreur.hidden = true;
+    try {
+      await remote.demanderAcces(state.espace, uid, { prenom, courriel: email });
+      await refreshEspace();
+      dismiss(dialog, () => {
+        toast('Demande envoyée. Un membre de l’équipe la verra en ouvrant l’espace.');
+        repaint();
+      });
+    } catch (err) {
+      erreur.textContent = err.message;
+      erreur.hidden = false;
+      valider.disabled = false;
+    }
+  });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  champ.focus();
+}
+
+async function verifierMonCourriel() {
+  try {
+    await remote.envoyerCourrielVerification();
+    toast(`Courriel de vérification envoyé à ${state.remoteSession.email}.`);
   } catch (err) {
     toast(err.message, 'danger');
   }
@@ -2380,9 +2653,7 @@ function repaint() { flush(); renderRail(); renderPanel(); }
 async function refreshEspace() {
   forgetEspace();
   state.remote = await loadEspace(state.espace);
-  state.membres = state.remoteSession
-    ? await remote.membres(state.espace).catch(() => [])
-    : [];
+  await releverLAppartenance();
   [state.profils, state.vitrines, state.stats, state.identite, state.corbeille] = await Promise.all([
     state.remoteSession ? remote.profilsEquipe(state.espace).catch(() => ({})) : {},
     remote.vitrines(state.espace),
@@ -2394,6 +2665,51 @@ async function refreshEspace() {
     await remote.presentation(state.espace).catch(() => null),
   );
   await verifierGardeFou();
+}
+
+/* Suis-je de l'équipe ? La question n'a pas deux réponses mais trois, et
+   c'est tout l'enjeu : membre, pas membre, ou pas su. Confondre les deux
+   dernières faisait dire au backoffice « tu es bien membre » à quelqu'un qui
+   venait de se voir refuser la lecture — un message faux, adressé
+   précisément à qui avait besoin d'un message juste.
+
+   Un refus des règles répond « non ». Une panne réseau ne répond rien : on
+   laisse alors `membre` à null, et l'écran dit qu'il n'a pas pu lire, sans
+   prétendre trancher.                                                   */
+async function releverLAppartenance() {
+  state.membres = [];
+  state.membre = null;
+  state.invitations = {};
+  state.demandes = {};
+  state.monEntree = null;
+  if (!state.remoteSession) return;
+
+  try {
+    state.membres = await remote.membres(state.espace);
+    state.membre = true;
+  } catch (err) {
+    if (!err.refus) return;      /* la base n'a pas répondu : on ne conclut pas */
+    state.membre = false;
+  }
+
+  if (state.membre) {
+    [state.invitations, state.demandes] = await Promise.all([
+      remote.invitations(state.espace).catch(() => ({})),
+      remote.demandes(state.espace).catch(() => ({})),
+    ]);
+    return;
+  }
+
+  /* Pas membre : reste à savoir par quelle porte cette personne peut
+     entrer. Les deux lectures sont permises aux non-membres — chacune ne
+     porte que sur soi. */
+  const { email, uid } = state.remoteSession;
+  const [invitation, demande, verifie] = await Promise.all([
+    remote.monInvitation(state.espace, email),
+    remote.maDemande(state.espace, uid),
+    remote.courrielVerifie().catch(() => false),
+  ]);
+  state.monEntree = { invitation, demande, verifie };
 }
 
 /* Poser une règle de base de données et croire qu'elle est là sont deux
