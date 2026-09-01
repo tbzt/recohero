@@ -697,21 +697,27 @@ function panneauQuestionnaires() {
    rouvrent la feuille existante : le déménagement se fait sans laisser de
    porte condamnée entre-temps. */
 function renderEspace() {
-  if (state.ongletEspace === 'questionnaires') {
-    dom.panel.replaceChildren(...panneauQuestionnaires());
+  const panneaux = {
+    questionnaires: panneauQuestionnaires,
+    equipe: contenuEquipe,
+    reglages: contenuReglages,
+  };
+  const construire = panneaux[state.ongletEspace];
+  if (construire) {
+    dom.panel.replaceChildren(...construire());
     return;
   }
-  const relais = {
-    vitrine: ouvrirPresentation,
-    frequentation: ouvrirFrequentation,
-    equipe: reglagesEspace,
-    reglages: reglagesEspace,
-  }[state.ongletEspace];
 
+  /* Vitrine et fréquentation gardent leur fenêtre pour l'instant : elles
+     portent leur propre état — un brouillon d'ordre qu'on enregistre, des
+     filtres — et les convertir demande plus qu'un déplacement de noeuds. La
+     porte reste ouverte plutôt que condamnée. */
+  const relais = { vitrine: ouvrirPresentation, frequentation: ouvrirFrequentation }[state.ongletEspace];
+  const onglet = ongletsEspace().find((o) => o.id === state.ongletEspace);
   dom.panel.replaceChildren(el('section', { class: 'panel' }, [
     el('div', { class: 'empty' }, [
-      el('div', { class: 'empty__icon', text: ongletsEspace().find((o) => o.id === state.ongletEspace)?.emoji || '✦' }),
-      el('p', { text: 'Ce réglage s’ouvre encore dans une fenêtre — son panneau arrive.' }),
+      el('div', { class: 'empty__icon', text: onglet?.emoji || '✦' }),
+      el('p', { text: `${onglet?.label} s’ouvre encore dans une fenêtre — son panneau arrive.` }),
       el('div', { class: 'row', style: { justifyContent: 'center', marginTop: 'var(--s-4)' } }, [
         el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'onglet-ouvrir', text: 'Ouvrir' }),
       ]),
@@ -1778,9 +1784,19 @@ function filesDAttente() {
   return bloc;
 }
 
-function reglagesEspace() {
+/* L'équipe, en panneau plein écran plutôt qu'en feuille modale. Une liste de
+   personnes à admettre ou à retirer n'est pas une parenthèse dans autre
+   chose : c'est un des écrans de l'espace. */
+function contenuEquipe() {
   const moi = state.remoteSession?.uid;
-  if (!moi) return undefined;
+  if (!moi) {
+    return [el('section', { class: 'panel' }, [
+      el('div', { class: 'empty' }, [
+        el('div', { class: 'empty__icon', text: '👥' }),
+        el('p', { text: 'Il faut être connecté à un espace pour en voir l’équipe.' }),
+      ]),
+    ])];
+  }
 
   const ligne = (m) => {
     const p = state.profils?.[m.uid];
@@ -1811,26 +1827,10 @@ function reglagesEspace() {
   const nombre = Math.max(1, state.membres.length);
   const listeLue = state.membres.length > 0;
 
-  return feuille(
-    state.identite?.titre || `Espace « ${state.espace} »`,
-    state.identite ? `Espace « ${state.espace} »` : null,
-    [
-      el('span', { class: 'field__label', text: 'Le kiosque' }),
-      el('div', { class: 'row' }, [
-        el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'identite-espace',
-          text: state.identite ? '✦ Apparence' : '✦ Personnaliser le kiosque' }),
-        el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'vitrine',
-          text: state.presentation.masques.size ? `▦ Vitrine · ${state.presentation.masques.size} masqué${state.presentation.masques.size > 1 ? 's' : ''}` : '▦ Vitrine' }),
-        el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'corbeille',
-          text: state.corbeille.length ? `🗑 Corbeille · ${state.corbeille.length}` : '🗑 Corbeille' }),
-        el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'frequentation',
-          text: '📊 Fréquentation' }),
-      ]),
-      !state.identite && el('p', { class: 'field__hint', text:
-        'Sans identité, le kiosque de cet espace affiche la marque RecoHero à vos usagers — son nom, son accroche et son pied de page.' }),
-
-      el('div', { class: 'section__head', style: { marginTop: 'var(--s-5)', marginBottom: 'var(--s-3)' } }, [
-        el('h3', { style: 'font-size:var(--t-base)', text: `Qui peut publier ici — ${nombre} membre${nombre > 1 ? 's' : ''}` }),
+  return [
+    el('section', { class: 'panel' }, [
+      el('div', { class: 'section__head' }, [
+        el('h2', { text: `Qui peut publier ici — ${nombre} membre${nombre > 1 ? 's' : ''}` }),
         el('span', { class: 'section__spacer' }),
         el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'inviter', text: '+ Inviter' }),
       ]),
@@ -1841,11 +1841,54 @@ function reglagesEspace() {
 
       ...filesDAttente(),
 
-      el('p', { class: 'field__hint', text:
+      el('p', { class: 'field__hint', style: { marginTop: 'var(--s-4)' }, text:
         'Inviter quelqu’un sans compte crée le sien et lui envoie un courriel : il choisit son mot de passe lui-même. Inviter une adresse qui a déjà un compte y dépose une invitation, que la personne réclame à sa prochaine connexion. Retirer quelqu’un lui ôte le droit de publier ici, sans supprimer son compte ni le retirer d’un autre espace.' }),
-    ],
-    [el('button', { class: 'btn btn--quiet', type: 'button', 'data-sheet': 'close', text: 'Fermer' })],
-  );
+    ]),
+  ];
+}
+
+/* Les réglages de l'espace. Vitrine et fréquentation ont désormais leur
+   onglet : les répéter ici en ferait des raccourcis vers soi-même. Ne restent
+   que l'apparence du kiosque et la corbeille — ce qu'on règle une fois, et ce
+   qu'on va rechercher rarement. */
+function contenuReglages() {
+  const partage = Boolean(state.espace && state.remoteSession);
+
+  return [
+    el('section', { class: 'panel' }, [
+      el('div', { class: 'section__head' }, [el('h2', { text: 'Réglages' })]),
+
+      partage && el('span', { class: 'field__label', text: 'Apparence du kiosque' }),
+      partage && el('div', { class: 'row' }, [
+        el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'identite-espace',
+          text: state.identite ? '✦ Modifier l’apparence' : '✦ Personnaliser le kiosque',
+        }),
+      ]),
+      partage && !state.identite && el('p', { class: 'field__hint', text:
+        'Sans identité, le kiosque de cet espace affiche la marque RecoHero à vos usagers — son nom, son accroche et son pied de page.' }),
+
+      partage && el('span', { class: 'field__label', style: { marginTop: 'var(--s-5)' }, text: 'Corbeille' }),
+      partage && el('div', { class: 'row' }, [
+        el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'corbeille',
+          text: state.corbeille.length
+            ? `🗑 Ouvrir · ${state.corbeille.length} questionnaire${state.corbeille.length > 1 ? 's' : ''}`
+            : '🗑 Ouvrir — elle est vide',
+        }),
+      ]),
+
+      !partage && el('p', { class: 'panel__hint', text:
+        'Cet ordinateur n’a pas de kiosque partagé à régler : les questionnaires y vivent en local, et le kiosque public est celui du dépôt. Ouvre un espace pour retrouver l’apparence, la corbeille, l’équipe et la fréquentation.' }),
+    ]),
+  ];
+}
+
+/* Reste joignable depuis l'ancien bouton du rail et depuis l'écran vide :
+   ces chemins mènent maintenant au bon onglet plutôt qu'à une fenêtre. */
+function reglagesEspace() {
+  state.ongletEspace = 'equipe';
+  return allerA('espace');
 }
 
 
