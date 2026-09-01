@@ -514,10 +514,29 @@ export async function restaurerQuiz(espace, id) {
   const trouve = items.find((q) => q.id === id);
   if (!trouve) throw new Error('Ce questionnaire n’est plus dans la corbeille.');
   const { supprimeLe, supprimePar, ...quiz } = trouve;
+  /* `updatedBy` reprend celui qui restaure, pas celui qui avait publié.
+     La règle l'exige — `quizzes/$quiz/updatedBy` valide
+     `newData.val() === auth.uid` — et rendre la ligne telle quelle faisait
+     donc échouer la restauration pour tout le monde sauf le dernier
+     publieur : c'est-à-dire précisément dans le cas qui justifie une
+     corbeille, quand ce n'est pas la même personne qui a publié et qui a
+     retiré, ou quand celle qui a publié est partie. Le message affiché
+     parlait alors d'appartenance à l'espace, ce qui envoyait chercher au
+     mauvais endroit.
+
+     C'est aussi ce que la ligne doit dire : restaurer est une publication,
+     faite par quelqu'un, un jour donné. `updatedAt` suit, sans quoi le rail
+     afficherait un nom et une date qui ne décrivent pas le même geste. */
+  const auth = session();
   await call(path(espace, `/${encodeURIComponent(id)}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...quiz, rev: Math.max(1, Number(quiz.rev) || 1) }),
+    body: JSON.stringify({
+      ...quiz,
+      rev: Math.max(1, Number(quiz.rev) || 1),
+      updatedBy: auth?.uid || quiz.updatedBy || '',
+      updatedAt: Date.now(),
+    }),
   });
   await jeterDefinitivement(espace, id);
   return quiz;
