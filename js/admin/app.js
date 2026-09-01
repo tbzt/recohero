@@ -11,6 +11,7 @@ import {
   normalize, diagnose, uid, slugify, safeImage, imageWeight, RECO_TYPES,
   normaliserIdentite, normaliserPresentation, presentationPourLaBase,
 } from '../core/schema.js';
+import { GLYPHES, EMOJIS, chercher } from '../core/symboles.js';
 import { reachability } from '../core/scoring.js';
 import { bindSortables } from '../core/sortable.js';
 import { questionView } from '../core/views.js';
@@ -1119,6 +1120,7 @@ function onClick(event) {
     case 'compte':           return monCompte();
     case 'espace':           return reglagesEspace();
     case 'mon-profil':       return monProfil();
+    case 'symbole':          return ouvrirSymboles(id);
     case 'inviter':          return inviter();
     case 'membre-retirer':   return retirerMembre(id);
     case 'demande-valider':  return validerDemande(id);
@@ -1193,6 +1195,88 @@ async function attachImage(bind, kind, file) {
   } catch (err) {
     toast(`Image refusée : ${err.message}`, 'danger');
   }
+}
+
+/* --- Choisir un signe ------------------------------------------------------
+   Trois champs demandaient un caractère qu'il fallait savoir taper. Sur un
+   poste sans pavé emoji, ✿ ou 🏛 supposaient une table de caractères ; la
+   liste de suggestions du glyphe d'axe, elle, ne se montrait qu'après avoir
+   commencé à écrire — or c'est justement ce qu'on ne sait pas faire.
+
+   Le champ reste libre et modifiable à la main : ce sélecteur ajoute un
+   chemin, il n'en ferme aucun. Quelqu'un qui a son propre signe le colle
+   comme avant.                                                           */
+function ouvrirSymboles(cible) {
+  const [bind, mode] = String(cible).split('|');
+  const emoji = mode === 'emoji';
+  const dictionnaire = emoji ? EMOJIS : GLYPHES;
+  const actuel = valeurLiee(bind);
+
+  const recherche = el('input', {
+    class: 'input', type: 'search',
+    placeholder: emoji ? 'polar, été, musique…' : 'étoile, cœur, fleur…',
+    'aria-label': 'Chercher un signe',
+  });
+  const grille = el('div', { class: 'stack' });
+  const vide = el('p', { class: 'field__hint', hidden: true, text: 'Aucun signe pour cette recherche.' });
+
+  const poser = (signe) => {
+    apply(bind, signe);
+    flush();
+    renderRail();
+    renderPanel();
+    dismiss(dialog);
+  };
+
+  const peindre = () => {
+    const trouves = chercher(dictionnaire, recherche.value);
+    vide.hidden = trouves.length > 0;
+    grille.replaceChildren(...trouves.map((groupe) => el('div', {}, [
+      el('span', { class: 'field__label', text: groupe.nom }),
+      el('div', { class: 'symboles' }, groupe.signes.map(([signe, mots]) => el('button', {
+        class: 'symbole' + (signe === actuel ? ' is-on' : ''),
+        type: 'button', title: mots,
+        /* Le signe seul ne se dit pas à voix haute : c'est le mot-clé qui
+           nomme le bouton pour une synthèse vocale. */
+        'aria-label': mots,
+        'aria-pressed': String(signe === actuel),
+        text: signe,
+        onClick: () => poser(signe),
+      }))),
+    ])));
+  };
+
+  recherche.addEventListener('input', peindre);
+  peindre();
+
+  const dialog = el('dialog', { class: 'modal modal--wide' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: emoji ? 'Choisir un emoji' : 'Choisir un glyphe' }),
+      el('p', { class: 'panel__hint', text: emoji
+        ? 'Une sélection utile en médiathèque, pas tout Unicode. Le champ reste libre : tu peux aussi coller le tien.'
+        : 'Des formes pleines, qui restent lisibles en petit et prennent la couleur de l’axe. Le champ reste libre.' }),
+      recherche, vide, grille,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      actuel && el('button', {
+        class: 'btn btn--quiet', type: 'button', text: 'Effacer',
+        onClick: () => poser(''),
+      }),
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
+    ]),
+  ]);
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  recherche.focus();
+}
+
+/* Ce que le champ contient à cet instant. On le lit dans le DOM plutôt que
+   dans le modèle : la frappe en cours n'y est pas encore écrite, et c'est
+   bien ce que la personne voit qu'il faut montrer comme sélectionné. */
+function valeurLiee(bind) {
+  return document.querySelector(`[data-bind="${CSS.escape(bind)}"]`)?.value?.trim() || '';
 }
 
 /* Ouvrir un questionnaire ne doit pas donner huit mille pixels d'un coup.

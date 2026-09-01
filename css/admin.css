@@ -845,7 +845,9 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
 /* --- Axes ------------------------------------------------------------------------ */
 .axis-row {
   display: grid;
-  grid-template-columns: 20px 4.2rem 1fr 46px auto;
+  /* La colonne du glyphe porte désormais le champ ET le bouton qui ouvre le
+     dictionnaire : 4,2 rem ne suffisaient plus. */
+  grid-template-columns: 20px 5.9rem 1fr 46px auto;
   align-items: center;
   gap: var(--s-2);
   padding: var(--s-2);
@@ -859,6 +861,60 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   font-size: var(--t-md);
   text-align: center;
   padding-inline: var(--s-1);
+}
+
+/* --- Champ de signe ---------------------------------------------------------
+   Le champ libre, et la porte vers le dictionnaire posée contre lui. Les deux
+   restent : taper son propre caractère marche toujours, choisir dans une
+   liste devient possible. */
+/* Cinq colonnes sur un téléphone, c'était une de trop : à 320 px le champ du
+   NOM tombait à 26 px — il ne restait plus de quoi écrire « Le Grand Large ».
+   La ligne passe donc sur deux rangs. Le haut porte ce qu'on écrit, le bas ce
+   qu'on règle : la couleur et les commandes de déplacement, alignées à
+   droite. Le défaut existait avant que la colonne du glyphe s'élargisse — il
+   se voyait seulement moins. */
+@media (max-width: 34rem) {
+  .axis-row { grid-template-columns: 20px 5.9rem 1fr; }
+  .axis-row > .swatch-input { grid-column: 2; grid-row: 2; }
+  .axis-row > .row { grid-column: 3; grid-row: 2; justify-self: end; }
+}
+
+.signe { display: flex; align-items: center; gap: var(--s-1); min-width: 0; }
+.signe__champ { flex: 1 1 auto; min-width: 0; }
+.signe__ouvrir { flex: none; }
+
+/* --- Le dictionnaire ----------------------------------------------------------
+   Une grille qui se remplit d'elle-même : `auto-fill` avec un minimum de
+   2,75 rem donne autant de colonnes que la largeur en permet, du téléphone au
+   grand écran, sans point de rupture à maintenir. */
+.symboles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.75rem, 1fr));
+  gap: var(--s-1);
+  margin-top: var(--s-1);
+}
+.symbole {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 44 px : la cible tactile, la même que partout ailleurs. Une grille de
+     signes se parcourt au doigt autant qu'à la souris. */
+  min-height: var(--tap);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  font-size: var(--t-md);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+.symbole:hover { background: var(--surface-2); border-color: var(--line); }
+.symbole:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.symbole.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 /* --- Règle de sortie ------------------------------------------------------------- */

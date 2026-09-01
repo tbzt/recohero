@@ -331,6 +331,11 @@
   color: var(--ink);
   box-shadow: var(--shadow-3);
 }
+/* Une boîte qui présente une grille — le dictionnaire de signes — gagne à
+   être plus large : à 34 rem elle n'offrait que six colonnes, et une
+   catégorie de quinze signes se lisait sur trois rangs hachés. */
+.modal--wide { max-width: min(46rem, calc(100vw - var(--s-6))); }
+
 /* Le corps défile, les actions restent. Sans cela c'est TOUTE la boîte qui
    défile, et « Enregistrer » se retrouve sous le bord de l'écran : on
    découvre alors qu'il fallait faire défiler un dialogue pour en sortir.

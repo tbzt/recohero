@@ -5,7 +5,7 @@
    qui écoute, applique et redessine.
    ========================================================================== */
 
-import { RECO_TYPES, GLYPHS, ACCENTS, RULE_MODES, slugify, imageWeight } from '../core/schema.js';
+import { RECO_TYPES, ACCENTS, RULE_MODES, slugify, imageWeight } from '../core/schema.js';
 import { ceilings } from '../core/scoring.js';
 import { el, formatBytes } from '../core/ui.js';
 
@@ -60,6 +60,22 @@ const field = (label, control, hint) => el('label', { class: 'field' }, [
 const input = (bind, value, props = {}) => el('input', {
   class: 'input', type: 'text', 'data-bind': bind, value: value ?? '', ...props,
 });
+
+/* Un champ de signe : la saisie libre, et à côté la porte vers le
+   dictionnaire. Le bouton ne remplace pas le champ, il s'y ajoute — qui sait
+   déjà taper son caractère continue de le taper. */
+const champSigne = (bind, value, mode, props = {}) => el('span', { class: 'signe' }, [
+  el('input', {
+    class: 'input signe__champ', type: 'text', 'data-bind': bind, value: value ?? '', ...props,
+  }),
+  el('button', {
+    class: 'btn btn--icon btn--quiet signe__ouvrir', type: 'button',
+    'data-act': 'symbole', 'data-id': `${bind}|${mode}`,
+    title: mode === 'emoji' ? 'Choisir un emoji' : 'Choisir un glyphe',
+    'aria-label': mode === 'emoji' ? 'Choisir un emoji' : 'Choisir un glyphe',
+    text: '⊞',
+  }),
+]);
 
 const textarea = (bind, value, props = {}) => {
   const node = el('textarea', { class: 'textarea', 'data-bind': bind, ...props });
@@ -130,7 +146,9 @@ export function identite(quiz, ctx = {}) {
     head('Identité', "Ce que le répondant voit avant de commencer. Le titre et l’emoji servent aussi de vignette au kiosque."),
     el('div', { class: 'card stack' }, [
       el('div', { class: 'grid-2' }, [
-        field('Emoji de couverture', input('q:emoji', quiz.emoji, { maxlength: '4', style: 'font-size:1.4rem;text-align:center' })),
+        field('Emoji de couverture', champSigne('q:emoji', quiz.emoji, 'emoji', {
+          class: 'input signe__champ', maxlength: '4', style: 'font-size:1.4rem;text-align:center',
+        })),
         field('Titre', input('q:title', quiz.title, { placeholder: 'Quel roman pour cet été ?' })),
       ]),
       field('Accroche', input('q:tagline', quiz.tagline, { placeholder: 'Une ligne pour donner envie.' }),
@@ -166,9 +184,8 @@ export function axes(quiz) {
           class: 'axis-row', style: { '--axis': axis.color },
         }, [
           grip(axis.label || `axe ${i + 1}`),
-          el('input', {
-            class: 'input axis-row__glyph', 'data-bind': `axis:${axis.id}:glyph`,
-            value: axis.glyph, maxlength: '3', list: 'glyphs', 'aria-label': 'Glyphe',
+          champSigne(`axis:${axis.id}:glyph`, axis.glyph, 'glyphe', {
+            class: 'input signe__champ axis-row__glyph', maxlength: '3', 'aria-label': 'Glyphe',
           }),
           input(`axis:${axis.id}:label`, axis.label, { placeholder: `Axe ${i + 1}`, 'aria-label': 'Nom de l’axe' }),
           el('input', {
@@ -186,7 +203,6 @@ export function axes(quiz) {
           el('div', { class: 'empty__icon', text: '★' }),
           el('p', { text: 'Aucun axe. Sans axe, il n’y a rien à compter.' }),
         ]),
-    el('datalist', { id: 'glyphs' }, GLYPHS.map((g) => el('option', { value: g }))),
     el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-4)' } , text:
       'Supprimer un axe efface aussi les points que les réponses lui donnaient. C’est irréversible.' }),
   ]);
@@ -356,9 +372,8 @@ function questionCard(quiz, question, index, ctx = {}) {
           return el('div', { class: 'opt-wrap' + (open ? ' is-open' : '') }, [
             el('div', { class: 'opt' }, [
               grip(`réponse ${j + 1}`),
-              el('input', {
-                class: 'input', 'data-bind': `option:${question.id}:${option.id}:emoji`,
-                value: option.emoji, maxlength: '4', placeholder: '🙂',
+              champSigne(`option:${question.id}:${option.id}:emoji`, option.emoji, 'emoji', {
+                class: 'input signe__champ', maxlength: '4', placeholder: '🙂',
                 style: 'text-align:center', 'aria-label': 'Emoji',
               }),
               input(`option:${question.id}:${option.id}:text`, option.text,
