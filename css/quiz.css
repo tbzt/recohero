@@ -76,8 +76,66 @@
   background: transparent;
 }
 .quizbar { position: sticky; }
+/* --- Le compteur sur téléphone ---------------------------------------------
+   Sur une ligne partagée avec le titre, le compteur était plafonné à 60 % de
+   la barre : à dix axes sur 320 px, il en montrait UN à la fois et il fallait
+   le faire défiler pour voir sa récolte. Un compteur qu'on doit faire défiler
+   pour se lire ne compte plus rien.
+
+   Il prend donc sa propre ligne, pleine largeur, et chaque axe passe en
+   colonne — glyphe au-dessus du nombre. Empilé, un axe tient dans la largeur
+   d'un glyphe au lieu de la largeur d'un glyphe PLUS celle d'un nombre : la
+   même récolte occupe à peu près la moitié de la place. Avec `flex: 1 1 0`,
+   les axes se partagent la ligne à parts égales et rentrent quel qu'en soit
+   le nombre — dix sur 320 px font 28 px chacun.
+
+   La barre est collante, et ce qu'elle prend le parcours ne l'a plus : c'est
+   pourquoi la deuxième ligne est serrée au maximum et les corps réduits d'un
+   cran. */
 @media (max-width: 34rem) {
   .quizbar__title { max-width: 8rem; font-size: var(--t-sm); }
+
+  /* Le compteur descend d'une ligne SEULEMENT s'il ne tient pas à côté du
+     titre. Rien ne le décide en JavaScript : un élément flexible passe à la
+     ligne quand sa largeur naturelle ne rentre plus, et empilé il est deux
+     fois plus étroit qu'en ligne. Un questionnaire à trois axes garde donc
+     son bandeau de 57 px ; c'est celui à dix qui prend la seconde ligne, et
+     lui seul. */
+  /* 1. Empiler, toujours. Le nombre passe SOUS le glyphe au lieu d'être à
+        côté : un axe occupe alors la largeur d'un glyphe seul, soit environ
+        22 px au lieu de 45. À trois axes, le compteur en ligne n'en montrait
+        déjà que deux — le problème n'attendait pas dix axes. */
+  /* Le compteur ne se comprime plus. Il n'obtenait que 66 px des 320 quand il
+     lui en fallait 94 : à largeur disputée, c'est le titre qui cédait le
+     terrain, pas lui. Or le titre sait s'abréger d'une ellipse et reste
+     lisible ; un compteur rogné, lui, ment sur la récolte. */
+  .quizbar__tally { flex: none; gap: var(--s-2); }
+  .quizbar__title { min-width: 0; }
+  .quizbar__tally .tally__axis {
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  /* 2. Descendre d'une ligne, seulement quand il le faut. Empilé, le
+        compteur tient à côté du titre jusqu'à cinq axes ; au-delà il prend
+        la largeur entière et se répartit dessus. Le seuil est compté en
+        JavaScript, qui seul connaît le nombre d'axes. */
+  .quizbar__inner.is-empile { flex-wrap: wrap; row-gap: var(--s-1); }
+  .is-empile .quizbar__tally {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+    margin-left: 0;
+    justify-content: space-around;
+  }
+  /* Interligne à 1 : sans cela, un glyphe de 16 px et un nombre de 12
+     occupaient 45 px de haut à eux deux, dont 17 de vide. Sur une barre
+     collante, ce vide se paie sur le parcours. */
+  .quizbar__tally .tally__glyph,
+  .quizbar__tally.is-dense .tally__glyph { font-size: var(--t-base); line-height: 1; }
+  .quizbar__tally .tally__count { font-size: var(--t-xs); line-height: 1; min-width: 0; }
 }
 
 /* --- Les points qui volent --------------------------------------------------

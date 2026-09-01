@@ -199,11 +199,18 @@ function updateBar() {
 
   const scores = tally(quiz, state.answers);
   /* Dix au plus, comme la carte de résultat — et resserrés au-delà de six.
-     Le bandeau est collant : ce qu'il prend, le parcours ne l'a plus. Il
-     défile horizontalement dans sa propre boîte, c'est ce qui lui permet
-     d'en porter dix sans repousser le titre. */
+     Le bandeau est collant : ce qu'il prend, le parcours ne l'a plus. */
   const montres = quiz.axes.slice(0, 10);
   dom.tally.classList.toggle('is-dense', montres.length > 6);
+
+  /* Sur téléphone, le CSS empile déjà le nombre sous le glyphe, ce qui rend
+     un axe deux fois plus étroit. Empilé, le compteur tient à côté du titre
+     jusqu'à cinq axes ; au-delà il lui faut la ligne entière.
+
+     Le seuil est ici et non en CSS parce qu'une requête de média ne sait pas
+     compter les axes ; et il ne s'applique qu'au téléphone, ce que le CSS,
+     lui, sait décider. Chacun tranche ce qu'il peut voir. */
+  dom.tally.parentElement?.classList.toggle('is-empile', montres.length > 5);
 
   /* Le compteur est une région vivante : le reconstruire à chaque rendu
      le ferait relire à chaque changement d'écran, alors que rien n'a
