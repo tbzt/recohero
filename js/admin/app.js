@@ -8,7 +8,7 @@
 import { PANELS, poidsHorsEchelle } from './panels.js';
 import {
   makeQuiz, makeAxis, makeQuestion, makeOption, makeResult, makeReco,
-  normalize, diagnose, uid, slugify, safeImage, imageWeight,
+  normalize, diagnose, uid, slugify, safeImage, imageWeight, RECO_TYPES,
   normaliserIdentite, normaliserPresentation, presentationPourLaBase,
 } from '../core/schema.js';
 import { reachability } from '../core/scoring.js';
@@ -907,13 +907,7 @@ function onClick(event) {
   };
 
   switch (act) {
-    case 'new-quiz': {
-      const created = makeQuiz();
-      store.saveDraft(created);
-      select(created.id);
-      state.panel = 'identite';
-      return structural();
-    }
+    case 'new-quiz': return assistantCreation();
     case 'select': return (select(id), structural());
     case 'panel': {
       state.panel = PANELS.some((p) => p.id === id) ? id : 'identite';
@@ -1032,7 +1026,7 @@ function onClick(event) {
     case 'res-down': return reorder('Profil déplacé', () => move(quiz.results, id, 1));
 
     case 'reco-add': return undoable('Recommandation ajoutée', () => {
-      byId(quiz.results, id)?.recos.push(makeReco());
+      byId(quiz.results, id)?.recos.push(makeReco(quiz.typeParDefaut));
     });
     case 'reco-del': return undoable('Recommandation retirée', () => {
       const result = byId(quiz.results, ownerId);
@@ -2410,6 +2404,169 @@ function envolerLaFiche(titre) {
   const retirer = () => { if (retiree) return; retiree = true; clearTimeout(secours); couche.remove(); };
   const secours = setTimeout(retirer, 6000);
   feuille.getAnimations?.().forEach((a) => a.finished.then(retirer, retirer));
+}
+
+/* --- L'assistant de création ---------------------------------------------------
+   « + Nouveau questionnaire » ouvrait l'éditeur complet sur un document qui
+   s'annonçait déjà en échec : dix lignes de diagnostic, quatre en rouge, et
+   des valeurs que personne n'avait choisies — « Nouveau questionnaire »,
+   « Axe 1 », « Axe 2 », « Axe 3 ». Le premier écran d'un outil ne devrait pas
+   être une liste de fautes qu'on n'a pas commises.
+
+   Trois questions, et pas une de plus. Chacune doit gagner sa place : elle
+   remplace une valeur par défaut que l'auteur aurait dû corriger de toute
+   façon, et elle porte SES mots, pas les nôtres.
+
+   CE QUE L'ASSISTANT NE FAIT PAS, et c'est le point : il ne rédige rien. Pas
+   d'accroche suggérée, pas de question modèle, pas de profil tout écrit. La
+   personne devant cet écran fait un métier d'écriture et de médiation ; lui
+   souffler ses phrases serait lui dire qu'on le fait mieux qu'elle. On règle
+   la charpente, elle écrit.
+
+   Le nombre d'axes est la décision la plus lourde du questionnaire — elle
+   commande les profils, les règles et toutes les pesées — et elle se prenait
+   en silence, à trois. C'est la seule qu'on insiste pour poser.           */
+
+const AXES_MIN = 2;
+const AXES_MAX = 6;
+
+function assistantCreation() {
+  const choix = { type: 'livre', titre: '', axes: ['', '', ''] };
+  let etape = 0;
+
+  const corps = el('div', { class: 'modal__body stack' });
+  const pied = el('div', { class: 'modal__actions' });
+  const dialog = el('dialog', { class: 'modal' }, [corps, pied]);
+
+  const creer = () => {
+    const quiz = makeQuiz({
+      title: choix.titre.trim() || 'Questionnaire sans titre',
+      typeParDefaut: choix.type,
+    });
+    quiz.axes = choix.axes.map((nom, i) => ({ ...makeAxis(i), label: nom.trim() || `Axe ${i + 1}` }));
+    quiz.questions = [makeQuestion(quiz.axes)];
+    /* Un seul profil, et c'est le filet. Le défaut ordinaire — « axe
+       dominant » sur le premier axe — laisserait sans résultat quiconque
+       penche ailleurs, tant qu'il n'y a qu'une sortie. Le filet, lui, est
+       juste dès le premier jour et le reste. */
+    quiz.results = [{
+      ...makeResult([], choix.type),
+      rule: { mode: 'fallback', axis: null, min: 0, max: 999 },
+    }];
+
+    store.saveDraft(quiz);
+    dismiss(dialog, () => {
+      select(quiz.id);
+      /* On atterrit sur les questions : les axes sont nommés, le titre est
+         posé, il ne reste qu'à écrire — c'est là que le travail commence. */
+      state.panel = 'questions';
+      flush();
+      renderRail();
+      renderPanel();
+      renderTopbar();
+      toast(`« ${quiz.title} » est prêt à écrire.`);
+    });
+  };
+
+  const dessiner = () => {
+    corps.replaceChildren();
+    pied.replaceChildren();
+
+    corps.append(el('p', { class: 'field__hint', text: `Étape ${etape + 1} sur 3` }));
+
+    if (etape === 0) {
+      corps.append(
+        el('h2', { text: 'Qu’avez-vous envie de faire découvrir ?' }),
+        el('p', { class: 'panel__hint', text: 'Cela préremplit le type de chaque nouvelle recommandation. Rien n’est figé : une reco peut toujours être d’un autre type.' }),
+        el('div', { class: 'row', style: { flexWrap: 'wrap', marginTop: 'var(--s-3)' } },
+          RECO_TYPES.filter((t) => t.id !== 'autre').map((t) => el('button', {
+            class: 'btn btn--sm ' + (choix.type === t.id ? 'btn--primary' : 'btn--ghost'),
+            type: 'button', 'data-pas': 'type', 'data-valeur': t.id,
+            text: `${t.icon} ${t.label}`,
+          }))),
+      );
+      pied.append(
+        el('button', { class: 'btn btn--quiet', type: 'button', 'data-pas': 'fermer', text: 'Annuler' }),
+        el('button', { class: 'btn btn--primary', type: 'button', 'data-pas': 'suivant', text: 'Suivant →' }),
+      );
+    }
+
+    if (etape === 1) {
+      const champ = el('input', {
+        class: 'input', value: choix.titre, maxlength: '120',
+        placeholder: 'Quel roman pour cet été ?', 'aria-label': 'Titre du questionnaire',
+      });
+      champ.addEventListener('input', () => { choix.titre = champ.value; });
+      champ.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); etape = 2; dessiner(); }
+      });
+      corps.append(
+        el('h2', { text: 'Comment s’appelle-t-il ?' }),
+        el('p', { class: 'panel__hint', text: 'C’est ce que verront vos usagers, sur la vignette du kiosque comme sur l’affiche. Il se change à tout moment.' }),
+        el('div', { style: { marginTop: 'var(--s-3)' } }, [champ]),
+      );
+      pied.append(
+        el('button', { class: 'btn btn--quiet', type: 'button', 'data-pas': 'retour', text: '← Retour' }),
+        el('button', { class: 'btn btn--primary', type: 'button', 'data-pas': 'suivant', text: 'Suivant →' }),
+      );
+      setTimeout(() => champ.focus(), 0);
+    }
+
+    if (etape === 2) {
+      const lignes = el('div', { class: 'stack', style: { marginTop: 'var(--s-3)' } },
+        choix.axes.map((nom, i) => {
+          const champ = el('input', {
+            class: 'input', value: nom, maxlength: '60',
+            placeholder: ['Le Ressac', 'Le Grand Large', 'La Loupe', 'La Veilleuse', 'Le Détour', 'Le Fil'][i] || `Tempérament ${i + 1}`,
+            'aria-label': `Tempérament ${i + 1}`,
+          });
+          champ.addEventListener('input', () => { choix.axes[i] = champ.value; });
+          return el('div', { class: 'row' }, [
+            champ,
+            choix.axes.length > AXES_MIN && el('button', {
+              class: 'btn btn--icon btn--quiet', type: 'button',
+              'data-pas': 'axe-moins', 'data-valeur': String(i),
+              title: 'Retirer ce tempérament', text: '✕',
+            }),
+          ]);
+        }));
+
+      corps.append(
+        el('h2', { text: 'Quels tempéraments voulez-vous distinguer ?' }),
+        el('p', { class: 'panel__hint', text: 'Ce sont les directions que vos questions vont compter, et ce qui décidera des profils. Deux suffisent ; au-delà de quatre, l’équilibre devient difficile à tenir.' }),
+        lignes,
+        choix.axes.length < AXES_MAX && el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button', 'data-pas': 'axe-plus',
+          style: { marginTop: 'var(--s-2)' }, text: '+ Un tempérament',
+        }),
+      );
+      pied.append(
+        el('button', { class: 'btn btn--quiet', type: 'button', 'data-pas': 'retour', text: '← Retour' }),
+        el('button', { class: 'btn btn--primary', type: 'button', 'data-pas': 'creer', text: 'Créer le questionnaire' }),
+      );
+    }
+  };
+
+  dialog.addEventListener('click', (event) => {
+    const pas = event.target.closest('[data-pas]');
+    if (!pas) return;
+    const { valeur } = pas.dataset;
+    switch (pas.dataset.pas) {
+      case 'type':      choix.type = valeur; dessiner(); break;
+      case 'suivant':   etape += 1; dessiner(); break;
+      case 'retour':    etape -= 1; dessiner(); break;
+      case 'axe-plus':  choix.axes.push(''); dessiner(); break;
+      case 'axe-moins': choix.axes.splice(Number(valeur), 1); dessiner(); break;
+      case 'creer':     creer(); break;
+      default:          dismiss(dialog); break;
+    }
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+
+  dessiner();
+  document.body.append(dialog);
+  dialog.showModal();
+  return undefined;
 }
 
 /* --- L'affiche ----------------------------------------------------------------

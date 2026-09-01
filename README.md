@@ -37,9 +37,23 @@ Au-delà de quatre axes, l'éditeur fait passer la rangée de pesées sous la
 ligne de réponse plutôt que de la comprimer ; la carte de résultat rétrécit
 ses glyphes au-delà de six et en affiche huit au maximum.
 
-**Les questions** proposent des réponses, et chaque réponse distribue des
-points aux axes. Une réponse peut donner 2 étoiles, ou 1 étoile et 1 rond, ou
-rien du tout. Une question accepte une seule réponse ou plusieurs.
+Créer un questionnaire passe par trois questions — ce qu'on recommande, le
+titre, et les tempéraments à distinguer. L'assistant ne règle que la
+charpente : il ne rédige ni accroche, ni question, ni profil. Le nombre d'axes
+est la décision la plus lourde du questionnaire, puisqu'elle commande les
+profils, les règles et toutes les pesées ; elle se prenait jusqu'ici en
+silence, à trois.
+
+**Les questions** proposent des réponses, et chaque réponse dit ce qu'elle
+révèle de chaque axe : *un peu*, *beaucoup*, *à fond*, ou rien. Ce sont des
+points sous le capot — de 0 à 3 — et le bouton **⚖ Points** rend le réglage
+au point près, de -9 à 9, pour qui en a besoin. Un questionnaire dont les
+valeurs sortent de l'échelle simple reste en mode numérique : afficher
+« à fond » pour un 7 serait montrer autre chose que ce qui est écrit.
+
+Une réponse peut donc peser sur plusieurs axes à la fois — beaucoup d'étoiles
+et un peu de ronds — ou sur aucun. Une question accepte une seule réponse ou
+plusieurs.
 
 **Les profils** sont les sorties. Chacun se déclenche sur une condition :
 

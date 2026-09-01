@@ -122,11 +122,15 @@ export function makeQuestion(axes = []) {
   };
 }
 
-export function makeReco() {
-  return { id: uid('reco'), type: 'livre', title: '', creator: '', year: '', note: '', link: '', image: '', location: '' };
+/* Le type d'une nouvelle recommandation suit celui du questionnaire. Un
+   kiosque consacré aux films n'a aucune raison de proposer « Livre » à
+   chaque ajout, puis de le corriger vingt fois. */
+export function makeReco(type = 'livre') {
+  const sur = RECO_TYPES.some((t) => t.id === type) ? type : 'livre';
+  return { id: uid('reco'), type: sur, title: '', creator: '', year: '', note: '', link: '', image: '', location: '' };
 }
 
-export function makeResult(axes = []) {
+export function makeResult(axes = [], type = 'livre') {
   return {
     id: uid('res'),
     title: '',
@@ -136,7 +140,7 @@ export function makeResult(axes = []) {
     rule: axes.length
       ? { mode: 'dominant', axis: axes[0].id, min: 0, max: 99 }
       : { mode: 'fallback', axis: null, min: 0, max: 99 },
-    recos: [makeReco()],
+    recos: [makeReco(type)],
   };
 }
 
@@ -151,6 +155,9 @@ export function makeQuiz(partial = {}) {
     emoji: '✦',
     image: '',
     accent: ACCENTS[0],
+    /* Ce que ce questionnaire recommande, en général. Purement éditorial :
+       il ne sert qu'à préremplir le type d'une nouvelle recommandation. */
+    typeParDefaut: 'livre',
     axes,
     questions: [makeQuestion(axes)],
     results: [makeResult(axes)],
@@ -256,6 +263,7 @@ export function normalize(raw) {
     emoji: String(raw.emoji || '✦').slice(0, 8),
     image: safeImage(raw.image),
     accent: /^#[0-9a-f]{3,8}$/i.test(raw.accent || '') ? raw.accent : ACCENTS[0],
+    typeParDefaut: RECO_TYPES.some((t) => t.id === raw.typeParDefaut) ? raw.typeParDefaut : 'livre',
     axes,
     questions,
     results,
