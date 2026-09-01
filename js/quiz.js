@@ -5,7 +5,7 @@
    aucun gestionnaire en ligne dans le HTML.
    ========================================================================== */
 
-import { resolveQuiz } from './core/catalog.js';
+import { resolveQuiz, loadAll } from './core/catalog.js';
 import { vitrines as chargerVitrines, compterParcours, compterDebut } from './core/remote.js';
 import { tally, resolve, proximite, indices } from './core/scoring.js';
 import { RECO_TYPES, slugify, dureeEstimee } from './core/schema.js';
@@ -181,6 +181,10 @@ function dessiner() {
     if (!firstPaint) window.parent.postMessage({ type: 'recohero:scroll' }, EMBED_TARGET);
   }
   firstPaint = false;
+
+  /* Après le rendu, jamais pendant : le catalogue arrive quand il arrive, et
+     le résultat n'a pas à l'attendre. */
+  if (step >= quiz.questions.length) suite(quiz);
 }
 
 let derniersScores = null;
@@ -400,12 +404,25 @@ function renderQuestion(question, index) {
     ]));
   }
 
+  /* Une question à choix multiple n'enchaîne pas toute seule, et rien ne le
+     disait. Après sept questions qui avancent d'elles-mêmes, la huitième
+     paraît ne pas répondre au clic : on coche, il ne se passe rien, et on
+     attend. Le bouton porte donc la consigne au lieu d'un « Suivant » qui
+     suppose qu'on ait deviné qu'il faut le presser. */
+  if (multiple) {
+    view.append(el('p', { class: 'astuce', text:
+      'Cochez tout ce qui vous tente — autant que vous voulez —, puis validez.' }));
+  }
+
+  const dernier = index + 1 === quiz.questions.length;
   view.append(el('div', { class: 'navrow' }, [
     el('button', { class: 'btn btn--quiet', type: 'button', 'data-act': 'back', text: '← Précédent' }),
     el('span', { class: 'navrow__spacer' }),
     (multiple || chosen.size) && el('button', {
       class: 'btn btn--primary', type: 'button', 'data-act': 'next',
-      text: index + 1 === quiz.questions.length ? 'Voir le résultat' : 'Suivant →',
+      text: multiple && !chosen.size
+        ? 'Choisissez au moins une réponse'
+        : (dernier ? 'Voir le résultat' : 'Suivant →'),
       'aria-disabled': chosen.size ? null : 'true',
     }),
   ]));
@@ -534,6 +551,9 @@ function renderResult() {
 
     presqueNode(quiz, scores, profile),
 
+    /* Rempli après coup, quand le catalogue a répondu — voir `suite()`. */
+    el('section', { class: 'suite' }),
+
     el('div', { class: 'result__actions' }, [
       el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'card', text: '🖼 Ma carte de résultat' }),
       el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'share', text: '⤴ Partager ce questionnaire' }),
@@ -546,6 +566,46 @@ function renderResult() {
      après coup : la largeur au repos est donc toujours juste, même si
      l'onglet est en arrière-plan quand le résultat est calculé.        */
   return node;
+}
+
+/* --- Et après ? -----------------------------------------------------------------
+   Le résultat laissait devant « Refaire » et « Retour au kiosque ». Or c'est
+   précisément l'instant où l'envie est là : quelqu'un qui vient de recevoir
+   trois livres qui lui ressemblent est disposé à en essayer un autre, et on
+   lui demandait de retourner chercher lui-même.
+
+   Deux au plus, et jamais le questionnaire qu'on vient de finir. Le catalogue
+   est chargé APRÈS l'affichage du résultat : la récompense ne doit pas
+   attendre une requête réseau, et si celle-ci échoue il ne manque rien.
+
+   Ni en mode embarqué — on n'emmène pas ailleurs le visiteur du site d'un
+   tiers — ni sur une borne, dont le QR code désigne un questionnaire précis
+   et qui doit revenir à celui-là. */
+async function suite(quiz) {
+  if (isEmbed || isKiosque) return;
+  const cible = dom.stage.querySelector('.suite');
+  if (!cible) return;
+
+  const autres = (await loadAll({ espace }).catch(() => []))
+    .filter((q) => q.id !== quiz.id && q.questions?.length)
+    .slice(0, 2);
+  if (!autres.length || !cible.isConnected) return;
+
+  cible.replaceChildren(
+    el('p', { class: 'suite__intro', text: 'Envie d’en essayer un autre ?' }),
+    el('div', { class: 'suite__liste' }, autres.map((q) => el('a', {
+      class: 'suite__carte',
+      href: avecEspace(`quiz.html?q=${encodeURIComponent(q.id)}`, espace),
+      style: { '--card-accent': q.accent },
+    }, [
+      el('span', { class: 'suite__emoji', text: q.emoji || '✦', 'aria-hidden': 'true' }),
+      el('span', { class: 'suite__corps' }, [
+        el('span', { class: 'suite__nom', text: q.title }),
+        q.tagline && el('span', { class: 'suite__accroche', text: q.tagline }),
+      ]),
+      el('span', { class: 'suite__fleche', text: '→', 'aria-hidden': 'true' }),
+    ]))),
+  );
 }
 
 /* Les réponses qui ont poussé le plus fort vers ce profil, rendues telles
