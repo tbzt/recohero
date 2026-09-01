@@ -155,6 +155,60 @@ export function proximite(quiz, scores, gagnant) {
   };
 }
 
+/* --- Ce qui a pesé -------------------------------------------------------------
+   Le résultat disait QUOI sans jamais dire POURQUOI. Le texte du profil
+   décrit une sensibilité générale, la feuille de score donne des nombres,
+   mais rien ne reliait le verdict aux choix qu'on venait de faire — et une
+   recommandation qu'on ne peut pas rattacher à soi se lit comme une sortie
+   de machine.
+
+   On rend donc au répondant SES propres réponses, celles qui ont poussé le
+   plus fort dans la direction retenue. Rien n'est inventé ni reformulé : ce
+   sont les phrases écrites par la bibliothécaire, et les points sont ceux
+   qui ont réellement servi au calcul.
+
+   L'axe qui décide dépend de la règle. « Axe dominant » et « palier sur un
+   axe » en nomment un : c'est celui-là qu'on regarde. « Palier sur le total »
+   et « par défaut » n'en nomment aucun — pour eux, ce qui compte est ce qui
+   a le plus rapporté, toutes couleurs confondues. Prétendre le contraire
+   serait désigner un coupable au hasard.                                  */
+
+export function indices(quiz, answers, resultat, combien = 3) {
+  const nomme = resultat?.rule?.mode === 'dominant' || resultat?.rule?.mode === 'range';
+  const axeId = nomme ? resultat.rule.axis : null;
+
+  const retenus = [];
+  quiz.questions.forEach((question, rang) => {
+    const choisi = answers[question.id];
+    if (choisi == null) return;
+    for (const optionId of Array.isArray(choisi) ? choisi : [choisi]) {
+      const option = question.options.find((o) => o.id === optionId);
+      if (!option) continue;
+      /* Sur le total, seuls les apports POSITIFS comptent : une réponse qui
+         retire des points n'a mené nulle part, elle a éloigné. */
+      const points = axeId
+        ? (option.scores[axeId] || 0)
+        : Object.values(option.scores).reduce((s, v) => s + Math.max(0, v), 0);
+      if (points > 0) retenus.push({ question, option, points, rang });
+    }
+  });
+
+  /* On choisit sur les points, on affiche dans l'ordre du parcours : « vous
+     avez dit ceci, puis cela » se relit, un classement décroissant non. */
+  const meilleurs = [...retenus]
+    .sort((a, b) => b.points - a.points)
+    .slice(0, combien)
+    .sort((a, b) => a.rang - b.rang);
+
+  /* Un seul choix n'est pas un faisceau d'indices, c'est une anecdote. */
+  if (meilleurs.length < 2) return null;
+
+  return {
+    axe: axeId ? quiz.axes.find((a) => a.id === axeId) || null : null,
+    choix: meilleurs,
+  };
+}
+
 /* Un profil est-il atteignable ? Le backoffice s'en sert pour prévenir
    avant publication qu'une règle ne se déclenchera jamais.
    On explore exhaustivement quand c'est petit, on échantillonne sinon.

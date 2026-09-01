@@ -741,6 +741,56 @@ html.a-la-transition .view-enter { animation: none; }
 
 /* La porte entrouverte. Volontairement en retrait : c'est une invitation
    à revenir, pas un second résultat qui concurrencerait le premier. */
+/* --- Ce qui a pesé ------------------------------------------------------------
+   Discret par construction : ce sont les propres mots du répondant qu'on lui
+   rend, pas une démonstration. Le bloc s'efface devant le profil qui le
+   précède et devant les prescriptions qui le suivent. */
+.indices {
+  margin-bottom: var(--s-6);
+  padding: var(--s-4) var(--s-5);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+}
+.indices__intro {
+  font-size: var(--t-sm);
+  color: var(--ink-muted);
+  margin-bottom: var(--s-3);
+}
+.indices__intro strong {
+  font-family: var(--font-display);
+  color: var(--accent-deep);
+}
+.indices__liste {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.indices__liste li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  min-width: 0;   /* item de flex porteur de texte : sans ça, l'ancêtre déborde */
+}
+.indices__reponse {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  line-height: var(--lh-snug);
+}
+/* Même mélange que partout ailleurs : une couleur d'axe posée en TEXTE se
+   marie à l'encre, sinon elle tombe sous le seuil de contraste en thème
+   sombre. */
+.indices__poids {
+  flex: none;
+  font-size: var(--t-sm);
+  font-weight: var(--fw-medium);
+  color: color-mix(in oklab, var(--axis, var(--accent)) 68%, var(--ink));
+  font-variant-numeric: tabular-nums;
+}
+
 .presque {
   animation: reco-in var(--dur-slow) var(--ease-out) both;
   animation-delay: 320ms;

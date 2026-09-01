@@ -7,7 +7,7 @@
 
 import { resolveQuiz } from './core/catalog.js';
 import { vitrines as chargerVitrines, compterParcours, compterDebut } from './core/remote.js';
-import { tally, resolve, proximite } from './core/scoring.js';
+import { tally, resolve, proximite, indices } from './core/scoring.js';
 import { RECO_TYPES, slugify, dureeEstimee } from './core/schema.js';
 import { questionView } from './core/views.js';
 import * as store from './core/store.js';
@@ -507,6 +507,12 @@ function renderResult() {
       });
     })()),
 
+    /* Ce qui a pesé, entre la récolte et la prescription : le résultat se
+       lit alors dans l'ordre où il s'est établi — voilà ce que vous avez
+       récolté, voilà ce qui l'a fait pencher, voilà donc ce qu'on vous
+       propose. */
+    indicesNode(quiz, profile),
+
     profile.recos.length ? recosNode : null,
 
     presqueNode(quiz, scores, profile),
@@ -523,6 +529,40 @@ function renderResult() {
      après coup : la largeur au repos est donc toujours juste, même si
      l'onglet est en arrière-plan quand le résultat est calculé.        */
   return node;
+}
+
+/* Les réponses qui ont poussé le plus fort vers ce profil, rendues telles
+   que le répondant les a choisies.
+
+   Une seule fois, et pas sous chaque recommandation. L'audit proposait une
+   ligne d'explication par œuvre ; mais toutes les recommandations d'un
+   profil ont exactement la même cause — le profil — et la même phrase
+   répétée trois fois de suite cesse d'être une explication pour devenir du
+   bruit. Un faisceau d'indices, posé une fois avant la liste, dit la même
+   chose et se lit. */
+function indicesNode(quiz, profile) {
+  const trouve = indices(quiz, state.answers, profile);
+  if (!trouve) return null;
+
+  /* « vers » et non « du côté de ». Le nom d'un axe est du texte libre :
+     « Le Grand Large », « La Loupe », « Curiosité ». Toute préposition qui
+     se contracte devant un article — de, à — produit « du côté de Le Grand
+     Large ». « vers » ne se contracte jamais, quel que soit le nom écrit. */
+  const titre = trouve.axe
+    ? ['Ce qui vous a mené vers ', el('strong', { text: trouve.axe.label })]
+    : ['Ce qui a pesé'];
+
+  return el('section', { class: 'indices' }, [
+    el('p', { class: 'indices__intro' }, titre),
+    el('ul', { class: 'indices__liste' }, trouve.choix.map(({ option, points }) => el('li', {}, [
+      el('span', { class: 'indices__reponse', text: option.text }),
+      trouve.axe && el('span', {
+        class: 'indices__poids',
+        style: { '--axis': trouve.axe.color },
+        text: `+${points} ${trouve.axe.glyph}`,
+      }),
+    ]))),
+  ]);
 }
 
 /* « Vous n'étiez pas loin de… ». Ne s'affiche que si c'est vrai — la
@@ -610,11 +650,25 @@ function pick(button) {
   if (!question) return;
   const optionId = button.dataset.option;
   const option = question.options.find((o) => o.id === optionId);
-  const gains = option
-    ? state.quiz.axes
-        .map((axe) => ({ axe, points: option.scores[axe.id] || 0 }))
-        .filter((g) => g.points > 0)
-    : [];
+
+  /* Le bouton n'appartient pas à l'écran courant : on l'ignore.
+     `render()` passe par `startViewTransition`, qui est ASYNCHRONE. `go()`
+     avance `state.step` tout de suite, mais le DOM ne se remplace qu'au
+     moment où le navigateur exécute la transition. Entre les deux, les
+     boutons de l'écran quittant sont encore là et encore cliquables, alors
+     que `state.step` désigne déjà la question suivante.
+
+     Un clic dans cette fenêtre — un répondant rapide, ou les touches 1 à 9
+     enchaînées — écrivait l'identifiant de l'ANCIENNE option sous la
+     NOUVELLE question. Le comptage l'ignorait, faute de retrouver l'option ;
+     mais `advance()`, lui, voyait une réponse non nulle et laissait passer.
+     La personne sautait une question sans le savoir, et repartait avec un
+     résultat établi sur sept réponses au lieu de huit. */
+  if (!option) return;
+
+  const gains = state.quiz.axes
+    .map((axe) => ({ axe, points: option.scores[axe.id] || 0 }))
+    .filter((g) => g.points > 0);
 
   if (question.type === 'multiple') {
     const current = new Set(state.answers[question.id] || []);

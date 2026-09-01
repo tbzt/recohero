@@ -415,6 +415,32 @@ export function diagnose(quiz) {
     }
   });
 
+  /* La même œuvre dans deux profils n'est pas une faute : un roman peut
+     convenir à deux tempéraments, et un bibliothécaire peut le vouloir.
+     Mais c'est bien plus souvent un copier-coller oublié — et deux personnes
+     aux réponses opposées repartent alors avec la même liste, ce qui vide le
+     questionnaire de son sens. On le signale, on ne l'interdit pas.
+
+     La comparaison se fait sur le titre seul, sans l'auteur : deux fiches
+     de la même œuvre se saisissent rarement à l'identique. */
+  const parTitre = new Map();
+  quiz.results.forEach((r, i) => {
+    const nomDuProfil = r.title.trim() || `Profil ${i + 1}`;
+    const vusIci = new Set();
+    for (const c of r.recos) {
+      const cle = c.title.trim().toLowerCase();
+      if (!cle || vusIci.has(cle)) continue;
+      vusIci.add(cle);
+      if (!parTitre.has(cle)) parTitre.set(cle, { titre: c.title.trim(), profils: [] });
+      parTitre.get(cle).profils.push(nomDuProfil);
+    }
+  });
+  for (const { titre, profils } of parTitre.values()) {
+    if (profils.length > 1) {
+      warn(`« ${titre} » est recommandé par ${profils.length} profils (${profils.join(', ')}). Voulu, ou oublié ?`, 'resultats');
+    }
+  }
+
   if (quiz.results.length && !quiz.results.some((r) => r.rule.mode === 'fallback')) {
     warn('Aucun profil « par défaut » : un répondant dont aucune règle ne se déclenche n’obtiendra aucun résultat. Une égalité entre deux axes suffit.', 'resultats');
   }

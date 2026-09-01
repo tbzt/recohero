@@ -14,7 +14,7 @@
    vide au premier abord.
    ========================================================================== */
 
-import { normalize } from './schema.js';
+import { normalize, diagnose } from './schema.js';
 import * as store from './store.js';
 import * as remote from './remote.js';
 import { decode, payloadFromHash } from './share.js';
@@ -110,6 +110,25 @@ export async function loadFromHash() {
   return { ...quiz, source: 'link' };
 }
 
+/* Un brouillon inachevé n'a rien à faire sur une page qu'on montre.
+
+   Le kiosque hors espace liste les brouillons locaux, et c'est utile : sans
+   base partagée, c'est le seul endroit où l'on joue ce qu'on écrit. Mais un
+   questionnaire vierge s'y affichait aussi — « Nouveau questionnaire », sans
+   titre, sans question valide — à côté d'une vraie proposition. Sur un poste
+   de bibliothèque qui sert à la fois de station d'édition et d'écran public,
+   c'est ce que voit l'usager.
+
+   Le critère n'est pas l'humeur du moment mais le diagnostic, celui-là même
+   qui décide qu'un questionnaire est prêt à diffuser : tant qu'il reste une
+   ERREUR, le brouillon n'est pas offert. Les avertissements passent — ils
+   disent « à vérifier », pas « cassé ». Rien n'est perdu pour l'auteur : le
+   brouillon reste dans le backoffice, et le bouton « Tester » l'ouvre à tout
+   moment.                                                                */
+function presentable(quiz) {
+  return !diagnose(quiz).some((souci) => souci.level === 'error');
+}
+
 /* Le catalogue complet vu par le kiosque. Un brouillon dont l'identifiant
    existe déjà ailleurs est masqué : la source distante ou le dépôt fait foi
    une fois publié. L'étagère `shared` est absente de cette liste, et c'est
@@ -130,7 +149,10 @@ export async function loadAll({ espace = null } = {}) {
 
   const [pub, drafts] = [await loadPublished(), loadDrafts()];
   const publishedIds = new Set(pub.map((q) => q.id));
-  return [...pub, ...drafts.filter((d) => !publishedIds.has(d.id))];
+  return [
+    ...pub,
+    ...drafts.filter((d) => !publishedIds.has(d.id) && presentable(d)),
+  ];
 }
 
 /* Résolution d'un questionnaire à jouer : lien d'abord, puis identifiant.

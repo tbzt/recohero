@@ -636,8 +636,15 @@ export function publier(quiz, ctx = {}) {
             ctx.espace && el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'export-espace', text: 'Exporter tout l’espace' }),
             ctx.remoteCount ? el('span', { class: 'pill', text: `${ctx.remoteCount} en ligne` }) : null,
           ]),
+          /* Ce texte affirmait que l'espace n'avait « ni corbeille ni
+             restauration », alors que la corbeille existe et restaure. La
+             phrase datait d'avant elle. Elle décourageait exactement le bon
+             réflexe — retirer un questionnaire saisonnier — en laissant
+             croire que le geste était définitif. On dit maintenant ce qui
+             est vrai, et où s'arrête le filet : la corbeille rattrape le
+             geste de trop, elle ne rattrape pas la perte du projet. */
           el('p', { class: 'field__hint', text: ctx.espace
-            ? 'Les brouillons ne vivent que dans ce navigateur. Et l’espace n’a ni corbeille ni restauration : une suppression y est définitive, l’export du catalogue en est la seule sauvegarde.'
+            ? 'Les brouillons ne vivent que dans ce navigateur. Retirer un questionnaire de l’espace le dépose dans sa corbeille, d’où il se restaure — les vingt derniers retraits y sont gardés. Mais la corbeille rattrape un geste, pas la perte de la base : l’export du catalogue reste la seule sauvegarde.'
             : 'Les brouillons ne vivent que dans ce navigateur.' }),
         ]),
       ]),
