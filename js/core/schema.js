@@ -356,16 +356,60 @@ export function normaliserPresentation(raw) {
       .filter(Boolean),
   );
 
-  return { ordre, masques, epingle: identifiant(source.epingle) };
+  /* Les intertitres de la vitrine. Un titre est attaché au questionnaire
+     qui OUVRE la section : « En ce moment » se pose sur le premier de son
+     groupe, et court jusqu'au titre suivant.
+
+     Ce choix évite d'inventer une seconde structure d'ordre à tenir en
+     cohérence avec la première. Le glisser-déposer existant suffit : on
+     déplace un questionnaire, son intertitre le suit — ce qui est le
+     comportement juste, puisque c'est lui qui ouvre la section. */
+  const sections = new Map(
+    Object.entries(source.sections && typeof source.sections === 'object' ? source.sections : {})
+      .filter(([k, v]) => k && typeof v === 'string' && v.trim())
+      .map(([k, v]) => [k.slice(0, 80), v.trim().slice(0, 60)]),
+  );
+
+  return { ordre, masques, epingle: identifiant(source.epingle), sections };
+}
+
+/* La vitrine en groupes. Un kiosque n'est pas un catalogue : une médiathèque
+   veut dire « En ce moment », « Nos coups de cœur », et pas seulement empiler
+   ses questionnaires. Un intertitre s'attache au questionnaire qui OUVRE son
+   groupe et court jusqu'au suivant.
+
+   Sans intertitre, un seul groupe sans titre — exactement la page d'avant.
+   C'est la règle du projet : ce qui n'est pas réglé garde le comportement
+   qu'on connaît.
+
+   Ici plutôt que dans gallery.js parce que c'est une transformation pure de
+   la forme, comme ses deux voisines — et parce que ce qui vit dans un
+   contrôleur de page ne s'éprouve qu'à l'écran. */
+export function grouperLaVitrine(liste, presentation) {
+  const titres = presentation?.sections;
+  if (!titres || !titres.size) return [{ titre: null, quizzes: liste }];
+
+  const groupes = [];
+  for (const quiz of liste) {
+    const titre = titres.get(quiz.id);
+    /* Un titre posé sur un questionnaire qui n'ouvre pas la liste coupe le
+       groupe en cours ; sans titre au tout début, le premier groupe est
+       anonyme plutôt qu'absent — sinon les questionnaires d'avant le premier
+       intertitre disparaîtraient de la page. */
+    if (titre || !groupes.length) groupes.push({ titre: titre || null, quizzes: [] });
+    groupes[groupes.length - 1].quizzes.push(quiz);
+  }
+  return groupes.filter((g) => g.quizzes.length);
 }
 
 /* L'inverse, pour l'écriture : Set et null ne traversent pas JSON, et une
    branche vide vaut mieux qu'une branche pleine de faux. */
-export function presentationPourLaBase({ ordre = [], masques = new Set(), epingle = null }) {
+export function presentationPourLaBase({ ordre = [], masques = new Set(), epingle = null, sections = new Map() }) {
   const corps = {};
   if (ordre.length) corps.ordre = ordre;
   if (masques.size) corps.masques = Object.fromEntries([...masques].map((id) => [id, true]));
   if (epingle) corps.epingle = epingle;
+  if (sections.size) corps.sections = Object.fromEntries(sections);
   return Object.keys(corps).length ? corps : null;
 }
 

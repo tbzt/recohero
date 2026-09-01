@@ -2040,6 +2040,7 @@ function ouvrirPresentation() {
     ordre: ordreCourant(),
     masques: new Set(state.presentation.masques),
     epingle: state.presentation.epingle,
+    sections: new Map(state.presentation.sections),
   };
 
   const corps = el('div', { class: 'modal__body stack' });
@@ -2063,10 +2064,29 @@ function ouvrirPresentation() {
       el('p', { class: 'panel__hint', text:
         'L’ordre du kiosque, de haut en bas. Masquer retire de la page d’accueil sans dépublier : le questionnaire reste en ligne à son adresse, pour qui a le lien.' }),
 
-      el('div', { class: 'editor-list', 'data-sortable': 'vitrine' }, liste.map((quiz, i) => {
+      el('div', { class: 'editor-list', 'data-sortable': 'vitrine' }, liste.flatMap((quiz, i) => {
         const masque = brouillon.masques.has(quiz.id);
         const alaune = brouillon.epingle === quiz.id;
-        return el('div', { class: 'sheet__row' + (masque ? ' is-masque' : '') }, [
+        const titre = brouillon.sections.get(quiz.id);
+
+        /* L'intertitre se pose SUR le questionnaire qui ouvre la section :
+           il n'est donc pas une ligne à part dans l'ordre, mais une
+           propriété de cette ligne-là. Le glisser-déposer n'a rien à
+           apprendre, et l'ordre reste une simple liste d'identifiants. */
+        const entete = titre !== undefined ? el('div', { class: 'vitrine__entete' }, [
+          el('input', {
+            class: 'input', value: titre, maxlength: '60',
+            placeholder: 'En ce moment', 'aria-label': 'Intertitre de section',
+            'data-vitrine-titre': quiz.id,
+          }),
+          el('button', {
+            class: 'btn btn--icon btn--quiet', type: 'button',
+            'data-vitrine': 'section-retirer', 'data-id': quiz.id,
+            title: 'Retirer cet intertitre', text: '✕',
+          }),
+        ]) : null;
+
+        const ligne = el('div', { class: 'sheet__row' + (masque ? ' is-masque' : '') }, [
           el('span', { class: 'grip', title: 'Glisser pour déplacer', 'aria-hidden': 'true', text: '⠿' }),
           el('span', { class: 'sheet__emoji', text: quiz.emoji || '✦' }),
           el('span', { class: 'sheet__label' }, [
@@ -2093,11 +2113,18 @@ function ouvrirPresentation() {
             class: 'btn btn--icon btn--quiet', type: 'button', 'data-vitrine': 'descendre', 'data-id': quiz.id,
             title: 'Descendre', 'aria-label': 'Descendre', text: '↓', ...(i === liste.length - 1 ? { disabled: true } : {}),
           }),
+          titre === undefined && el('button', {
+            class: 'btn btn--icon btn--quiet', type: 'button',
+            'data-vitrine': 'section-ouvrir', 'data-id': quiz.id,
+            title: 'Ouvrir une section ici', 'aria-label': 'Ouvrir une section ici', text: '§',
+          }),
         ]);
+
+        return entete ? [entete, ligne] : [ligne];
       })),
 
       el('p', { class: 'field__hint', text:
-        'Un questionnaire publié plus tard se rangera après ceux-ci, par ordre alphabétique, jusqu’à ce qu’on lui donne sa place.' }),
+        'Le § ouvre une section : son intertitre coiffe ce questionnaire et ceux qui le suivent, jusqu’au prochain. Un questionnaire publié plus tard se rangera après ceux-ci, par ordre alphabétique, jusqu’à ce qu’on lui donne sa place.' }),
     );
 
     bindSortables(corps, (cle, de, vers) => {
@@ -2133,13 +2160,25 @@ function ouvrirPresentation() {
     }
     if (vitrine === 'monter') { deplacer(id, -1); return dessiner(); }
     if (vitrine === 'descendre') { deplacer(id, 1); return dessiner(); }
+    if (vitrine === 'section-ouvrir') { brouillon.sections.set(id, ''); return dessiner(); }
+    if (vitrine === 'section-retirer') { brouillon.sections.delete(id); return dessiner(); }
     if (vitrine === 'defaut') {
       brouillon.ordre = [...state.remote].sort((a, b) => a.title.localeCompare(b.title, 'fr')).map((q) => q.id);
       brouillon.masques = new Set();
       brouillon.epingle = null;
+      brouillon.sections = new Map();
       return dessiner();
     }
     return undefined;
+  });
+
+  /* La frappe d'un intertitre ne redessine pas : un redessin déplacerait le
+     curseur du champ à chaque lettre. On écrit dans le brouillon, et c'est
+     tout — même règle que l'éditeur de questionnaire. */
+  corps.addEventListener('input', (event) => {
+    const champ = event.target.closest('[data-vitrine-titre]');
+    if (!champ) return;
+    brouillon.sections.set(champ.dataset.vitrineTitre, champ.value);
   });
 
   valider.addEventListener('click', async () => {

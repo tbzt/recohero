@@ -515,6 +515,27 @@
 }
 .scorechip__input::-webkit-outer-spin-button,
 .scorechip__input::-webkit-inner-spin-button { opacity: 0.35; }
+/* L'intertitre d'une section de vitrine, au-dessus de la ligne qui l'ouvre.
+   Il se lit comme un titre et non comme un champ de plus : d'où le retrait,
+   le filet, et la typographie de titre dans le champ lui-même. */
+.vitrine__entete {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+  padding-bottom: var(--s-1);
+  border-bottom: 1px solid var(--accent-line);
+}
+.vitrine__entete .input {
+  border: none;
+  background: transparent;
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--t-md);
+  padding-inline: 0;
+}
+.vitrine__entete .input:focus { box-shadow: none; }
+
 /* La pesée en mots. Elle porte le nom de ce qu'elle règle, donc elle est
    plus large qu'un champ de deux chiffres — et c'est le prix assumé :
    `scoreset` sait déjà passer à la ligne, et sous 48 rem la rangée occupe

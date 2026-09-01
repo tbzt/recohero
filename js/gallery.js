@@ -5,7 +5,7 @@
 import { loadAll } from './core/catalog.js';
 import * as store from './core/store.js';
 import { identite as chargerIdentite, presentation as chargerPresentation } from './core/remote.js';
-import { normaliserIdentite, normaliserPresentation } from './core/schema.js';
+import { normaliserIdentite, normaliserPresentation, grouperLaVitrine } from './core/schema.js';
 import { el, formatDate, toast, espaceCourant, avecEspace, garderEspace, applyAccent } from './core/ui.js';
 
 /* L'espace vient de l'adresse, jamais du code : une même page sert le
@@ -153,9 +153,31 @@ function renderQuizzes(quizzes, presentation = null) {
   });
 
   const alaune = presentation?.epingle;
-  /* Douze au plus : au-delà, la cascade devient une attente. */
-  dom.grid.replaceChildren(...sorted.map((quiz, i) =>
-    card(quiz, quiz.id === alaune, Math.min(i, 12) * 45)));
+  const groupes = grouperLaVitrine(sorted, presentation);
+
+  /* Douze au plus : au-delà, la cascade devient une attente. Le retard se
+     compte sur la vitrine entière et non par groupe, sinon chaque section
+     repartirait de zéro et les dernières arriveraient avant les premières. */
+  let rang = 0;
+  const vignette = (quiz) => {
+    const noeud = card(quiz, quiz.id === alaune, Math.min(rang, 12) * 45);
+    rang += 1;
+    return noeud;
+  };
+
+  /* Un seul groupe sans titre : on garde la grille nue d'avant, sans
+     enrobage inutile. */
+  if (groupes.length === 1 && !groupes[0].titre) {
+    dom.grid.replaceChildren(...groupes[0].quizzes.map(vignette));
+    dom.grid.classList.remove('quiz-grid--sections');
+    return;
+  }
+
+  dom.grid.classList.add('quiz-grid--sections');
+  dom.grid.replaceChildren(...groupes.map((groupe) => el('div', { class: 'vitrine__groupe' }, [
+    groupe.titre && el('h3', { class: 'vitrine__titre', text: groupe.titre }),
+    el('div', { class: 'quiz-grid' }, groupe.quizzes.map(vignette)),
+  ])));
 }
 
 function card(quiz, alaune = false, retard = 0) {

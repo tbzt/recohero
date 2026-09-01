@@ -55,6 +55,22 @@
   gap: var(--s-4);
 }
 
+/* En sections, la grille n'est plus une grille : elle empile des groupes qui
+   portent chacun la leur. Sans intertitre, cette classe n'est pas posée et
+   la page est exactement celle d'avant. */
+.quiz-grid--sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-7);
+}
+.vitrine__groupe { display: grid; gap: var(--s-4); min-width: 0; }
+.vitrine__titre {
+  font-size: var(--t-lg);
+  color: var(--ink);
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--accent-line);
+}
+
 .quiz-card {
   --card-accent: var(--accent);
   position: relative;
