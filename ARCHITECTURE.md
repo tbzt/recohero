@@ -616,20 +616,41 @@ ouvert » et n'avait **aucun chemin** vers les réglages de son espace. Ils vive
 désormais dans la feuille du compte, atteignable depuis la barre en toutes
 circonstances ; « Diffuser » n'en garde qu'un renvoi.
 
-**L'en-tête d'authentification est plus strict que la query.** Le passage de
-`?auth=` à `Authorization: Bearer` a fermé une fuite — un jeton dans une query
-finit dans l'historique et les journaux — mais a changé un comportement :
+**Le jeton voyage en `?auth=`, et il n'y a pas le choix.** L'API REST de
+Realtime Database reconnaît deux authentifications, et elles ne sont pas
+interchangeables : `?auth=` attend un **jeton d'identité** (celui que produit
+la connexion par mot de passe), `Authorization: Bearer` attend un **jeton
+d'accès OAuth2**, celui d'un compte de service — hors de portée d'une
+application sans serveur.
 
-    ?auth=<périmé>                  → ignoré, la lecture publique passe
-    Authorization: Bearer <périmé>  → 401, même sur une branche publique
+Une version a envoyé le jeton d'identité dans l'en-tête Bearer, pour fermer
+une fuite réelle : une query finit dans les journaux. La base tentait alors de
+le lire comme un jeton OAuth2, échouait, et répondait `"Unauthorized
+request."` — et non `"Permission denied"`, puisque les règles n'étaient jamais
+atteintes. **Aucune requête authentifiée ne fonctionnait** : ni lire les
+membres, ni publier, ni enregistrer une identité, une vitrine, une corbeille.
+Le symptôme visible était un espace qui affichait « 0 membre » à quelqu'un qui
+en était manifestement membre.
 
-Un mot de passe changé ailleurs, une session révoquée, une horloge décalée, et
-c'est tout qui échoue — y compris ce qui n'a jamais eu besoin de compte.
-L'équipe voit un espace vide et des profils absents alors que rien n'a bougé
-dans la base. `call()` retente donc une LECTURE refusée sans jeton, et jette le
-jeton en cache en gardant celui de renouvellement : la session se répare en un
-appel, sans déconnecter personne. Une ÉCRITURE refusée reste refusée — là, il
-faut vraiment un compte.
+**Le défaut a survécu parce qu'il avait été éprouvé avec un jeton
+volontairement invalide** — cas où les deux modes échouent pareil, et où rien
+ne pouvait donc le révéler. Un banc qui ne teste que l'échec ne prouve pas le
+succès. Mesuré le 1ᵉʳ septembre 2026, même jeton, même URL, même seconde :
+
+    Authorization: Bearer <valide>  → 401  { "error": "Unauthorized request." }
+    ?auth=<valide>                  → 200  la liste des membres
+
+Le coût est assumé : le jeton reparaît dans l'adresse, donc dans les journaux
+de la base. Il n'entre ni dans l'historique du navigateur — ce sont des
+`fetch`, pas des navigations — ni dans un `Referer` vers un tiers, et il expire
+en une heure.
+
+Effet de bord, dans le bon sens : `?auth=<périmé>` est **ignoré** plutôt que
+rejeté, donc une lecture publique passe malgré un jeton mort. `call()` retente
+tout de même une LECTURE refusée sans jeton, et ne jette le jeton en cache que
+si le corps du refus l'incrimine — sur un « Permission denied », le jeton est
+valide et l'effacer ne provoquait qu'un renouvellement inutile. Une ÉCRITURE
+refusée reste refusée : là, il faut vraiment un compte.
 
 **L'état d'un espace se charge à l'ouverture, pas en réaction.** Tout ce qui
 le décrit — l'équipe, les profils, les vitrines, les compteurs, l'identité du

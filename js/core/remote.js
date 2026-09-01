@@ -462,56 +462,88 @@ function path(espace, rest = '') {
   return `${DB}/espaces/${encodeURIComponent(espace)}/quizzes${rest}.json`;
 }
 
-/* Le jeton voyage en EN-TÊTE, pas en paramètre d'adresse. Une query string
-   se retrouve dans l'historique du navigateur, dans les en-têtes `Referer`
-   et dans les journaux de tout intermédiaire — exactement ce que share.js
-   évite avec soin pour les questionnaires (« le fragment, et non la
-   query »). Le même réflexe des deux côtés. */
-/* Le passage de `?auth=` à l'en-tête a corrigé une fuite — un jeton dans une
-   query finit dans l'historique et les journaux — mais il a changé un
-   comportement, et pas dans le bon sens :
+/* --- Comment le jeton voyage ----------------------------------------------
+   En PARAMÈTRE `?auth=`, et non dans un en-tête `Authorization: Bearer`.
+   Ce n'est pas un choix de confort : c'est le seul mode que l'API REST de
+   Realtime Database accepte pour un jeton d'identité Firebase.
 
-     ?auth=<périmé>              → IGNORÉ, la lecture publique passe
-     Authorization: Bearer <périmé> → 401, même sur une branche publique
+   Elle reconnaît deux authentifications, et elles ne sont pas
+   interchangeables :
 
-   Autrement dit, un jeton révoqué ou périmé — mot de passe changé ailleurs,
-   session invalidée, horloge décalée — faisait soudain échouer tout, y compris
-   ce qui n'avait jamais eu besoin de compte. L'équipe voyait un espace vide et
-   des profils absents, alors que rien n'avait bougé dans la base.
+     ?auth=<jeton d'identité>          → celui que produit signInWithPassword
+     Authorization: Bearer <jeton>     → un jeton d'ACCÈS OAuth2, celui d'un
+                                          compte de service
 
-   Deux garde-fous, donc. Une LECTURE refusée est retentée sans jeton : si la
-   branche est publique, elle répond, et c'était bien le jeton le fautif. Et
-   dans ce cas on jette le jeton en cache — en gardant celui de renouvellement
-   — pour que l'appel suivant en redemande un neuf. La session se répare
-   d'elle-même en un appel, sans déconnecter personne.
+   Une version précédente envoyait le jeton d'identité dans l'en-tête Bearer,
+   pour fermer une fuite réelle — une query finit dans les journaux. La base
+   tentait alors de le lire comme un jeton OAuth2, échouait, et répondait
+   `"Unauthorized request."` — et non `"Permission denied"`, puisque les
+   règles n'étaient jamais atteintes. AUCUNE REQUÊTE AUTHENTIFIÉE NE
+   FONCTIONNAIT : ni lire les membres, ni publier, ni enregistrer une
+   identité, une vitrine ou une corbeille.
 
-   Une ÉCRITURE refusée reste refusée : là, il faut vraiment un compte, et
-   réessayer sans en serait un mensonge.                                  */
+   Le défaut avait survécu parce qu'il avait été éprouvé avec un jeton
+   VOLONTAIREMENT INVALIDE — cas où les deux modes échouent pareil, et où
+   rien ne pouvait donc le révéler. Mesuré le 1er septembre 2026, même
+   jeton, même URL, même seconde :
+
+     A) en-tête Bearer → 401  { "error": "Unauthorized request." }
+     B) ?auth=         → 200  la liste des membres
+
+   LE COÛT EST ASSUMÉ. Le jeton reparaît dans l'adresse, donc dans les
+   journaux de la base. Il n'entre pas dans l'historique du navigateur — ce
+   sont des `fetch`, pas des navigations — ni dans un `Referer` vers un
+   tiers. Et il expire en une heure. Un espace partagé qui ne fonctionne
+   pas du tout coûte plus cher que cette exposition-là, et l'API ne laisse
+   pas d'autre porte à une application sans serveur.
+
+   Effet de bord, dans le bon sens cette fois : `?auth=<périmé>` est IGNORÉ
+   plutôt que rejeté, donc une lecture publique passe malgré un jeton mort.
+   La résilience que l'en-tête avait fait perdre revient d'elle-même.    */
+
+function avecJeton(url, jeton) {
+  if (!jeton) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}auth=${encodeURIComponent(jeton)}`;
+}
 
 function estUneLecture(options) {
   const methode = (options.method || 'GET').toUpperCase();
   return methode === 'GET';
 }
 
+/* La base répond 401 pour deux choses différentes, et le corps les
+   distingue. On ne jette le jeton que quand c'est LUI qui est refusé :
+   sur un refus de règle, il est parfaitement valide, et l'effacer
+   provoquait un renouvellement inutile à chaque tentative. */
+function jetonRefuse(corps) {
+  return !/permission denied/i.test(corps || '');
+}
+
 async function call(url, options = {}) {
   const auth = await token();
-  const envoyer = (jeton) => fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      ...(jeton ? { Authorization: `Bearer ${jeton}` } : {}),
-    },
-  });
+  const envoyer = (jeton) => fetch(avecJeton(url, jeton), options);
 
   let response = await envoyer(auth);
+  let corps = '';
 
-  if (response.status === 401 && auth) {
-    /* Le jeton est suspect : on le retire du cache pour forcer un
-       renouvellement au prochain appel, sans toucher au renouvellement
-       lui-même — la personne reste connectée. */
-    const saved = store.getRemote();
-    if (saved) store.setRemote({ ...saved, idToken: null, expiresAt: 0 });
-    if (estUneLecture(options)) response = await envoyer(null);
+  if (response.status === 401) {
+    corps = await response.clone().text().catch(() => '');
+
+    if (auth && jetonRefuse(corps)) {
+      /* Le jeton est suspect : on le retire du cache pour forcer un
+         renouvellement au prochain appel, sans toucher au renouvellement
+         lui-même — la personne reste connectée. */
+      const saved = store.getRemote();
+      if (saved) store.setRemote({ ...saved, idToken: null, expiresAt: 0 });
+      /* Une LECTURE refusée est retentée sans jeton : si la branche est
+         publique, elle répond, et c'était bien le jeton le fautif. Une
+         ÉCRITURE refusée reste refusée — là il faut vraiment un compte, et
+         réessayer sans en serait un mensonge. */
+      if (estUneLecture(options)) {
+        response = await envoyer(null);
+        if (response.status === 401) corps = await response.clone().text().catch(() => '');
+      }
+    }
   }
 
   /* Un 401 a DEUX causes, et ce message n'en affirmait qu'une.
@@ -530,11 +562,13 @@ async function call(url, options = {}) {
     if (!auth) throw new Error('Il faut être connecté pour cela.');
     const session = store.getRemote();
     const qui = session?.email ? `${session.email} — identifiant ${session.uid}` : `identifiant ${session?.uid}`;
-    throw new Error(
-      `Refusé par la base pour ${qui}. `
-      + 'Soit ce compte ne figure pas dans les membres de cet espace, soit sa session n’est plus acceptée. '
-      + 'Compare cet identifiant avec la branche « membres », puis reconnecte-toi si c’est le bon.',
-    );
+    /* Le corps distingue les deux refus, et il n'y a plus lieu de deviner :
+       « Permission denied » vient des règles, donc de l'appartenance ;
+       « Unauthorized request. » vient du jeton lui-même. */
+    throw new Error(jetonRefuse(corps)
+      ? `La base n’a pas accepté la session de ${qui}. Reconnecte-toi.`
+      : `Refusé par les règles pour ${qui}. Ce compte ne figure pas dans les membres de cet espace, `
+        + 'ou la règle interdit cette écriture.');
   }
   if (!response.ok) throw new Error(`La base a répondu ${response.status}.`);
   return response.status === 204 ? null : response.json();
