@@ -151,14 +151,14 @@ const head = (title, hint, actions = []) => el('div', {}, [
     el('span', { class: 'panel__spacer' }),
     ...actions,
   ]),
-  el('p', { class: 'panel__hint', text: hint }),
+  hint && el('p', { class: 'panel__hint', text: hint }),
 ]);
 
 /* --- 1. Identité ----------------------------------------------------------- */
 
 export function identite(quiz, ctx = {}) {
   return el('section', { class: 'panel' }, [
-    head('Identité', "Ce que le répondant voit avant de commencer. Le titre et l’emoji servent aussi de vignette au kiosque."),
+    head('Identité', "Le titre et l’emoji servent aussi de vignette au kiosque."),
     el('div', { class: 'card stack' }, [
       el('div', { class: 'grid-2' }, [
         field('Emoji de couverture', champSigne('q:emoji', quiz.emoji, 'emoji', {
@@ -166,10 +166,9 @@ export function identite(quiz, ctx = {}) {
         })),
         field('Titre', input('q:title', quiz.title, { placeholder: 'Quel roman pour cet été ?' })),
       ]),
-      field('Accroche', input('q:tagline', quiz.tagline, { placeholder: 'Une ligne pour donner envie.' }),
-        'Affichée en italique sous le titre.'),
+      field('Accroche', input('q:tagline', quiz.tagline, { placeholder: 'Une ligne pour donner envie.' })),
       field('Introduction', textarea('q:intro', quiz.intro, { rows: '5', placeholder: 'Deux ou trois phrases pour poser le ton.' }),
-        'Une ligne vide sépare deux paragraphes. Rien d’autre n’est interprété.'),
+        'Une ligne vide sépare deux paragraphes.'),
       crediterBloc(quiz, ctx),
       imageField('Image de couverture', 'q:image', quiz.image, 'cover',
         'Affichée sur l’écran de départ et sur la vignette du kiosque. Facultative.'),
@@ -184,7 +183,7 @@ export function identite(quiz, ctx = {}) {
           title: 'Couleur libre', 'aria-label': 'Couleur libre' }),
       ]),
         (avertissementAccent(quiz.accent) ? avertissementAccent(quiz.accent) + ' ' : '')
-        + "Elle habille le parcours entier. Le texte posé dessus bascule en noir ou blanc automatiquement."),
+        + "Elle habille le parcours entier."),
     ]),
   ]);
 }
@@ -195,7 +194,7 @@ export function axes(quiz) {
   const caps = ceilings(quiz);
 
   return el('section', { class: 'panel' }, [
-    head('Axes', "Les signes que le questionnaire compte : les étoiles, les ronds, les triangles. Chaque réponse en distribue.", [
+    head('Axes', "Ce que le questionnaire compte. Chaque réponse en distribue.", [
       el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'axis-add', text: '+ Axe' }),
     ]),
     quiz.axes.length
@@ -223,7 +222,7 @@ export function axes(quiz) {
           el('p', { text: 'Aucun axe. Sans axe, il n’y a rien à compter.' }),
         ]),
     el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-4)' } , text:
-      'Supprimer un axe efface aussi les points que les réponses lui donnaient. Le bandeau « Annuler » et Ctrl+Z le rétablissent.' }),
+      'Supprimer un axe efface aussi les points que les réponses lui donnaient.' }),
   ]);
 }
 
@@ -289,7 +288,7 @@ function pesee(question, option, axis, rang, ctx) {
 
 export function questions(quiz, ctx = {}) {
   return el('section', { class: 'panel' }, [
-    head('Questions', "Une question par écran. À droite de chaque réponse, ce qu'elle révèle — un réglage par axe.", [
+    head('Questions', "Une question par écran.", [
       /* Hors échelle, la bascule n'a pas de sens : on ne propose pas un
          mode qui ne saurait pas afficher ce qui est déjà écrit. */
       !ctx.poidsHorsEchelle && el('button', {
@@ -304,9 +303,8 @@ export function questions(quiz, ctx = {}) {
     ]),
 
     ctx.poidsHorsEchelle && el('p', { class: 'panel__hint' }, [
-      'Ce questionnaire contient des pesées hors de l’échelle simple — au-delà de trois, ',
-      'ou négatives. Elles restent réglables au point près ; l’échelle en mots les ',
-      'trahirait plutôt que de les afficher.',
+      'Ce questionnaire contient des pesées que l’échelle en mots ne sait pas dire — ',
+      'au-delà de trois, ou négatives. Elles restent réglables au point près.',
     ]),
 
     /* L'aperçu se remplit depuis app.js et se met à jour à la frappe, sans
@@ -430,7 +428,7 @@ function questionCard(quiz, question, index, ctx = {}) {
 
 export function resultats(quiz, ctx = {}) {
   return el('section', { class: 'panel' }, [
-    head('Profils de sortie', "Ce que le répondant obtient à la fin. Les règles sont examinées de haut en bas : la première qui matche gagne, et « par défaut » passe toujours en dernier.", [
+    head('Profils de sortie', "Les règles sont lues de haut en bas. La première qui passe l’emporte.", [
       ctx.stats?.total ? el('span', {
         class: 'pill pill--accent',
         title: 'Parcours terminés depuis la mise en ligne, reprises comprises. Un ordre de grandeur : rien n’empêche quelqu’un de le gonfler.',
@@ -622,7 +620,6 @@ function crediterBloc(quiz, ctx) {
         ]),
       ]);
     })),
-    el('span', { class: 'field__hint', text: 'Un nom ne s’affiche que si la personne l’a autorisé de son côté ET que ce questionnaire la crédite. Toi seul ne suffis pas.' }),
   ]);
 }
 
@@ -640,7 +637,7 @@ function espaceCard(ctx) {
         el('h3', { text: `Espace « ${ctx.espace} »` }),
         ctx.remoteSession
           ? el('div', {}, [
-              el('p', { text: 'Publier dépose le questionnaire dans l’espace : il paraît aussitôt sur son kiosque, pour tout le monde, sans que personne ait à se connecter pour y répondre. Retirer ne détruit rien — le questionnaire part à la corbeille de l’espace, d’où il se restaure.' }),
+              el('p', { text: 'Publier le met en ligne sur le kiosque. Retirer l’envoie à la corbeille, d’où il se restaure.' }),
               el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
                 el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'remote-publish', text: '⇧ Publier dans l’espace' }),
                 ctx.inEspace && el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'remote-unpublish', text: '⌫ Retirer de l’espace' }),
@@ -667,7 +664,7 @@ function espaceCard(ctx) {
               ]),
             ])
           : el('div', {}, [
-              el('p', { text: 'Connecte-toi pour publier dans cet espace. C’est le seul moment où un mot de passe est demandé — les visiteurs qui répondent n’ont besoin de rien.' }),
+              el('p', { text: 'Connecte-toi pour publier ici. Répondre ne demande aucun compte.' }),
               el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
                 el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'remote-signin', text: '→ Se connecter' }),
               ]),
@@ -681,7 +678,7 @@ export function publier(quiz, ctx = {}) {
   const file = `${slugify(quiz.title, quiz.id)}.json`;
 
   return el('section', { class: 'panel' }, [
-    head('Diffuser', "Un lien, qui ne demande rien à personne ; un espace partagé, pour publier à plusieurs ; un fichier, pour se passer un modèle de la main à la main."),
+    head('Diffuser'),
 
     espaceCard(ctx),
 
@@ -690,7 +687,7 @@ export function publier(quiz, ctx = {}) {
         el('span', { class: 'publish-step__num', text: '1' }),
         el('div', {}, [
           el('h3', { text: 'Par lien — immédiat' }),
-          el('p', { text: 'Le questionnaire entier est compressé dans l’adresse. Rien à déployer, rien à héberger : celui qui reçoit le lien peut répondre tout de suite. Le même lien s’intègre dans une page d’un autre site.' }),
+          el('p', { text: 'Le questionnaire entier tient dans l’adresse. Qui reçoit le lien répond tout de suite.' }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
             el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'copy-link', text: 'Copier le lien' }),
             el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'embed', text: 'Code d’intégration' }),
@@ -707,7 +704,7 @@ export function publier(quiz, ctx = {}) {
         el('span', { class: 'publish-step__num', text: '2' }),
         el('div', {}, [
           el('h3', { text: 'Par affiche — dans les rayons' }),
-          el('p', { text: 'Une feuille A4 à imprimer et à coller : l’accroche, un QR code, et le temps que ça prend. Il faut que le questionnaire soit servi quelque part — un brouillon local n’a pas d’adresse à mettre sur un mur.' }),
+          el('p', { text: 'Une feuille A4 : l’accroche, un QR code, la durée. Le questionnaire doit être en ligne — un brouillon n’a pas d’adresse à mettre sur un mur.' }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
             el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'affiche', text: '🖼 Affiche à imprimer' }),
           ]),
@@ -721,7 +718,7 @@ export function publier(quiz, ctx = {}) {
         el('span', { class: 'publish-step__num', text: '3' }),
         el('div', {}, [
           el('h3', { text: 'Par fichier — pour se passer un modèle' }),
-          el('p', { text: 'Le fichier JSON contient tout : questions, axes, profils, recommandations, images intégrées. Qui le reçoit l’ouvre dans son propre backoffice et le modifie à sa guise. C’est la voie pour partir du questionnaire de quelqu’un d’autre plutôt que de la page blanche.' }),
+          el('p', { text: 'Tout y est : questions, axes, profils, recommandations, images. Qui le reçoit l’ouvre dans son backoffice et le modifie.' }),
           el('code', { class: 'code', text: file }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
             el('button', {
@@ -730,7 +727,7 @@ export function publier(quiz, ctx = {}) {
             }),
             el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'copy-json', text: 'Copier le JSON' }),
           ]),
-          el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-4)' }, text: 'Dans l’autre sens — reprendre le modèle de quelqu’un :' }),
+          el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-4)' }, text: 'Reprendre le modèle de quelqu’un :' }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-2)' } }, [
             el('label', { class: 'btn btn--ghost btn--sm' }, [
               'Importer un fichier',
@@ -738,7 +735,7 @@ export function publier(quiz, ctx = {}) {
             ]),
             el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'import-paste', text: 'Coller du JSON' }),
           ]),
-          el('p', { class: 'field__hint', text: 'Un fichier peut contenir un questionnaire ou un catalogue entier. Si l’import trouve des identifiants déjà présents, il demande une fois s’il faut remplacer tes copies — c’est ce qui permet de restaurer une sauvegarde — ou en faire des variantes.' }),
+          el('p', { class: 'field__hint', text: 'Un questionnaire ou un catalogue entier. Si des identifiants sont déjà là, l’import demande s’il faut remplacer tes copies ou en faire des variantes.' }),
           el('div', { class: 'row', style: { marginTop: 'var(--s-4)' } }, [
             el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'export-drafts', text: 'Exporter tous mes brouillons' }),
             ctx.espace && el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'export-espace', text: 'Exporter tout l’espace' }),
@@ -752,16 +749,16 @@ export function publier(quiz, ctx = {}) {
              est vrai, et où s'arrête le filet : la corbeille rattrape le
              geste de trop, elle ne rattrape pas la perte du projet. */
           el('p', { class: 'field__hint', text: ctx.espace
-            ? 'Les brouillons ne vivent que dans ce navigateur. Retirer un questionnaire de l’espace le dépose dans sa corbeille, d’où il se restaure — les vingt derniers retraits y sont gardés. Mais la corbeille rattrape un geste, pas la perte de la base : l’export du catalogue reste la seule sauvegarde.'
+            ? 'Les brouillons ne vivent que dans ce navigateur. La corbeille de l’espace garde les vingt derniers retraits ; seul l’export sauvegarde le catalogue.'
             : 'Les brouillons ne vivent que dans ce navigateur.' }),
         ]),
       ]),
     ]),
 
     el('div', { class: 'danger-zone' }, [
-      el('h3', { text: 'Supprimer ce questionnaire' }),
+      el('h3', { text: 'Supprimer ce brouillon' }),
       el('p', { class: 'panel__hint', style: { marginBottom: 'var(--s-3)' }, text:
-        'Le brouillon est effacé de ce navigateur. Un fichier déjà exporté, un lien déjà envoyé et une version déjà publiée dans un espace ne sont pas touchés.' }),
+        'Efface le brouillon de ce navigateur. Les fichiers exportés, les liens envoyés et la version publiée ne sont pas touchés.' }),
       el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-act': 'delete-quiz', text: 'Supprimer ce brouillon' }),
     ]),
   ]);

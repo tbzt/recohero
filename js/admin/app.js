@@ -647,7 +647,7 @@ function panneauQuestionnaires() {
 
   const blocs = [
     liste('Mes brouillons',
-      'Ce que tu es en train d’écrire, gardé sur cet ordinateur. Rien n’en sort tant que tu ne diffuses pas.',
+      'Gardés sur cet ordinateur. Rien n’en sort tant que tu ne diffuses pas.',
       drafts.length
         ? el('div', { class: 'sheet__list' }, drafts.map((quiz) => ligne(quiz, [
             el('span', { class: 'pill', text: `${quiz.questions?.length ?? 0} q.` }),
@@ -658,13 +658,14 @@ function panneauQuestionnaires() {
           ])))
         : el('div', { class: 'empty' }, [
             el('div', { class: 'empty__icon', text: '✦' }),
-            el('p', { text: 'Rien encore. Le bouton « + Nouveau » ouvre l’assistant.' }),
+            el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'new-quiz',
+              text: '+ Créer un questionnaire' }),
           ])),
   ];
 
   if (partage && state.remote.length) {
-    blocs.push(liste(`Diffusés dans ${nomDeLEspace()}`,
-      'Ce que vos usagers voient. Modifier en crée une copie locale : le questionnaire diffusé ne bouge qu’à la prochaine diffusion.',
+    blocs.push(liste(`Publiés dans ${nomDeLEspace()}`,
+      'Ce que vos usagers voient. Modifier en crée une copie locale ; la version diffusée ne bouge qu’à la prochaine diffusion.',
       el('div', { class: 'sheet__list' }, state.remote.map((quiz) => ligne(quiz, [
         el('button', {
           class: 'btn btn--icon btn--quiet', type: 'button',
@@ -960,7 +961,7 @@ function paintPreview() {
 
   const index = state.quiz.questions.findIndex((q) => q.id === state.focused);
   if (index < 0) {
-    stage.replaceChildren(el('p', { class: 'preview__empty', text: 'Placez le curseur dans une question pour la voir telle que le répondant la verra.' }));
+    stage.replaceChildren(el('p', { class: 'preview__empty', text: 'Placez le curseur dans une question.' }));
     if (hint) hint.textContent = '';
     return;
   }
@@ -1504,8 +1505,8 @@ function ouvrirSymboles(cible) {
     el('div', { class: 'modal__body stack' }, [
       el('h2', { text: emoji ? 'Choisir un emoji' : 'Choisir un glyphe' }),
       el('p', { class: 'panel__hint', text: emoji
-        ? 'Une sélection utile en médiathèque, pas tout Unicode. Le champ reste libre : tu peux aussi coller le tien.'
-        : 'Des formes pleines, qui restent lisibles en petit et prennent la couleur de l’axe. Le champ reste libre.' }),
+        ? 'Une sélection utile en médiathèque. Le champ reste libre : colle le tien.'
+        : 'Des formes lisibles en petit, qui prennent la couleur de l’axe. Le champ reste libre.' }),
       recherche, vide, grille,
     ]),
     el('div', { class: 'modal__actions' }, [
@@ -1663,7 +1664,7 @@ function afficherRaccourcis() {
         ligne('Balayer', 'Au doigt : passer d’une question à l’autre'),
       ]),
 
-      el('p', { class: 'field__hint', text: 'Rien de tout cela n’est nécessaire : tout se fait aussi à la souris et au clic.' }),
+      el('p', { class: 'field__hint', text: 'Tout se fait aussi à la souris et au clic.' }),
     ]),
     el('div', { class: 'modal__actions' }, [
       el('button', { class: 'btn btn--primary', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
@@ -1741,9 +1742,7 @@ function monCompte() {
       el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'copier-uid', text: '⧉ Mon identifiant' }),
     ]),
     !monNom && el('p', { class: 'field__hint', text:
-      'Sans profil, tes collègues te voient comme un identifiant technique — dans les messages de conflit, par exemple.' }),
-    el('p', { class: 'field__hint', style: { marginTop: 'var(--s-4)' }, text:
-      'Ce profil te suit d’un espace à l’autre. Le rendre public se décide espace par espace, au moment de créditer un questionnaire.' }),
+      'Sans profil, tes collègues te voient comme un identifiant technique.' }),
   ], [
     el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-act': 'remote-signout', text: 'Se déconnecter' }),
     el('span', { class: 'section__spacer' }),
@@ -1788,7 +1787,7 @@ function filesDAttente() {
       }),
     ]))));
     bloc.push(el('p', { class: 'field__hint', text:
-      'Accepter donne le droit de publier dans cet espace. L’adresse affichée est celle du compte, vérifiée par la base — pas un nom que la personne aurait saisi.' }));
+      'Accepter donne le droit de publier ici. L’adresse affichée est celle du compte, vérifiée par la base.' }));
   }
 
   if (conviees.length) {
@@ -1811,7 +1810,7 @@ function filesDAttente() {
       }),
     ]))));
     bloc.push(el('p', { class: 'field__hint', text:
-      'Une invitation attend que la personne se connecte avec cette adresse et l’ait vérifiée. Tant qu’elle n’est pas réclamée, elle ne donne aucun droit.' }));
+      'Tant qu’elle n’est pas réclamée, une invitation ne donne aucun droit.' }));
   }
 
   return bloc;
@@ -1870,12 +1869,12 @@ function contenuEquipe() {
       listeLue
         ? el('div', { class: 'sheet__list' }, state.membres.map(ligne))
         : el('p', { class: 'alerte', text:
-            'La liste des membres n’a pas pu être lue. Ce n’est pas une équipe vide : c’est une lecture qui a échoué. Recharge la page — si le message revient, la base ne répond pas.' }),
+            'La liste des membres n’a pas pu être lue. Recharge la page ; si le message revient, la base ne répond pas.' }),
 
       ...filesDAttente(),
 
       el('p', { class: 'field__hint', style: { marginTop: 'var(--s-4)' }, text:
-        'Inviter quelqu’un sans compte crée le sien et lui envoie un courriel : il choisit son mot de passe lui-même. Inviter une adresse qui a déjà un compte y dépose une invitation, que la personne réclame à sa prochaine connexion. Retirer quelqu’un lui ôte le droit de publier ici, sans supprimer son compte ni le retirer d’un autre espace.' }),
+        'Inviter envoie un courriel, ou dépose une invitation si l’adresse a déjà un compte. Retirer quelqu’un lui ôte le droit de publier ici, sans toucher à son compte.' }),
     ]),
   ];
 }
@@ -1899,7 +1898,7 @@ function contenuReglages() {
         }),
       ]),
       partage && !state.identite && el('p', { class: 'field__hint', text:
-        'Sans identité, le kiosque de cet espace affiche la marque RecoHero à vos usagers — son nom, son accroche et son pied de page.' }),
+        'Sans identité, le kiosque affiche la marque RecoHero à vos usagers.' }),
 
       partage && el('span', { class: 'field__label', style: { marginTop: 'var(--s-5)' }, text: 'Corbeille' }),
       partage && el('div', { class: 'row' }, [
@@ -1912,7 +1911,7 @@ function contenuReglages() {
       ]),
 
       !partage && el('p', { class: 'panel__hint', text:
-        'Cet ordinateur n’a pas de kiosque partagé à régler : les questionnaires y vivent en local, et le kiosque public est celui du dépôt. Ouvre un espace pour retrouver l’apparence, la corbeille, l’équipe et la fréquentation.' }),
+        'Rien à régler sans espace : les questionnaires vivent en local. Ouvre un espace pour son apparence, sa corbeille, son équipe et sa fréquentation.' }),
     ]),
   ];
 }
@@ -2007,13 +2006,13 @@ function monProfil() {
   const dialog = el('dialog', { class: 'modal' }, [
     el('div', { class: 'modal__body stack' }, [
       el('h2', { text: 'Mon profil' }),
-      el('p', { class: 'panel__hint', text: 'Renseigné, ton profil te nomme auprès de ton équipe — dans les messages de conflit, par exemple. Il n’est visible que des membres de cet espace.' }),
+      el('p', { class: 'panel__hint', text: 'Te nomme auprès de ton équipe. Visible des seuls membres de cet espace.' }),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Prénom' }), prenom]),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Nom' }), nom]),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Fonction' }), poste]),
       el('label', { class: 'field' }, [
         el('span', { class: 'field__label', text: 'Photo' }), photo,
-        el('span', { class: 'field__hint', text: 'Adresse d’une image. Facultative, et publique si tu coches ci-dessous.' }),
+        el('span', { class: 'field__hint', text: 'Adresse d’une image.' }),
       ]),
 
       el('div', { class: 'card', style: { background: 'var(--surface-2)' } }, [
@@ -2022,19 +2021,17 @@ function monProfil() {
           el('span', {}, [
             el('strong', { text: 'Afficher mon nom publiquement' }),
             el('span', { class: 'field__hint', style: { display: 'block' }, text:
-              'Décoché, rien de toi n’est lisible hors de l’équipe — la donnée n’est pas seulement masquée, elle n’est pas publiée. Coché, ton nom, ta fonction et ta photo deviennent visibles de tout visiteur, sur les questionnaires qui te créditent.' }),
+              'Coché, ton nom, ta fonction et ta photo deviennent lisibles par toute personne qui connaît le nom de l’espace. Décocher les efface.' }),
             /* Ce que la case promet et ce qu'elle fait ne sont pas tout à
                fait la même chose, et l'écart est celui que la CNIL regarde :
                « mon nom apparaît sous mes questionnaires » d'un côté, « la
                fiche est lisible en bloc, sans compte, à une adresse stable »
                de l'autre. Le dire ici, au moment de cocher. */
-            el('span', { class: 'field__hint', style: { display: 'block', marginTop: 'var(--s-2)' }, text:
-              'À savoir : ces informations deviennent alors lisibles par toute personne qui connaît le nom de l’espace, y compris en dehors d’un questionnaire. Décocher les efface — il n’en reste rien.' }),
           ]),
         ]),
       ]),
 
-      el('p', { class: 'field__hint', text: 'Être crédité demande les deux : que tu coches ici, et que le questionnaire te nomme. L’un sans l’autre n’affiche rien.' }),
+      el('p', { class: 'field__hint', text: 'Être crédité demande les deux : cette case, et un questionnaire qui te nomme.' }),
       erreur,
     ]),
     el('div', { class: 'modal__actions' }, [
@@ -2104,7 +2101,7 @@ function inviter() {
   const dialog = el('dialog', { class: 'modal' }, [
     el('div', { class: 'modal__body stack' }, [
       el('h2', { text: `Inviter dans « ${state.espace} »` }),
-      el('p', { class: 'panel__hint', text: 'La personne reçoit un courriel et choisit son mot de passe elle-même. Tu ne le verras jamais, et RecoHero non plus.' }),
+      el('p', { class: 'panel__hint', text: 'La personne reçoit un courriel et choisit son mot de passe elle-même.' }),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Adresse e-mail' }), email]),
       el('label', { class: 'field' }, [
         el('span', { class: 'field__label', text: 'Ou son identifiant, si elle a déjà un compte' }),
@@ -2356,7 +2353,7 @@ function changerMonMotDePasse() {
   const dialog = el('dialog', { class: 'modal' }, [
     el('div', { class: 'modal__body stack' }, [
       el('h2', { text: 'Changer mon mot de passe' }),
-      el('p', { class: 'panel__hint', text: 'Six caractères au minimum. Il ne transite que vers Firebase, jamais vers ce site — qui n’a pas de serveur pour le recevoir.' }),
+      el('p', { class: 'panel__hint', text: 'Six caractères au minimum. Il ne transite que vers Firebase, jamais vers ce site.' }),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Nouveau mot de passe' }), champ]),
       erreur,
     ]),
@@ -2419,26 +2416,26 @@ function editerIdentite() {
     el('div', { class: 'modal__body stack' }, [
       el('h2', { text: `Le kiosque de « ${state.espace} »` }),
       el('p', { class: 'panel__hint', text:
-        'Ce que voient les usagers en arrivant sur l’adresse publique de cet espace. Ce que tu laisses vide reste à RecoHero.' }),
+        'Ce que voient les usagers en arrivant. Ce qu’on laisse vide reste à RecoHero.' }),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Nom de la structure' }), titre]),
       el('label', { class: 'field' }, [
         el('span', { class: 'field__label', text: 'Accroche' }), accroche,
-        el('span', { class: 'field__hint', text: 'Le grand titre de la page. Le nom, lui, est déjà dans le bandeau.' }),
+        el('span', { class: 'field__hint', text: 'Le grand titre de la page.' }),
       ]),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Mot d’accueil' }), intro]),
       el('label', { class: 'field' }, [
         el('span', { class: 'field__label', text: 'Logo' }), logo,
         el('span', { class: 'field__hint', text:
-          'Adresse d’une image — elle remplace le signe ✦ dans le bandeau. Un SVG en ligne (data:) est refusé par le filtre du projet ; hébergez-le et donnez son adresse https, ou passez par un PNG.' }),
+          'Remplace le signe ✦ dans le bandeau. Un SVG en ligne (data:) est refusé : donnez une adresse https, ou un PNG.' }),
       ]),
       el('div', { class: 'field' }, [
         el('span', { class: 'field__label', text: 'Couleur' }),
-        el('div', { class: 'row' }, [accent, el('span', { class: 'field__hint', style: { margin: '0' }, text: 'Habille le kiosque entier.' })]),
+        el('div', { class: 'row' }, [accent]),
       ]),
       el('div', { class: 'card', style: { background: 'var(--surface-2)' } }, [
         el('span', { class: 'field__label', text: 'Lien de retour' }),
         el('span', { class: 'field__hint', style: { display: 'block', marginBottom: 'var(--s-3)' }, text:
-          'Remplace le bouton « Backoffice » dans le bandeau : un usager n’a rien à y faire, mais il peut vouloir revenir chez vous.' }),
+          'Remplace le bouton « Backoffice » dans le bandeau.' }),
         retourUrl, el('div', { style: { height: 'var(--s-2)' } }), retourLib,
       ]),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Pied de page' }), pied]),
@@ -2528,11 +2525,11 @@ function ouvrirCorbeille() {
     el('div', { class: 'modal__body stack' }, [
       el('h2', { text: 'Corbeille de l’espace' }),
       el('p', { class: 'panel__hint', text: items.length
-        ? 'Ce qui a été retiré du kiosque. Restaurer le remet en ligne tel qu’il était.'
-        : 'Rien n’a été retiré de cet espace. Ce qu’on en retire atterrit ici, et s’en reprend.' }),
+        ? 'Restaurer remet en ligne tel quel.'
+        : 'Vide. Ce qu’on retire du kiosque atterrit ici.' }),
       items.length ? el('div', { class: 'sheet__list' }, items.map(ligne)) : null,
       items.length ? el('p', { class: 'field__hint', text:
-        'Les vingt derniers retraits sont conservés — au-delà, le plus ancien s’efface. Ce n’est pas une sauvegarde : l’export du catalogue reste la seule.' }) : null,
+        'Les vingt derniers retraits, au-delà le plus ancien s’efface. Seul l’export du catalogue sauvegarde.' }) : null,
     ]),
     el('div', { class: 'modal__actions' }, [
       items.length && el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-poubelle': 'vider', text: 'Vider la corbeille' }),
@@ -2725,12 +2722,10 @@ function contenuFrequentation() {
 
     lignes.length
       ? el('div', { class: 'sheet__list' }, lignes.map(ligne))
-      : el('p', { class: 'panel__hint', text: 'Aucun questionnaire en ligne dans cet espace : il n’y a rien à compter.' }),
+      : el('p', { class: 'panel__hint', text: 'Aucun questionnaire en ligne : rien à compter.' }),
 
     el('p', { class: 'field__hint', style: { marginTop: 'var(--s-4)' }, text:
-      'Un ordre de grandeur, pas une mesure d’audience : l’écriture est ouverte — qui répond n’a pas de compte — et rien n’empêche quelqu’un de gonfler un compteur. « Refaire » compte un départ ET une arrivée, pour que le taux reste juste. Les essais depuis l’éditeur ne comptent pas.' }),
-    el('p', { class: 'field__hint', text:
-      'Pas de courbe dans le temps, et ce n’est pas un oubli : les compteurs sont des nombres sans date. En tracer une demanderait d’écrire quand chacun a répondu.' }),
+      'Un ordre de grandeur : répondre ne demande pas de compte, rien n’empêche de gonfler un compteur. Les essais depuis l’éditeur ne comptent pas.' }),
   ])];
 }
 
@@ -2833,7 +2828,7 @@ function contenuVitrine() {
     corps.replaceChildren(
       el('h2', { text: `La vitrine de « ${state.espace} »` }),
       el('p', { class: 'panel__hint', text:
-        'L’ordre du kiosque, de haut en bas. Masquer retire de la page d’accueil sans dépublier : le questionnaire reste en ligne à son adresse, pour qui a le lien.' }),
+        'L’ordre du kiosque, de haut en bas. Masquer retire de l’accueil sans dépublier : le lien direct répond toujours.' }),
 
       el('div', { class: 'editor-list', 'data-sortable': 'vitrine' }, liste.flatMap((quiz, i) => {
         const masque = brouillon.masques.has(quiz.id);
@@ -2895,7 +2890,7 @@ function contenuVitrine() {
       })),
 
       el('p', { class: 'field__hint', text:
-        'Le § ouvre une section : son intertitre coiffe ce questionnaire et ceux qui le suivent, jusqu’au prochain. Un questionnaire publié plus tard se rangera après ceux-ci, par ordre alphabétique, jusqu’à ce qu’on lui donne sa place.' }),
+        'Le § ouvre une section : son intertitre coiffe les questionnaires qui suivent, jusqu’au prochain. Un questionnaire publié plus tard se range à la fin.' }),
     );
 
     bindSortables(corps, (cle, de, vers) => {
@@ -3081,7 +3076,7 @@ async function showEmbed() {
         text: `Adresse locale (${location.host || 'file://'}) — ce code ne marchera que sur cette machine.`,
       })]),
       area,
-      el('p', { class: 'panel__hint', text: 'Le script ajuste la hauteur du cadre au fil des questions et remonte la page hôte à chaque écran. Sans lui, le parcours défile dans un cadre de 720 px. Dans une iframe, le navigateur peut refuser le stockage : la reprise d’un parcours interrompu et l’historique ne fonctionnent alors pas, le reste si.' }),
+      el('p', { class: 'panel__hint', text: 'Le script ajuste la hauteur du cadre au fil des questions. Sans lui, le parcours défile dans 720 px. En iframe, le navigateur peut refuser le stockage : la reprise et l’historique tombent, le reste tient.' }),
     ]),
     el('div', { class: 'modal__actions' }, [
       el('button', { class: 'btn btn--quiet', type: 'button', 'data-embed': 'close', text: 'Fermer' }),
@@ -3519,7 +3514,7 @@ function assistantCreation() {
     if (etape === 0) {
       corps.append(
         el('h2', { text: 'Qu’avez-vous envie de faire découvrir ?' }),
-        el('p', { class: 'panel__hint', text: 'Cela préremplit le type de chaque nouvelle recommandation. Rien n’est figé : une reco peut toujours être d’un autre type.' }),
+        el('p', { class: 'panel__hint', text: 'Préremplit le type des nouvelles recommandations. Chacune peut en changer.' }),
         el('div', { class: 'row', style: { flexWrap: 'wrap', marginTop: 'var(--s-3)' } },
           RECO_TYPES.filter((t) => t.id !== 'autre').map((t) => el('button', {
             class: 'btn btn--sm ' + (choix.type === t.id ? 'btn--primary' : 'btn--ghost'),
@@ -3544,7 +3539,7 @@ function assistantCreation() {
       });
       corps.append(
         el('h2', { text: 'Comment s’appelle-t-il ?' }),
-        el('p', { class: 'panel__hint', text: 'C’est ce que verront vos usagers, sur la vignette du kiosque comme sur l’affiche. Il se change à tout moment.' }),
+        el('p', { class: 'panel__hint', text: 'Ce que vos usagers verront, sur la vignette comme sur l’affiche.' }),
         el('div', { style: { marginTop: 'var(--s-3)' } }, [champ]),
       );
       pied.append(
@@ -3575,7 +3570,7 @@ function assistantCreation() {
 
       corps.append(
         el('h2', { text: 'Quels tempéraments voulez-vous distinguer ?' }),
-        el('p', { class: 'panel__hint', text: 'Ce sont les directions que vos questions vont compter, et ce qui décidera des profils. Deux suffisent ; au-delà de quatre, l’équilibre devient difficile à tenir.' }),
+        el('p', { class: 'panel__hint', text: 'Ce que vos questions vont compter. Deux suffisent ; au-delà de quatre, l’équilibre devient difficile à tenir.' }),
         lignes,
         choix.axes.length < AXES_MAX && el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button', 'data-pas': 'axe-plus',
@@ -3745,7 +3740,7 @@ async function resoudreConflit(distant) {
     el('div', { class: 'modal__body stack' }, [
       el('h2', { text: 'Publication refusée — la version en ligne a changé' }),
       el('p', { text: `« ${distant.title} » a été modifié par ${qui}, ${quand}. Publier ta version maintenant effacerait ce travail-là.` }),
-      el('p', { class: 'panel__hint', text: 'Reprendre la version en ligne l’ouvre dans l’éditeur, à côté de la tienne, pour que tu compares avant de décider. Écraser publie ta version telle quelle : l’autre est alors perdue.' }),
+      el('p', { class: 'panel__hint', text: 'Reprendre ouvre la version en ligne à côté de la tienne, pour comparer. Écraser publie la tienne et perd l’autre.' }),
     ]),
     el('div', { class: 'modal__actions' }, [
       el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler',
@@ -3873,7 +3868,7 @@ function askCollision(count) {
         el('p', { text: count > 1
           ? `Ce fichier contient ${count} questionnaires que tu as déjà en brouillon, sous le même identifiant.`
           : 'Tu as déjà un brouillon portant le même identifiant.' }),
-        el('p', { class: 'panel__hint', text: 'Remplacer écrase ta copie locale — c’est ce qu’il faut pour restaurer une sauvegarde. Créer une variante garde les deux, avec un identifiant neuf.' }),
+        el('p', { class: 'panel__hint', text: 'Remplacer écrase ta copie locale — la voie pour restaurer une sauvegarde. Une variante garde les deux.' }),
       ]),
       el('div', { class: 'modal__actions' }, [
         el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler',

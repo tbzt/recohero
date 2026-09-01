@@ -437,7 +437,7 @@ function renderQuestion(question, index) {
      suppose qu'on ait deviné qu'il faut le presser. */
   if (multiple) {
     view.append(el('p', { class: 'astuce', text:
-      'Cochez tout ce qui vous tente — autant que vous voulez —, puis validez.' }));
+      'Cochez tout ce qui vous tente, puis validez.' }));
   }
 
   const dernier = index + 1 === quiz.questions.length;
