@@ -701,6 +701,7 @@ function renderEspace() {
     questionnaires: panneauQuestionnaires,
     equipe: contenuEquipe,
     reglages: contenuReglages,
+    frequentation: contenuFrequentation,
   };
   const construire = panneaux[state.ongletEspace];
   if (construire) {
@@ -712,7 +713,7 @@ function renderEspace() {
      portent leur propre état — un brouillon d'ordre qu'on enregistre, des
      filtres — et les convertir demande plus qu'un déplacement de noeuds. La
      porte reste ouverte plutôt que condamnée. */
-  const relais = { vitrine: ouvrirPresentation, frequentation: ouvrirFrequentation }[state.ongletEspace];
+  const relais = { vitrine: ouvrirPresentation }[state.ongletEspace];
   const onglet = ongletsEspace().find((o) => o.id === state.ongletEspace);
   dom.panel.replaceChildren(el('section', { class: 'panel' }, [
     el('div', { class: 'empty' }, [
@@ -1355,7 +1356,9 @@ function onClick(event) {
     case 'mon-mot-de-passe': return changerMonMotDePasse();
     case 'identite-espace':  return editerIdentite();
     case 'corbeille':        return ouvrirCorbeille();
-    case 'frequentation':    return ouvrirFrequentation();
+    case 'frequentation':
+      state.ongletEspace = 'frequentation';
+      return allerA('espace');
     case 'vitrine':          return ouvrirPresentation();
     case 'export-espace': return exportEspace();
     case 'export-drafts': return exportDrafts();
@@ -2559,8 +2562,15 @@ function tauxDe(s) {
   return Math.min(100, Math.round(((s.total || 0) / s.debuts) * 100));
 }
 
-function ouvrirFrequentation() {
-  if (!state.remoteSession) return showSignIn();
+function contenuFrequentation() {
+  if (!state.remoteSession) {
+    return [el('section', { class: 'panel' }, [
+      el('div', { class: 'empty' }, [
+        el('div', { class: 'empty__icon', text: '📊' }),
+        el('p', { text: 'Il faut être connecté à un espace pour lire sa fréquentation.' }),
+      ]),
+    ])];
+  }
 
   const lignes = state.remote.map((quiz) => ({ quiz, s: state.stats?.[quiz.id] || {} }))
     .sort((a, b) => (b.s.total || 0) - (a.s.total || 0));
@@ -2656,34 +2666,28 @@ function ouvrirFrequentation() {
 
   const tauxGlobal = tauxDe(cumul);
 
-  const dialog = el('dialog', { class: 'modal sheet' }, [
-    el('div', { class: 'modal__body stack' }, [
-      el('h2', { text: `Fréquentation de « ${state.espace} »` }),
+  /* En lecture seule, donc rien à enregistrer ni à abandonner : le passage en
+     panneau ne coûte que la suppression du pied de fenêtre. C'est aussi la
+     conversion qui gagne le plus à la largeur — des jauges de répartition
+     rognées à 27 rem se lisaient mal. */
+  return [el('section', { class: 'panel' }, [
+    el('div', { class: 'section__head' }, [el('h2', { text: 'Fréquentation' })]),
 
-      lignes.length ? el('div', { class: 'etat', style: { marginBottom: 'var(--s-4)' } }, [
-        chiffre(cumul.debuts, cumul.debuts > 1 ? 'parcours commencés' : 'parcours commencé'),
-        chiffre(cumul.total, cumul.total > 1 ? 'terminés' : 'terminé'),
-        tauxGlobalItem(tauxGlobal),
-      ].filter(Boolean)) : null,
+    lignes.length ? el('div', { class: 'etat', style: { marginBottom: 'var(--s-4)' } }, [
+      chiffre(cumul.debuts, cumul.debuts > 1 ? 'parcours commencés' : 'parcours commencé'),
+      chiffre(cumul.total, cumul.total > 1 ? 'terminés' : 'terminé'),
+      tauxGlobalItem(tauxGlobal),
+    ].filter(Boolean)) : null,
 
-      lignes.length
-        ? el('div', { class: 'sheet__list' }, lignes.map(ligne))
-        : el('p', { class: 'panel__hint', text: 'Aucun questionnaire en ligne dans cet espace : il n’y a rien à compter.' }),
+    lignes.length
+      ? el('div', { class: 'sheet__list' }, lignes.map(ligne))
+      : el('p', { class: 'panel__hint', text: 'Aucun questionnaire en ligne dans cet espace : il n’y a rien à compter.' }),
 
-      el('p', { class: 'field__hint', text:
-        'Un ordre de grandeur, pas une mesure d’audience : l’écriture est ouverte — qui répond n’a pas de compte — et rien n’empêche quelqu’un de gonfler un compteur. « Refaire » compte un départ ET une arrivée, pour que le taux reste juste. Les essais depuis l’éditeur ne comptent pas.' }),
-      el('p', { class: 'field__hint', text:
-        'Pas de courbe dans le temps, et ce n’est pas un oubli : les compteurs sont des nombres sans date. En tracer une demanderait d’écrire quand chacun a répondu.' }),
-    ]),
-    el('div', { class: 'modal__actions' }, [
-      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
-    ]),
-  ]);
-
-  dialog.addEventListener('close', () => dialog.remove());
-  document.body.append(dialog);
-  dialog.showModal();
-  return undefined;
+    el('p', { class: 'field__hint', style: { marginTop: 'var(--s-4)' }, text:
+      'Un ordre de grandeur, pas une mesure d’audience : l’écriture est ouverte — qui répond n’a pas de compte — et rien n’empêche quelqu’un de gonfler un compteur. « Refaire » compte un départ ET une arrivée, pour que le taux reste juste. Les essais depuis l’éditeur ne comptent pas.' }),
+    el('p', { class: 'field__hint', text:
+      'Pas de courbe dans le temps, et ce n’est pas un oubli : les compteurs sont des nombres sans date. En tracer une demanderait d’écrire quand chacun a répondu.' }),
+  ])];
 }
 
 /* Le taux global ne s'affiche que si des départs ont été comptés — sinon
