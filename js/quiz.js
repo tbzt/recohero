@@ -49,6 +49,7 @@ const state = {
   vitrines: {},
   quiz: null,
   step: -1,        // -1 = couverture, n = résultat
+  reprise: 0,      // l'étape d'une session retrouvée, 0 si aucune
   answers: {},
   direction: 'forward',
   finished: false,
@@ -81,7 +82,15 @@ async function boot() {
        appartient à la personne devant l'écran, et la suivante doit trouver
        la couverture, pas les réponses de quelqu'un d'autre. */
     const saved = store.getSession(quiz.id);
-    if (saved && !isTest && !isKiosque) state.answers = saved.answers || {};
+    if (saved && !isTest && !isKiosque) {
+      state.answers = saved.answers || {};
+      /* L'étape où l'on s'est arrêté. Elle n'était pas enregistrée : « Reprendre
+         où j'en étais » ramenait à la question 1, c'est-à-dire promettait ce
+         que le format des données ne permettait pas. Une session écrite avant
+         ce changement n'a pas de `step` — elle reprend au début, comme avant.
+         Bornée, parce que le questionnaire a pu raccourcir entre-temps. */
+      state.reprise = Math.min(Math.max(0, Number(saved.step) || 0), quiz.questions.length - 1);
+    }
 
     render();
     window.addEventListener('keydown', onKey);
@@ -225,7 +234,15 @@ function updateBar() {
       class: 'tally__axis' + (scores.leaders.includes(axis.id) && scores.best > 0 ? ' is-lead' : ''),
       style: { '--axis': axis.color }, title: axis.label, 'data-axis': axis.id },
     [
-      el('span', { class: 'tally__glyph', text: axis.glyph }),
+      /* Le glyphe est un signe, pas un mot : lu à voix haute, « puce » ne dit
+         rien de l'axe, et le compteur — qui est une région vivante — annonçait
+         « puce zéro, étoile deux, triangle zéro » à chaque réponse. Le nom
+         n'existait que dans `title`, qui n'entre pas dans le nom accessible.
+         Le glyphe passe donc en décoratif et le nom devient du texte, masqué
+         à l'œil seulement. La course entre axes est le sujet du
+         questionnaire : elle doit s'entendre. */
+      el('span', { class: 'tally__glyph', text: axis.glyph, 'aria-hidden': 'true' }),
+      el('span', { class: 'visually-hidden', text: `${axis.label} : ` }),
       el('span', { class: 'tally__count', text: String(scores.counts[axis.id]) }),
     ],
     )));
@@ -567,7 +584,13 @@ function renderResult() {
       el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'card', text: '🖼 Ma carte de résultat' }),
       el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'share', text: '⤴ Partager ce questionnaire' }),
       el('button', { class: 'btn btn--quiet', type: 'button', 'data-act': 'restart', text: '↺ Refaire' }),
-      !isEmbed && el('a', { class: 'btn btn--quiet', href: kiosque, text: 'Retour au kiosque' }),
+      /* `isKiosque` autant qu'`isEmbed`. Sur une borne, le bandeau a perdu
+         sa sortie (`wireKiosque`), mais celle-ci restait — et `avecEspace()`
+         reconduit l'espace, jamais le mode. Un doigt ici sortait la tablette
+         du mode borne pour la journée : la session et l'historique se
+         remettaient à s'écrire, et le kiosque montrait à l'usager suivant
+         les résultats de tous les précédents. */
+      !isEmbed && !isKiosque && el('a', { class: 'btn btn--quiet', href: kiosque, text: 'Retour au kiosque' }),
     ]),
   ]);
 
@@ -657,24 +680,39 @@ function indicesNode(quiz, profile) {
    quelque chose de concret, là où « vous étiez proche » ne dit rien.
 
    Deux recommandations au plus : c'est une porte entrouverte, pas un
-   second résultat qui viendrait concurrencer le premier.               */
+   second résultat qui viendrait concurrencer le premier.
+
+   Quand plusieurs profils sont à la même distance, on les nomme tous et on
+   n'affiche AUCUNE recommandation : en montrer celles d'un seul refarait,
+   un cran plus bas, le choix arbitraire que `proximite` vient de cesser de
+   faire.                                                                */
 function presqueNode(quiz, scores, profile) {
   const proche = proximite(quiz, scores, profile);
   if (!proche) return null;
+
+  const plusieurs = proche.resultats.length > 1;
+  const seul = plusieurs ? null : proche.resultats[0];
 
   const ecart = proche.points === 0
     ? 'à égalité'
     : `à ${proche.points} ${proche.axe ? proche.axe.glyph : 'point'}${!proche.axe && proche.points > 1 ? 's' : ''} près`;
 
-  const recos = proche.resultat.recos.filter((r) => r.title.trim()).slice(0, 2);
+  const intro = !plusieurs ? 'Vous n’étiez pas loin de '
+    : proche.points === 0 ? 'Vous étiez à égalité avec '
+    : 'Vous étiez à la même distance de ';
+  /* « à égale distance de A et B — à égalité » se répéterait. */
+  const queue = plusieurs && proche.points === 0 ? '.' : ` — ${ecart}.`;
+
+  const noms = proche.resultats.map((r) => el('strong', { text: `« ${r.title} »` }));
+  const liste = noms.flatMap((n, i) => (
+    i === 0 ? [n] : [i === noms.length - 1 ? ' et ' : ', ', n]
+  ));
+
+  const recos = seul ? seul.recos.filter((r) => r.title.trim()).slice(0, 2) : [];
 
   return el('section', { class: 'presque' }, [
-    el('p', { class: 'presque__intro' }, [
-      'Vous n’étiez pas loin de ',
-      el('strong', { text: `« ${proche.resultat.title} »` }),
-      ` — ${ecart}.`,
-    ]),
-    proche.resultat.subtitle && el('p', { class: 'presque__sous', text: proche.resultat.subtitle }),
+    el('p', { class: 'presque__intro' }, [intro, ...liste, queue]),
+    seul?.subtitle && el('p', { class: 'presque__sous', text: seul.subtitle }),
     recos.length && el('ul', { class: 'presque__recos' }, recos.map((r) => el('li', {}, [
       el('span', { class: 'presque__titre', text: r.title }),
       r.creator && el('span', { class: 'presque__auteur', text: ` — ${r.creator}` }),
@@ -720,7 +758,7 @@ function onStageClick(event) {
 
   switch (trigger.dataset.act) {
     case 'start':   return demarrer();
-    case 'resume':  return go(0);
+    case 'resume':  return go(state.reprise);
     case 'restart': return restart();
     case 'back':    return go(state.step - 1);
     case 'next':    return advance();
@@ -779,7 +817,12 @@ function pick(button) {
 
   for (const node of dom.stage.querySelectorAll('.option')) {
     node.classList.toggle('is-picked', node === button);
-    node.setAttribute('aria-checked', String(node === button));
+    /* `aria-pressed`, et pas `aria-checked` : ces options sont des boutons
+       (views.js explique pourquoi elles ne sont pas un radiogroup), et un
+       bouton ne porte pas `aria-checked` — les deux ensemble se
+       contredisaient. On repose ici le même attribut que le rendu, pour que
+       l'état soit juste avant le repaint des 340 ms. */
+    node.setAttribute('aria-pressed', String(node === button));
   }
   button.classList.add('is-confirmed');
   updateBar();
@@ -844,7 +887,7 @@ let refusSignale = false;
 
 function persist() {
   if (isTest || isKiosque) return;
-  const ok = store.saveSession(state.quiz.id, state.answers);
+  const ok = store.saveSession(state.quiz.id, state.answers, state.step);
   if (ok || refusSignale || isEmbed) return;
   refusSignale = true;
   toast('Ce navigateur refuse d’enregistrer : vous ne pourrez pas reprendre ce parcours plus tard.', 'danger');

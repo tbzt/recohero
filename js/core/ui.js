@@ -14,8 +14,15 @@ export function el(tag, props = {}, children = []) {
       node.addEventListener(key.slice(2).toLowerCase(), value);
     } else node.setAttribute(key, value === true ? '' : value);
   }
+  /* `0` est écarté au même titre que `false` et `null`. Le patron
+     `liste.length && el(…)` rend le nombre 0 quand la liste est vide, et
+     `String(0)` l'imprimait tel quel : un « 0 » nu au bord de la barre de
+     navigation, à l'endroit précis où « Suivant → » va apparaître, et un
+     second entre les recommandations et la proximité. Aucun appelant ne
+     passe un enfant numérique — les nombres affichés passent tous par
+     `String(...)` en amont. */
   for (const child of [].concat(children)) {
-    if (child == null || child === false) continue;
+    if (child == null || child === false || child === 0) continue;
     node.append(child.nodeType ? child : document.createTextNode(String(child)));
   }
   return node;
@@ -102,16 +109,40 @@ export function toast(message, options = '') {
 }
 
 /* Noir ou blanc sur une couleur donnée — luminance relative WCAG. */
-export function inkOn(hex) {
+function luminance(hex) {
   const value = String(hex || '').replace('#', '');
   const full = value.length === 3 ? value.split('').map((c) => c + c).join('') : value;
-  if (full.length < 6) return '#FFFFFF';
+  if (full.length < 6) return null;
   const channel = (i) => {
     const c = parseInt(full.slice(i, i + 2), 16) / 255;
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   };
-  const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
-  return luminance > 0.42 ? '#17120F' : '#FFFFFF';
+  return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+}
+
+export function inkOn(hex) {
+  const l = luminance(hex);
+  if (l === null) return '#FFFFFF';
+  return l > 0.42 ? '#17120F' : '#FFFFFF';
+}
+
+/* Le rapport de contraste de l'accent avec le blanc, qui est exactement
+   `--surface` du thème clair (#FFFFFF) — la carte sur laquelle l'anneau de
+   focus se dessine. C'est le cas qui casse, et il ne se voit pas au moment
+   du choix : `--focus` VAUT `--accent` (foundation.css:152), donc un accent
+   clair rend l'anneau invisible dans tout le questionnaire, et les jauges
+   avec lui. `inkOn` ne rattrape que le texte posé SUR l'accent, qui bascule
+   en noir ou blanc ; l'anneau et les filets, eux, n'ont pas de repli.
+
+   Mesure vérifiée contre l'audit d'accessibilité du 1er septembre 2026 :
+   #C8452B → 4,84 · #FFD400 → 1,43 · #7ED321 → 1,87 · #00E5FF → 1,54.
+
+   Le fond de page `--bg` (#FBF7F1) est un rien plus sombre : le rapport y
+   est légèrement inférieur. Ce qu'on mesure ici est donc l'hypothèse la
+   plus favorable — un accent qui échoue ici échoue partout. */
+export function contrasteSurBlanc(hex) {
+  const l = luminance(hex);
+  return l === null ? null : Math.round((1.05 / (l + 0.05)) * 100) / 100;
 }
 
 /* Un questionnaire ne redéfinit qu'une variable : --accent.

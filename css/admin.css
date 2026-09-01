@@ -104,10 +104,15 @@
    glisser une barre de navigation pour trouver où l'on va est un coût
    qu'on paie à chaque changement de section.
 
-   Ce qui les fait tenir : seul l'onglet actif porte son nom. Les autres
-   se réduisent à leur glyphe — et c'est celui de la section active qu'on
-   a besoin de lire, puisque c'est la seule qu'on ne voit pas surlignée
-   ailleurs à l'écran. */
+   Ce qui les fait tenir *dans une largeur de téléphone* : seul l'onglet
+   actif porte son nom. Les autres se réduisent à leur glyphe — et c'est
+   celui de la section active qu'on a besoin de lire, puisque c'est la seule
+   qu'on ne voit pas surlignée ailleurs à l'écran.
+
+   Au-dessus de 62 rem, cette contrainte n'existe plus : la barre ne s'y
+   affiche qu'au niveau de l'espace, où elle est la navigation principale du
+   backoffice. Quatre glyphes muets qu'il faut survoler pour lire ne sont pas
+   une navigation principale. */
 .tab {
   position: relative;
   display: inline-flex;
@@ -128,7 +133,12 @@
               border-color var(--dur-fast) var(--ease-out),
               color var(--dur-fast) var(--ease-out);
 }
-.tab__label { display: none; }
+.tab__label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .tab__emoji { font-size: var(--t-base); line-height: 1; }
 
 .tab.is-active {
@@ -145,6 +155,12 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+@media (max-width: 62rem) {
+  /* Le repli étroit : les libellés s'effacent, l'actif garde le sien par la
+     spécificité de la règle ci-dessus. */
+  .tab__label { display: none; }
 }
 /* --- La répartition des profils, dans la fréquentation -----------------------
    Une petite jauge par profil, sous la ligne du questionnaire. Elle se mesure

@@ -142,16 +142,35 @@ export function proximite(quiz, scores, gagnant) {
   /* Le seuil suit l'échelle du questionnaire : deux points d'écart ne
      veulent pas dire la même chose sur un axe qui plafonne à 6 et sur un
      qui plafonne à 40. En dessous de deux points, on affiche toujours —
-     c'est un quasi ex æquo quelle que soit l'échelle. */
-  const plafond = meilleur.axis ? (plafonds[meilleur.axis] || 0)
-                                : Object.values(plafonds).reduce((a, b) => a + b, 0);
-  const seuil = Math.max(2, Math.ceil(plafond * 0.15));
-  if (meilleur.points > seuil) return null;
+     c'est un quasi ex æquo quelle que soit l'échelle.
+
+     Il se calcule par candidat : deux profils au même écart peuvent se
+     jouer sur des axes d'amplitudes différentes. */
+  const seuilDe = (c) => {
+    const plafond = c.axis ? (plafonds[c.axis] || 0)
+                           : Object.values(plafonds).reduce((a, b) => a + b, 0);
+    return Math.max(2, Math.ceil(plafond * 0.15));
+  };
+  if (meilleur.points > seuilDe(meilleur)) return null;
+
+  /* TOUS ceux qui sont à la même distance, et non le premier de la liste.
+     Le tri est stable : jusqu'ici, c'est donc l'ordre des profils dans
+     l'éditeur qui départageait des ex æquo, en silence. L'auteur a rangé
+     ses profils pour la priorité de résolution, pas pour arbitrer une
+     proximité — et le cas est loin d'être rare : il couvre 100 % des
+     parcours qui tombent au « par défaut », soit près d'un sur six sur le
+     questionnaire d'exemple. Dire « vous n'étiez pas loin de A » quand B
+     l'était tout autant, c'est dépenser la seule chose que ce bloc a pour
+     lui : être exact. */
+  const exaequo = candidats.filter((c) => c.points === meilleur.points && c.points <= seuilDe(c));
+  const axes = [...new Set(exaequo.map((c) => c.axis))];
 
   return {
-    resultat: meilleur.resultat,
+    resultats: exaequo.map((c) => c.resultat),
     points: meilleur.points,
-    axe: meilleur.axis ? quiz.axes.find((a) => a.id === meilleur.axis) : null,
+    /* Le glyphe ne se dit que si tous les ex æquo se jouent sur le même
+       axe ; sinon l'écart n'a pas d'unité commune et se compte en points. */
+    axe: axes.length === 1 && axes[0] ? quiz.axes.find((a) => a.id === axes[0]) : null,
   };
 }
 

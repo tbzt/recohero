@@ -5,9 +5,9 @@
    qui écoute, applique et redessine.
    ========================================================================== */
 
-import { RECO_TYPES, ACCENTS, RULE_MODES, slugify, imageWeight } from '../core/schema.js';
+import { RECO_TYPES, ACCENTS, NOMS_ACCENTS, RULE_MODES, slugify, imageWeight } from '../core/schema.js';
 import { ceilings } from '../core/scoring.js';
-import { el, formatBytes } from '../core/ui.js';
+import { el, formatBytes, contrasteSurBlanc } from '../core/ui.js';
 
 /* En dessous de tant de parcours terminés, on montre le compte plutôt que
    la part : un pourcentage sur sept parcours désigne des personnes. */
@@ -56,6 +56,21 @@ const field = (label, control, hint) => el('label', { class: 'field' }, [
   control,
   hint && el('span', { class: 'field__hint', text: hint }),
 ]);
+
+/* `--accent` ne colore pas que la marque : il EST `--focus`, l'anneau qui
+   dit où l'on se trouve au clavier, et il peint les jauges et les filets.
+   Ces trois-là n'ont pas de repli en noir ou blanc comme le texte, dont
+   `inkOn` s'occupe. Un accent clair choisi de bonne foi rend donc le focus
+   invisible dans tout le questionnaire, et rien ne le disait.
+
+   On avertit, on ne corrige pas : la couleur appartient à celle qui la
+   choisit. Seuil 3:1 — celui de WCAG 1.4.11, pour ce qui n'est pas du
+   texte. */
+const avertissementAccent = (hex) => {
+  const ratio = contrasteSurBlanc(hex);
+  if (ratio === null || ratio >= 3) return null;
+  return `⚠ Contraste ${String(ratio).replace('.', ',')}:1 sur fond clair — l’anneau de focus et les jauges y seront difficiles à voir (3:1 minimum). Le texte posé dessus, lui, reste lisible.`;
+};
 
 const input = (bind, value, props = {}) => el('input', {
   class: 'input', type: 'text', 'data-bind': bind, value: value ?? '', ...props,
@@ -162,10 +177,14 @@ export function identite(quiz, ctx = {}) {
         ...ACCENTS.map((hex) => el('button', {
           class: 'swatch' + (hex.toLowerCase() === quiz.accent.toLowerCase() ? ' is-active' : ''),
           type: 'button', 'data-act': 'accent', 'data-id': hex,
-          style: { background: hex }, title: hex, 'aria-label': `Accent ${hex}`,
+          style: { background: hex }, title: NOMS_ACCENTS[hex] || hex,
+          'aria-label': NOMS_ACCENTS[hex] || `Accent ${hex}`,
         })),
-        el('input', { class: 'swatch-input', type: 'color', 'data-bind': 'q:accent', value: quiz.accent, title: 'Couleur libre' }),
-      ]), "Elle habille le parcours entier. Le texte posé dessus bascule en noir ou blanc automatiquement."),
+        el('input', { class: 'swatch-input', type: 'color', 'data-bind': 'q:accent', value: quiz.accent,
+          title: 'Couleur libre', 'aria-label': 'Couleur libre' }),
+      ]),
+        (avertissementAccent(quiz.accent) ? avertissementAccent(quiz.accent) + ' ' : '')
+        + "Elle habille le parcours entier. Le texte posé dessus bascule en noir ou blanc automatiquement."),
     ]),
   ]);
 }
@@ -204,7 +223,7 @@ export function axes(quiz) {
           el('p', { text: 'Aucun axe. Sans axe, il n’y a rien à compter.' }),
         ]),
     el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-4)' } , text:
-      'Supprimer un axe efface aussi les points que les réponses lui donnaient. C’est irréversible.' }),
+      'Supprimer un axe efface aussi les points que les réponses lui donnaient. Le bandeau « Annuler » et Ctrl+Z le rétablissent.' }),
   ]);
 }
 
@@ -743,7 +762,7 @@ export function publier(quiz, ctx = {}) {
       el('h3', { text: 'Supprimer ce questionnaire' }),
       el('p', { class: 'panel__hint', style: { marginBottom: 'var(--s-3)' }, text:
         'Le brouillon est effacé de ce navigateur. Un fichier déjà exporté, un lien déjà envoyé et une version déjà publiée dans un espace ne sont pas touchés.' }),
-      el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-act': 'delete-quiz', text: 'Supprimer définitivement' }),
+      el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-act': 'delete-quiz', text: 'Supprimer ce brouillon' }),
     ]),
   ]);
 }

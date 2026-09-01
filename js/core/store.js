@@ -10,7 +10,7 @@ const PREFIX = 'recohero.v1.';
 const KEY = {
   drafts:  PREFIX + 'drafts',   // { [quizId]: quiz }  — les brouillons du backoffice
   results: PREFIX + 'results',  // [ resultEntry ]     — l'historique de réponses
-  session: PREFIX + 'session',  // { [quizId]: { answers, at } } — parcours en cours
+  session: PREFIX + 'session',  // { [quizId]: { answers, step, at } } — parcours en cours
   unlock:  PREFIX + 'unlock',   // horodatage du déverrouillage du backoffice
   remote:  PREFIX + 'remote',   // { email, uid, idToken, refreshToken, expiresAt }
 };
@@ -85,9 +85,9 @@ export function getSession(quizId) {
 /* Rend `false` si le navigateur a refusé. L'appelant décide quoi en
    faire : embarqué dans le site d'un tiers, le refus est attendu et se
    tait ; ailleurs, il coûte la reprise du parcours et mérite d'être dit. */
-export function saveSession(quizId, answers) {
+export function saveSession(quizId, answers, step = 0) {
   const map = read(KEY.session, {});
-  map[quizId] = { answers, at: Date.now() };
+  map[quizId] = { answers, step, at: Date.now() };
   return write(KEY.session, map);
 }
 

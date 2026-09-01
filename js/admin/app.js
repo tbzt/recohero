@@ -9,7 +9,7 @@ import { PANELS, poidsHorsEchelle, PETIT_ECHANTILLON } from './panels.js';
 import {
   makeQuiz, makeAxis, makeQuestion, makeOption, makeResult, makeReco,
   normalize, diagnose, uid, slugify, safeImage, imageWeight, RECO_TYPES,
-  normaliserIdentite, normaliserPresentation, presentationPourLaBase,
+  normaliserIdentite, normaliserPresentation, presentationPourLaBase, normaliserVitrine,
 } from '../core/schema.js';
 import { GLYPHES, EMOJIS, chercher } from '../core/symboles.js';
 import { reachability } from '../core/scoring.js';
@@ -143,7 +143,7 @@ function gateCompte() {
   const pass = el('input', {
     class: 'input', type: 'password', autocomplete: 'current-password', required: true,
   });
-  const erreur = el('p', { class: 'alerte', hidden: true });
+  const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
   const valider = el('button', { class: 'btn btn--primary btn--block', type: 'submit', text: 'Se connecter' });
 
   const form = el('form', { class: 'card gate__card stack' }, [
@@ -848,12 +848,15 @@ function bandeauEtat(ctx) {
        sur une donnée absente vaudrait moins que se taire. La borne à
        100 % couvre le cas de ceux-là — des arrivées sans départ. */
     state.espace && enLigne && stats?.debuts > 0 && (() => {
+      const assez = assezDeDeparts(stats);
       const taux = Math.min(100, Math.round(((stats.total || 0) / stats.debuts) * 100));
       return el('span', {
-        class: 'etat__item' + (taux < 50 ? ' etat__item--erreur' : ''),
-        title: `${stats.total || 0} parcours terminés sur ${stats.debuts} commencés.`,
+        class: 'etat__item' + (assez && taux < 50 ? ' etat__item--erreur' : ''),
+        title: `${stats.total || 0} parcours terminés sur ${stats.debuts} commencés.`
+          + (assez ? '' : TROP_PEU_DE_DEPARTS),
       }, [
-        el('strong', { class: 'etat__valeur', text: `${taux} %` }),
+        el('strong', { class: 'etat__valeur',
+          text: assez ? `${taux} %` : `${stats.total || 0}/${stats.debuts}` }),
         el('span', { class: 'etat__libelle', text: 'terminés' }),
       ]);
     })(),
@@ -1009,6 +1012,13 @@ function touch() {
   saveTimer = setTimeout(flush, 500);
 }
 
+/* Le témoin d'enregistrement n'est PAS une région vivante, et c'est
+   délibéré : `touch()` écrit « Enregistrement… » à chaque frappe, une
+   région polie annoncerait donc deux phrases par mot tapé. Ce qui mérite
+   d'être entendu, c'est l'échec — et une seule fois, comme le parcours le
+   fait déjà pour un refus de session. */
+let refusEnregistrementSignale = false;
+
 function flush() {
   clearTimeout(saveTimer);
   if (!state.quiz) return;
@@ -1017,6 +1027,10 @@ function flush() {
   dom.saveStatus.textContent = saved
     ? `Enregistré · ${new Date(saved.updatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
     : 'Enregistrement impossible (stockage plein ?)';
+  if (saved) { refusEnregistrementSignale = false; return; }
+  if (refusEnregistrementSignale) return;
+  refusEnregistrementSignale = true;
+  toast('Ce navigateur refuse d’enregistrer : vos modifications ne sont plus conservées. Exportez ce questionnaire avant de fermer.', 'danger');
 }
 
 /* --- Liaisons ------------------------------------------------------------------ */
@@ -1163,7 +1177,22 @@ function onClick(event) {
   const structural = () => { flush(); renderRail(); renderPanel(); };
   /* Un déplacement est annulable mais ne mérite pas de bandeau : son
      effet est déjà sous les yeux de celui qui vient de le provoquer. */
-  const reorder = (label, mutate) => { remember(label); mutate(); structural(); };
+  const reorder = (label, mutate) => {
+    remember(label);
+    mutate();
+    structural();
+    /* `renderPanel()` remplace le panneau entier : le bouton qu'on vient de
+       presser n'existe plus, et le focus retombe sur le document. Au clavier,
+       remonter une question de trois crans demandait de re-tabuler jusqu'à
+       elle entre chaque cran. On repose donc le focus sur le même geste, à sa
+       nouvelle place — et sur son jumeau quand il vient de se désactiver,
+       c'est-à-dire quand l'élément a atteint le haut ou le bas de la liste. */
+    const famille = act.replace(/-(up|down)$/, '');
+    const candidats = [...dom.panel.querySelectorAll(`[data-act^="${famille}-"]`)]
+      .filter((n) => n.dataset.id === id && /-(up|down)$/.test(n.dataset.act) && !n.disabled);
+    (candidats.find((n) => n.dataset.act === act) || candidats[0])
+      ?.focus({ preventScroll: true });
+  };
   const byId = (list, key) => list.find((item) => item.id === key);
   const move = (list, key, delta) => {
     const from = list.findIndex((item) => item.id === key);
@@ -1669,9 +1698,13 @@ function afficherRaccourcis() {
    c'est que la coupure est fausse.                                        */
 
 function feuille(titre, sousTitre, contenu, actions) {
-  const dialog = el('dialog', { class: 'modal sheet' }, [
+  /* Sans `aria-labelledby`, la feuille s'annonce « dialogue » et rien de
+     plus : le titre est à l'écran mais n'est pas le nom du dialogue. Posé
+     ici, dans le helper, il couvre toutes celles qui passent par lui. */
+  const titreId = uid('titre');
+  const dialog = el('dialog', { class: 'modal sheet', 'aria-labelledby': titreId }, [
     el('div', { class: 'modal__body stack' }, [
-      el('h2', { text: titre }),
+      el('h2', { id: titreId, text: titre }),
       sousTitre && el('p', { class: 'panel__hint', text: sousTitre }),
       ...contenu,
     ]),
@@ -1968,7 +2001,7 @@ function monProfil() {
   const publier = el('input', { type: 'checkbox' });
   publier.checked = enVitrine;
 
-  const erreur = el('p', { class: 'alerte', hidden: true });
+  const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
   const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Enregistrer' });
 
   const dialog = el('dialog', { class: 'modal' }, [
@@ -2027,11 +2060,11 @@ function monProfil() {
       await remote.enregistrerProfil(state.espace, uid, profil);
       /* La vitrine ne reprend que ce que la personne a saisi, et n'existe
          que si elle l'a demandé. Décocher efface. */
-      await remote.publierVitrine(state.espace, uid, publier.checked ? {
+      await remote.publierVitrine(state.espace, uid, publier.checked ? normaliserVitrine({
         nom: [profil.prenom, profil.nom].filter(Boolean).join(' '),
-        poste: profil.poste || undefined,
-        image: profil.image || undefined,
-      } : null);
+        poste: profil.poste,
+        image: profil.image,
+      }) : null);
       await refreshEspace();
       dismiss(dialog, () => {
         toast(publier.checked ? 'Profil enregistré et affiché publiquement.' : 'Profil enregistré, visible de l’équipe seule.');
@@ -2065,7 +2098,7 @@ function inviter() {
   });
   const uidChamp = el('input', { class: 'input input--mono', placeholder: 'son identifiant, s’il a déjà un compte' });
   const info = el('p', { class: 'panel__hint', hidden: true });
-  const erreur = el('p', { class: 'alerte', hidden: true });
+  const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
   const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Inviter' });
 
   const dialog = el('dialog', { class: 'modal' }, [
@@ -2264,7 +2297,7 @@ function demanderLAcces() {
     class: 'input', value: state.profils?.[uid]?.prenom || '',
     placeholder: invitee.prenom,
   });
-  const erreur = el('p', { class: 'alerte', hidden: true });
+  const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
   const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Envoyer la demande' });
 
   const dialog = el('dialog', { class: 'modal' }, [
@@ -2317,7 +2350,7 @@ async function verifierMonCourriel() {
 
 function changerMonMotDePasse() {
   const champ = el('input', { class: 'input', type: 'password', autocomplete: 'new-password' });
-  const erreur = el('p', { class: 'alerte', hidden: true });
+  const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
   const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Changer' });
 
   const dialog = el('dialog', { class: 'modal' }, [
@@ -2379,7 +2412,7 @@ function editerIdentite() {
   const retourLib = el('input', { class: 'input', value: actuelle.retour?.libelle || '', placeholder: 'Retour au site de la médiathèque', maxlength: '60' });
   const pied = el('input', { class: 'input', value: actuelle.pied || '', placeholder: 'Médiathèque Maupassant · Mentions légales', maxlength: '200' });
 
-  const erreur = el('p', { class: 'alerte', hidden: true });
+  const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
   const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Enregistrer' });
 
   const dialog = el('dialog', { class: 'modal' }, [
@@ -2559,6 +2592,19 @@ function tauxDe(s) {
   return Math.min(100, Math.round(((s.total || 0) / s.debuts) * 100));
 }
 
+/* Le même refus que pour la répartition des profils — sauf qu'il n'était
+   appliqué que là. Le taux d'achèvement s'affichait dès le premier départ
+   compté, et passait en rouge sous 50 % : un abandon sur deux départs peignait
+   une alerte, et le premier chiffre qu'une bibliothécaire voit après sa mise
+   en ligne était le moins fiable de tous. Sous le seuil, on montre les deux
+   nombres et on ne peint rien. */
+function assezDeDeparts(s) {
+  return (s?.debuts || 0) >= PETIT_ECHANTILLON;
+}
+
+const TROP_PEU_DE_DEPARTS =
+  ` Trop peu pour un pourcentage (${PETIT_ECHANTILLON} départs minimum).`;
+
 function contenuFrequentation() {
   if (!state.remoteSession) {
     return [el('section', { class: 'panel' }, [
@@ -2654,9 +2700,10 @@ function contenuFrequentation() {
       taux === null
         ? el('span', { class: 'pill', title: 'Ce questionnaire a été mis en ligne avant le comptage des départs.', text: '—' })
         : el('span', {
-            class: 'pill' + (taux < 50 ? ' pill--warn' : ''),
-            title: `${s.total || 0} parcours terminés sur ${s.debuts} commencés.`,
-            text: `${taux} %`,
+            class: 'pill' + (assezDeDeparts(s) && taux < 50 ? ' pill--warn' : ''),
+            title: `${s.total || 0} parcours terminés sur ${s.debuts} commencés.`
+              + (assezDeDeparts(s) ? '' : TROP_PEU_DE_DEPARTS),
+            text: assezDeDeparts(s) ? `${taux} %` : `${s.total || 0}/${s.debuts}`,
           }),
     ]), repartition({ quiz, s })]);
   };
@@ -2673,7 +2720,7 @@ function contenuFrequentation() {
     lignes.length ? el('div', { class: 'etat', style: { marginBottom: 'var(--s-4)' } }, [
       chiffre(cumul.debuts, cumul.debuts > 1 ? 'parcours commencés' : 'parcours commencé'),
       chiffre(cumul.total, cumul.total > 1 ? 'terminés' : 'terminé'),
-      tauxGlobalItem(tauxGlobal),
+      tauxGlobalItem(tauxGlobal, cumul),
     ].filter(Boolean)) : null,
 
     lignes.length
@@ -2690,10 +2737,16 @@ function contenuFrequentation() {
 /* Le taux global ne s'affiche que si des départs ont été comptés — sinon
    il vaudrait 100 % sur des questionnaires antérieurs au compteur, ce qui
    serait faux et flatteur. */
-function tauxGlobalItem(taux) {
+function tauxGlobalItem(taux, cumul) {
   if (taux === null) return null;
-  return el('span', { class: 'etat__item' + (taux < 50 ? ' etat__item--erreur' : '') }, [
-    el('strong', { class: 'etat__valeur', text: `${taux} %` }),
+  const assez = assezDeDeparts(cumul);
+  return el('span', {
+    class: 'etat__item' + (assez && taux < 50 ? ' etat__item--erreur' : ''),
+    title: `${cumul.total || 0} parcours terminés sur ${cumul.debuts} commencés.`
+      + (assez ? '' : TROP_PEU_DE_DEPARTS),
+  }, [
+    el('strong', { class: 'etat__valeur',
+      text: assez ? `${taux} %` : `${cumul.total || 0}/${cumul.debuts}` }),
     el('span', { class: 'etat__libelle', text: 'terminés' }),
   ]);
 }

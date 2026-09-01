@@ -320,8 +320,18 @@ Pour une structure qui veut son autonomie complète, sans dépendre de personne 
    seulement. Créer un utilisateur par personne, noter son UID.
 4. Coller [`firebase.rules.json`](firebase.rules.json) dans l'onglet Règles.
 5. Créer `espaces/<nom>/membres/<UID>` à `true`, pour chaque personne.
-6. Remplacer `DB` et `API_KEY` en tête de
+6. Créer `espaces/<nom>/gerants/<UID>` à `true` pour **au moins une** personne —
+   deux valent mieux qu'une.
+7. Remplacer `DB` et `API_KEY` en tête de
    [`js/core/remote.js`](js/core/remote.js).
+
+**L'étape 6 n'est pas facultative.** Membre et gérant ont exactement les mêmes
+droits d'écriture ; la seule différence est qu'un gérant ne peut pas être
+retiré depuis le web. Un espace sans gérant tient donc à ceci qu'un seul
+membre peut mettre toute l'équipe dehors — y compris par erreur — et que rien
+ne rouvre la porte, sauf la console. Le nombre de personnes qui savent
+retourner dans la console est la vraie mesure de ce qu'un espace peut
+encaisser.
 
 Créer un espace passe toujours par la console : les règles interdisent d'en
 fabriquer un depuis le web. C'est voulu.

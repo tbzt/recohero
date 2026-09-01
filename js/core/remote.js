@@ -22,6 +22,7 @@
    ========================================================================== */
 
 import * as store from './store.js';
+import { normaliserVitrine } from './schema.js';
 
 const DB = 'https://recohero-f9cf9-default-rtdb.europe-west1.firebasedatabase.app';
 const API_KEY = 'AIzaSyBVWe1ZBdh0IU-6_hJoDCY3YroJz2iyBHc';
@@ -328,9 +329,25 @@ export async function compterDebut(espace, quizId) {
   return incrementer(espace, quizId, { debuts: INCR });
 }
 
+/* Realtime Database interdit ces caractères dans une clé. Un identifiant de
+   profil qui en contient — un JSON importé à la main, `normalize()` accepte
+   n'importe quelle chaîne — ferait échouer le lot entier. */
+const CLE_INVALIDE = /[.$#[\]\/]/;
+
 export async function compterParcours(espace, quizId, resultId) {
   const corps = { total: INCR };
-  if (resultId) corps.profils = { [resultId]: INCR };
+  /* `profils/<id>` en clé, et NON `{ profils: { <id>: … } }`. Un PATCH traite
+     ses clés de premier niveau comme des CHEMINS et un objet imbriqué comme
+     une valeur entière : la seconde forme visait `stats/<quiz>/profils`, qui
+     n'a aucune règle d'écriture — seul `$profil` en a une. Le chemin était
+     refusé, et comme un PATCH est atomique, `total` tombait avec lui. Le
+     taux d'achèvement ne comptait donc rien, en silence : `incrementer` ne
+     rattrape que le rejet réseau, pas une réponse d'erreur. Elle écrasait au
+     passage les compteurs de tous les autres profils.
+
+     Si l'identifiant ne peut pas être une clé, on compte le parcours sans le
+     profil plutôt que de ne rien compter du tout. */
+  if (resultId && !CLE_INVALIDE.test(resultId)) corps[`profils/${resultId}`] = INCR;
   return incrementer(espace, quizId, corps);
 }
 
@@ -388,7 +405,15 @@ export async function vitrines(espace) {
   try {
     const response = await fetch(branche(espace, 'vitrines'));
     if (!response.ok) return {};
-    return (await response.json()) || {};
+    const brut = (await response.json()) || {};
+    /* À la lecture comme à l'écriture : c'était la seule branche externe du
+       produit qui n'avait pas de poste-frontière. Une vitrine qui ne passe
+       pas le filtre est jetée, pas réparée à moitié. */
+    return Object.fromEntries(
+      Object.entries(brut)
+        .map(([uid, v]) => [uid, normaliserVitrine(v)])
+        .filter(([, v]) => v),
+    );
   } catch {
     return {};
   }

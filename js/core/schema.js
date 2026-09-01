@@ -55,6 +55,22 @@ export const ACCENTS = [
   '#2E6BA8', '#5B4EA8', '#A03A72', '#A23ADE', '#687620',
 ];
 
+/* Le nom sert au nom accessible de chaque pastille. Il se lisait
+   « Accent dièse C huit quatre cinq deux B » : une couleur se choisit à
+   l'œil, mais elle se nomme à la voix. */
+export const NOMS_ACCENTS = {
+  '#C8452B': 'Terre cuite',
+  '#B4531E': 'Rouille',
+  '#8A6D1F': 'Ocre',
+  '#3F7A3A': 'Vert feuille',
+  '#2C7A78': 'Bleu canard',
+  '#2E6BA8': 'Bleu de cobalt',
+  '#5B4EA8': 'Violet d’encre',
+  '#A03A72': 'Framboise',
+  '#A23ADE': 'Améthyste',
+  '#687620': 'Vert olive',
+};
+
 export const RULE_MODES = [
   { id: 'dominant', label: 'Axe dominant', help: "Le profil gagne si cet axe a le plus de points, à lui seul. En cas d’égalité, la règle ne s’applique pas — c’est au « par défaut » de rattraper." },
   { id: 'range',    label: 'Palier sur un axe', help: "Le profil gagne si le score de cet axe est dans l'intervalle." },
@@ -347,6 +363,24 @@ export function normaliserIdentite(raw) {
     retour: url ? { libelle: String(raw.retour.libelle || '').slice(0, 60) || 'Retour au site', url } : null,
     pied: String(raw.pied || '').slice(0, 200),
   };
+}
+
+/* La vitrine d'un auteur : nom, fonction, portrait. Elle vient de la base,
+   qui n'est pas plus digne de confiance qu'un questionnaire reçu par lien —
+   et elle finit dans une `<img>` du parcours PUBLIC. Sans ce filtre, une
+   adresse arbitraire y faisait partir une requête vers un tiers à chaque
+   ouverture d'un questionnaire signé, avec l'IP du répondant : ce n'est pas
+   ce à quoi consent la personne qui coche « afficher mon nom publiquement ».
+
+   Les champs facultatifs vides sont omis plutôt que rendus vides : la
+   branche garde la forme qu'elle avait. */
+export function normaliserVitrine(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const nom = String(raw.nom || '').slice(0, 80).trim();
+  if (!nom) return null;
+  const poste = String(raw.poste || '').slice(0, 80).trim();
+  const image = safeImage(raw.image);
+  return { nom, ...(poste ? { poste } : {}), ...(image ? { image } : {}) };
 }
 
 /* --- La présentation du kiosque ----------------------------------------------
