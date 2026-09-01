@@ -514,8 +514,27 @@ async function call(url, options = {}) {
     if (estUneLecture(options)) response = await envoyer(null);
   }
 
+  /* Un 401 a DEUX causes, et ce message n'en affirmait qu'une.
+     ARCHITECTURE.md le notait déjà : « un jeton invalide mais non expiré
+     fait échouer même les lectures publiques, et le message parle alors
+     d'appartenance à l'espace au lieu de dire la vérité ».
+
+     La base ne dit pas laquelle : elle renvoie le même 401 pour « tu n'es
+     pas membre » et pour « ton jeton ne vaut plus rien ». On ne devine
+     donc pas — on nomme les deux, et on affiche l'identifiant que cette
+     session utilise RÉELLEMENT. C'est lui qu'il faut comparer à la branche
+     `membres`, et un message qui l'affiche épargne une heure de recherche
+     à côté de la plaque : croire que l'UID est le bon parce qu'il n'a pas
+     changé dans les données ne dit rien de celui que le jeton porte. */
   if (response.status === 401) {
-    throw new Error('Écriture refusée : ce compte n’est pas membre de cet espace.');
+    if (!auth) throw new Error('Il faut être connecté pour cela.');
+    const session = store.getRemote();
+    const qui = session?.email ? `${session.email} — identifiant ${session.uid}` : `identifiant ${session?.uid}`;
+    throw new Error(
+      `Refusé par la base pour ${qui}. `
+      + 'Soit ce compte ne figure pas dans les membres de cet espace, soit sa session n’est plus acceptée. '
+      + 'Compare cet identifiant avec la branche « membres », puis reconnecte-toi si c’est le bon.',
+    );
   }
   if (!response.ok) throw new Error(`La base a répondu ${response.status}.`);
   return response.status === 204 ? null : response.json();
