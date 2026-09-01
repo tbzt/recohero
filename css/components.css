@@ -326,10 +326,25 @@
   padding: 0;
   max-width: min(34rem, calc(100vw - var(--s-6)));
   width: 100%;
+  max-height: calc(100dvh - var(--s-6));
   background: var(--surface);
   color: var(--ink);
   box-shadow: var(--shadow-3);
 }
+/* Le corps défile, les actions restent. Sans cela c'est TOUTE la boîte qui
+   défile, et « Enregistrer » se retrouve sous le bord de l'écran : on
+   découvre alors qu'il fallait faire défiler un dialogue pour en sortir.
+
+   `[open]` n'est pas décoratif : la feuille de l'agent utilisateur ferme un
+   `<dialog>` avec `display: none`, et un `display: flex` posé sans condition
+   le rendrait visible en permanence. Même piège que l'attribut `hidden`,
+   déjà payé sur ce projet. */
+.modal[open] {
+  display: flex;
+  flex-direction: column;
+}
+.modal[open] .modal__body { overflow-y: auto; min-height: 0; }
+.modal[open] .modal__actions { flex: none; }
 .modal::backdrop {
   background: rgba(20, 14, 10, 0.5);
   backdrop-filter: blur(3px);
@@ -343,6 +358,37 @@
   border-top: 1px solid var(--line);
   background: var(--surface-2);
   border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+
+/* --- Aperçu d'un visuel produit sur canvas ----------------------------------
+   La carte de résultat (parcours) et l'affiche de rayon (backoffice) : deux
+   pages, donc ici et non dans la feuille de l'une d'elles. L'affiche vivait
+   dans `quiz.css`, que le backoffice ne charge pas — elle s'y affichait donc
+   à sa taille intrinsèque, 1240 × 1754, et débordait de l'écran.
+
+   Le visuel se règle sur les DEUX bords. Contraint à la seule largeur, un
+   format portrait dépasse en hauteur et il faut faire défiler pour atteindre
+   le bouton d'enregistrement. La définition exportée, elle, ne change pas :
+   c'est l'affichage qu'on réduit, pas le fichier. */
+.cardview { max-width: min(27rem, calc(100vw - var(--s-6))); }
+.cardview .modal__body { padding: var(--s-3); }
+.cardview__canvas {
+  display: block;
+  max-width: 100%;
+  max-height: min(64dvh, 44rem);
+  width: auto;
+  height: auto;
+  margin-inline: auto;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  /* Le visuel se présente comme un objet : il arrive de dessous, légèrement
+     incliné, et se pose. C'est ce qu'on va partager ou imprimer — il mérite
+     d'être montré, pas affiché. */
+  animation: affiche var(--dur-slow) var(--ease-spring) both;
+}
+@keyframes affiche {
+  from { opacity: 0; transform: translateY(20px) rotate(-1.4deg) scale(0.96); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* --- En-tête de site ------------------------------------------------------ */

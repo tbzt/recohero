@@ -908,23 +908,4 @@ html.a-la-transition .view-enter { animation: none; }
   word-break: break-word;
 }
 
-/* --- Aperçu de la carte de résultat ----------------------------------------
-   Le canvas fait 1080×1350 : on le laisse se réduire à la largeur du
-   dialogue, la définition exportée ne change pas pour autant.          */
-.cardview { max-width: min(27rem, calc(100vw - var(--s-6))); }
-.cardview .modal__body { padding: var(--s-3); }
-.cardview__canvas {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-1);
-  /* L'affiche se présente comme une affiche : elle arrive de dessous,
-     légèrement inclinée, et se pose. C'est l'objet qu'on va partager —
-     il mérite d'être montré, pas affiché. */
-  animation: affiche var(--dur-slow) var(--ease-spring) both;
-}
-@keyframes affiche {
-  from { opacity: 0; transform: translateY(20px) rotate(-1.4deg) scale(0.96); }
-  to   { opacity: 1; transform: none; }
 }

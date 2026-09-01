@@ -84,12 +84,18 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/* Une image distante « salit » le canvas et fait échouer toBlob(). On ne
-   dessine donc que ce qui est certainement lisible : une image intégrée
-   en data: URI, ou un fichier du même hébergeur. Sinon on retombe sur
-   l'emoji, sans le dire — la carte reste correcte.                     */
-function isSafeToDraw(src) {
-  if (!src) return false;
+/* Une image d'un autre domaine « teinte » le canvas et fait échouer
+   `toBlob()` : la carte deviendrait impossible à exporter. Mais un serveur
+   qui envoie les en-têtes CORS autorise explicitement la lecture de ses
+   pixels — et là, le canvas n'est pas teinté.
+
+   On tente donc, plutôt que de refuser d'avance. `crossOrigin` transforme
+   la question en un pari sans risque : le serveur accepte et l'image
+   s'affiche dans la carte ; il refuse et le chargement échoue, ce qui
+   ramène exactement au comportement d'avant — l'emoji. Sans cet attribut,
+   l'image se chargeait mais teintait le canvas, donc même les hébergeurs
+   coopératifs étaient perdus.                                            */
+function local(src) {
   if (src.startsWith('data:')) return true;
   try {
     return new URL(src, location.href).origin === location.origin;
@@ -101,6 +107,9 @@ function isSafeToDraw(src) {
 function loadImage(src) {
   return new Promise((resolve) => {
     const img = new Image();
+    /* Jamais sur une image locale : `anonymous` y déclencherait un contrôle
+       CORS que notre propre hébergeur n'a aucune raison de satisfaire. */
+    if (!local(src)) img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = src;
@@ -135,7 +144,9 @@ export async function renderResultCard(quiz, profile, scores) {
 
   /* Le médaillon : l'illustration du profil si elle est dessinable,
      l'emoji sinon. */
-  const medallion = isSafeToDraw(profile.image) ? await loadImage(profile.image) : null;
+  /* On tente toute image : `loadImage` rend `null` quand l'hébergeur refuse
+     la lecture de ses pixels, et le médaillon retombe sur l'emoji. */
+  const medallion = profile.image ? await loadImage(profile.image) : null;
   if (medallion) {
     const size = 240;
     ctx.save();
