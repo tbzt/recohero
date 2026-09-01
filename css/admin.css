@@ -31,6 +31,14 @@
   align-items: start;
   padding-block: var(--s-5) var(--s-8);
 }
+/* Au niveau de l'espace, le rail n'a plus rien à dire : les listes de
+   questionnaires sont devenues le panneau lui-même, et les onglets portent la
+   navigation. Le laisser afficherait les mêmes listes deux fois. L'écran
+   prend donc toute la largeur — ce qui convient à un tableau de bord, quand
+   17 rem de colonne conviennent à une navigation de document. */
+.admin-shell.est-espace { grid-template-columns: 1fr; }
+.admin-shell.est-espace > .rail { display: none; }
+
 @media (max-width: 62rem) {
   .admin-shell { grid-template-columns: 1fr; }
   /* Le panneau d'abord. Le rail — liste des questionnaires, diagnostic —

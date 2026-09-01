@@ -58,6 +58,24 @@ const state = {
   stats: {},            /* parcours terminés, par questionnaire et par profil */
   remote: [],           /* les questionnaires de cet espace */
   remoteSession: null,  /* { email, uid } une fois connecté */
+  /* --- Deux niveaux de navigation ------------------------------------------
+     Le backoffice n'avait qu'un écran : l'éditeur de questionnaire. Tout ce
+     qui relève de l'espace — vitrine, corbeille, identité, fréquentation,
+     équipe — vivait dans des dialogues ouverts depuis un bouton du rail. Or
+     un dialogue est par construction une parenthèse dans ce qu'on faisait :
+     l'espace était donc présenté comme une interruption de l'édition. Il
+     avait un bouton, pas un lieu.
+
+     Désormais `espace` est le niveau d'accueil, et `quiz` ce dans quoi on
+     entre depuis lui. On travaille DANS un espace, où l'on fait des
+     questionnaires — et non sur un questionnaire flanqué de réglages.
+
+     Sans espace partagé, on n'échappe pas au modèle : c'est « Cet
+     ordinateur », un espace comme un autre avec moins d'onglets. Le mode
+     hors ligne cesse d'être un cas particulier du code pour devenir un cas
+     du modèle. */
+  vue: 'espace',        /* 'espace' | 'quiz' */
+  ongletEspace: 'questionnaires',
   panel: 'identite',
   reach: null,
   expanded: new Set(),  /* réponses dont le champ image est déplié */
@@ -179,8 +197,15 @@ async function open() {
   [state.published, state.remote] = await Promise.all([
     loadPublished(), loadEspace(state.espace),
   ]);
+  /* On charge le dernier brouillon pour l'avoir sous la main, mais on
+     n'ouvre pas son écran : on arrive dans l'espace. Voir d'abord la maison,
+     entrer dans un questionnaire ensuite — sans quoi la vitrine, la
+     fréquentation et les demandes d'accès restent des choses qu'il faut
+     penser à aller chercher. `select()` bascule au niveau du document, on
+     revient donc explicitement au niveau du dessus. */
   const drafts = store.allDrafts();
   if (drafts.length) select(drafts[0].id);
+  state.vue = 'espace';
 
   /* Tout ce qui décrit l'espace — l'équipe, les profils, les vitrines, les
      compteurs, l'identité du kiosque, la corbeille — n'était chargé qu'en
@@ -200,7 +225,13 @@ async function open() {
   dom.shell.addEventListener('change', onChange);
   dom.topActions.addEventListener('click', onClick);
   dom.tabbar.addEventListener('click', onClick);
-  dom.quizName.addEventListener('click', onClick);
+  /* La délégation est posée sur des éléments précis, pas sur le document :
+     un bouton ajouté dans le bandeau à côté du fil d'Ariane — le retour vers
+     l'espace — tombait donc hors de toute écoute. Visible, et inerte. On
+     écoute la ligne entière du bandeau, ce qui couvre le fil lui-même : une
+     écoute de plus sur `quizName` le ferait répondre deux fois par remontée
+     d'événement. */
+  dom.quizName.parentElement?.addEventListener('click', onClick);
   window.addEventListener('beforeunload', flush);
   dom.shell.addEventListener('focusin', (event) => {
     const bind = event.target.closest('[data-bind]')?.dataset.bind || '';
@@ -251,13 +282,39 @@ function renderTopbar() {
     compte.hidden = true;
   }
 
-  const label = state.quiz ? state.quiz.title : 'Aucun questionnaire ouvert';
-  dom.quizName.replaceChildren(
-    el('span', { class: 'topbar__doc__emoji', text: state.quiz?.emoji || '✦', 'aria-hidden': 'true' }),
-    el('span', { class: 'topbar__doc__name', text: label }),
-    el('span', { class: 'topbar__doc__caret', text: '▾', 'aria-hidden': 'true' }),
-  );
-  dom.quizName.title = `${label} — changer de questionnaire`;
+  /* Le fil d'Ariane dit où l'on est, et il n'y a que deux endroits possibles.
+     Au niveau de l'espace, le bandeau porte le nom de l'espace — ce n'est pas
+     un bouton de document, c'est l'adresse. Dans un questionnaire, il porte
+     les deux : d'où l'on vient, et ce qu'on édite. Sans cela, descendre dans
+     un questionnaire faisait disparaître l'espace de l'écran, et il fallait
+     se souvenir qu'il existait. */
+  const dansUnQuiz = state.vue === 'quiz' && state.quiz;
+  dom.quizName.replaceChildren(...(dansUnQuiz
+    ? [
+      el('span', { class: 'topbar__doc__emoji', text: state.quiz.emoji || '✦', 'aria-hidden': 'true' }),
+      el('span', { class: 'topbar__doc__name', text: state.quiz.title }),
+      el('span', { class: 'topbar__doc__caret', text: '▾', 'aria-hidden': 'true' }),
+    ]
+    : [
+      el('span', { class: 'topbar__doc__emoji', text: '🗄', 'aria-hidden': 'true' }),
+      el('span', { class: 'topbar__doc__name', text: nomDeLEspace() }),
+    ]));
+  dom.quizName.title = dansUnQuiz
+    ? `${state.quiz.title} — changer de questionnaire`
+    : nomDeLEspace();
+
+  /* Le retour vers l'espace ne vit que dans un questionnaire. Il est posé à
+     côté du fil plutôt que dedans : un bouton qui apparaît et disparaît au
+     même endroit qu'un autre finit par se cliquer par erreur. */
+  let retour = dom.topActions.parentElement.querySelector('[data-act="retour-espace"]');
+  if (dansUnQuiz && !retour) {
+    retour = el('button', {
+      class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'retour-espace',
+      title: 'Revenir à l’espace', text: '←',
+    });
+    dom.quizName.before(retour);
+  }
+  if (retour) retour.hidden = !dansUnQuiz;
   /* Le verrou reste actif même sans questionnaire ouvert. */
   for (const button of dom.topActions.querySelectorAll('[data-act="test"], [data-act="panel"]')) {
     button.disabled = !state.quiz;
@@ -491,8 +548,50 @@ function renderRail() {
    toute la surface d'édition pour remonter. Elle est rendue partout et
    masquée en CSS — une barre construite à la volée au franchissement du
    seuil arriverait toujours trop tard. */
+/* Les onglets de l'espace. « Cet ordinateur » n'a ni équipe ni fréquentation
+   partagée : on ne montre pas des portes qui ne mènent nulle part. */
+const ONGLETS_ESPACE = [
+  { id: 'questionnaires', label: 'Questionnaires', emoji: '✦', partout: true },
+  { id: 'vitrine',        label: 'Vitrine',        emoji: '▦', partout: true },
+  { id: 'frequentation',  label: 'Fréquentation',  emoji: '📊', partout: false },
+  { id: 'equipe',         label: 'Équipe',         emoji: '👥', partout: false },
+  { id: 'reglages',       label: 'Réglages',       emoji: '⚙', partout: true },
+];
+
+function ongletsEspace() {
+  const partage = Boolean(state.espace && state.remoteSession);
+  return ONGLETS_ESPACE.filter((o) => o.partout || partage);
+}
+
+/* Le nom de l'endroit où l'on travaille. Sans espace partagé, c'est bien un
+   lieu quand même — celui de cette machine — et le dire ainsi vaut mieux que
+   de laisser un vide là où les autres lisent le nom de leur médiathèque. */
+function nomDeLEspace() {
+  if (!state.espace) return 'Cet ordinateur';
+  return state.identite?.titre || `Espace « ${state.espace} »`;
+}
+
 function renderTabbar(bySection) {
   if (!dom.tabbar) return;
+
+  if (state.vue === 'espace') {
+    dom.tabbar.replaceChildren(...ongletsEspace().map((o) => el('button', {
+      class: 'tab' + (state.ongletEspace === o.id ? ' is-active' : ''),
+      type: 'button', 'data-act': 'onglet-espace', 'data-id': o.id,
+      'aria-current': state.ongletEspace === o.id ? 'page' : null,
+      'aria-label': o.label, title: o.label,
+    }, [
+      el('span', { class: 'tab__emoji', text: o.emoji, 'aria-hidden': 'true' }),
+      el('span', { class: 'tab__label', text: o.label }),
+      /* Une demande d'accès attend une décision : elle se signale sur
+         l'onglet, comme une anomalie se signale sur sa section. */
+      o.id === 'equipe' && Object.keys(state.demandes || {}).length
+        ? el('span', { class: 'rail__item__badge', text: String(Object.keys(state.demandes).length) })
+        : null,
+    ])));
+    return;
+  }
+
   if (!state.quiz) {
     dom.tabbar.replaceChildren();
     return;
@@ -512,7 +611,119 @@ function renderTabbar(bySection) {
   ])));
 }
 
+/* La liste des questionnaires, au niveau de l'espace. Deux listes et non
+   trois : le catalogue statique du dépôt — « Au kiosque » — ne décrit rien
+   d'utile quand on travaille dans un espace, qui a son propre publié. Il
+   reste sur « Cet ordinateur », où il EST le kiosque local. */
+function panneauQuestionnaires() {
+  const drafts = store.allDrafts();
+  const draftIds = new Set(drafts.map((q) => q.id));
+  const partage = Boolean(state.espace && state.remoteSession);
+
+  const ligne = (quiz, actions) => el('div', { class: 'sheet__row' }, [
+    el('span', { class: 'sheet__emoji', text: quiz.emoji || '✦' }),
+    el('span', { class: 'sheet__label' }, [
+      el('span', { text: quiz.title }),
+      signature(quiz) && el('span', { class: 'field__hint', style: { display: 'block' }, text: signature(quiz) }),
+    ]),
+    ...actions,
+  ]);
+
+  const liste = (titre, aide, contenu) => el('section', { class: 'panel' }, [
+    el('div', { class: 'section__head' }, [
+      el('h2', { text: titre }),
+      el('span', { class: 'section__spacer' }),
+      titre === 'Mes brouillons' && el('button', {
+        class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'new-quiz', text: '+ Nouveau',
+      }),
+    ]),
+    aide && el('p', { class: 'panel__hint', text: aide }),
+    contenu,
+  ]);
+
+  const blocs = [
+    liste('Mes brouillons',
+      'Ce que tu es en train d’écrire, gardé sur cet ordinateur. Rien n’en sort tant que tu ne diffuses pas.',
+      drafts.length
+        ? el('div', { class: 'sheet__list' }, drafts.map((quiz) => ligne(quiz, [
+            el('span', { class: 'pill', text: `${quiz.questions?.length ?? 0} q.` }),
+            el('button', {
+              class: 'btn btn--sm' + (state.quiz?.id === quiz.id ? ' btn--primary' : ' btn--ghost'),
+              type: 'button', 'data-act': 'select', 'data-id': quiz.id, text: 'Ouvrir',
+            }),
+          ])))
+        : el('div', { class: 'empty' }, [
+            el('div', { class: 'empty__icon', text: '✦' }),
+            el('p', { text: 'Rien encore. Le bouton « + Nouveau » ouvre l’assistant.' }),
+          ])),
+  ];
+
+  if (partage && state.remote.length) {
+    blocs.push(liste(`Diffusés dans ${nomDeLEspace()}`,
+      'Ce que vos usagers voient. Modifier en crée une copie locale : le questionnaire diffusé ne bouge qu’à la prochaine diffusion.',
+      el('div', { class: 'sheet__list' }, state.remote.map((quiz) => ligne(quiz, [
+        el('button', {
+          class: 'btn btn--icon btn--quiet', type: 'button',
+          'data-act': 'export-one', 'data-id': quiz.id, title: 'Exporter en JSON', text: '↓',
+        }),
+        el('button', {
+          class: 'btn btn--sm btn--ghost', type: 'button',
+          'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-remote', 'data-id': quiz.id,
+          text: draftIds.has(quiz.id) ? 'Copie ouverte' : 'Modifier',
+        }),
+      ])))));
+  }
+
+  if (!partage && state.published.length) {
+    blocs.push(liste('Au kiosque de ce dépôt',
+      'Les questionnaires livrés avec l’application. Modifier en crée une copie locale.',
+      el('div', { class: 'sheet__list' }, state.published.map((quiz) => ligne(quiz, [
+        el('button', {
+          class: 'btn btn--icon btn--quiet', type: 'button',
+          'data-act': 'export-one', 'data-id': quiz.id, title: 'Exporter en JSON', text: '↓',
+        }),
+        el('button', {
+          class: 'btn btn--sm btn--ghost', type: 'button',
+          'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-published', 'data-id': quiz.id,
+          text: draftIds.has(quiz.id) ? 'Copie ouverte' : 'Reprendre',
+        }),
+      ])))));
+  }
+
+  return blocs;
+}
+
+/* L'écran d'espace. Les onglets qui n'ont pas encore leur panneau propre
+   rouvrent la feuille existante : le déménagement se fait sans laisser de
+   porte condamnée entre-temps. */
+function renderEspace() {
+  if (state.ongletEspace === 'questionnaires') {
+    dom.panel.replaceChildren(...panneauQuestionnaires());
+    return;
+  }
+  const relais = {
+    vitrine: ouvrirPresentation,
+    frequentation: ouvrirFrequentation,
+    equipe: reglagesEspace,
+    reglages: reglagesEspace,
+  }[state.ongletEspace];
+
+  dom.panel.replaceChildren(el('section', { class: 'panel' }, [
+    el('div', { class: 'empty' }, [
+      el('div', { class: 'empty__icon', text: ongletsEspace().find((o) => o.id === state.ongletEspace)?.emoji || '✦' }),
+      el('p', { text: 'Ce réglage s’ouvre encore dans une fenêtre — son panneau arrive.' }),
+      el('div', { class: 'row', style: { justifyContent: 'center', marginTop: 'var(--s-4)' } }, [
+        el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'onglet-ouvrir', text: 'Ouvrir' }),
+      ]),
+    ]),
+  ]));
+  state.relaisEspace = relais;
+}
+
 async function renderPanel() {
+  dom.shell?.classList.toggle('est-espace', state.vue === 'espace');
+  if (state.vue === 'espace') return renderEspace();
+
   if (!state.quiz) {
     dom.panel.replaceChildren(el('section', { class: 'panel' }, [
       el('div', { class: 'empty' }, [
@@ -1120,6 +1331,11 @@ function onClick(event) {
     case 'compte':           return monCompte();
     case 'espace':           return reglagesEspace();
     case 'mon-profil':       return monProfil();
+    case 'onglet-espace':
+      state.ongletEspace = ongletsEspace().some((o) => o.id === id) ? id : 'questionnaires';
+      return allerA('espace');
+    case 'onglet-ouvrir':    return state.relaisEspace?.();
+    case 'retour-espace':    return allerA('espace');
     case 'symbole':          return ouvrirSymboles(id);
     case 'inviter':          return inviter();
     case 'membre-retirer':   return retirerMembre(id);
@@ -1317,6 +1533,10 @@ function select(id) {
   }
   plierSiLongue(state.quiz);
   state.reach = null;
+  /* Ouvrir un questionnaire, c'est descendre d'un niveau — et `select()` est
+     le seul chemin pour y entrer. Poser la bascule ici plutôt que chez ses
+     six appelants garantit qu'aucun n'oublie de la faire. */
+  state.vue = 'quiz';
   renderTopbar();
   dom.saveStatus.textContent = draft.updatedAt ? `Enregistré · ${formatDate(draft.updatedAt)}` : '';
 }
@@ -2747,6 +2967,15 @@ async function showEmbed() {
    contre un jeton, et c'est le jeton seul qui est conservé.            */
 
 function repaint() { flush(); renderRail(); renderPanel(); }
+
+/* Changer de niveau redessine AUSSI le bandeau : c'est lui qui porte le fil
+   d'Ariane et le retour, et `repaint()` ne s'en occupe pas — il a été écrit
+   pour un backoffice qui n'avait qu'un seul écran. */
+function allerA(vue) {
+  state.vue = vue;
+  repaint();
+  renderTopbar();
+}
 
 async function refreshEspace() {
   forgetEspace();
