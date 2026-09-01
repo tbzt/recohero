@@ -5,7 +5,7 @@
    par un data-bind : aucun gestionnaire en ligne dans le HTML.
    ========================================================================== */
 
-import { PANELS, poidsHorsEchelle } from './panels.js';
+import { PANELS, poidsHorsEchelle, PETIT_ECHANTILLON } from './panels.js';
 import {
   makeQuiz, makeAxis, makeQuestion, makeOption, makeResult, makeReco,
   normalize, diagnose, uid, slugify, safeImage, imageWeight, RECO_TYPES,
@@ -1941,6 +1941,52 @@ function ouvrirFrequentation() {
     el('span', { class: 'etat__libelle', text: libelle }),
   ]);
 
+  /* --- La répartition des profils ---------------------------------------------
+     « 2 profils jamais atteints » disait qu'il y avait un problème sans dire
+     lequel. Or c'est LA question que l'on se pose devant des compteurs : mon
+     questionnaire différencie-t-il vraiment, ou renvoie-t-il tout le monde au
+     même endroit ?
+
+     Aucune donnée nouvelle n'est collectée : `stats.profils` compte déjà les
+     arrivées par profil depuis toujours. Elle ne se voyait simplement pas.
+
+     Deux refus que le projet s'impose déjà ailleurs et qui valent ici. Pas de
+     pourcentage sous trente parcours — à sept, « 14 % » désigne une personne :
+     on montre alors le nombre brut. Et la jauge se mesure au profil le plus
+     servi, pas au total : c'est l'écart ENTRE profils qu'on vient lire. */
+  const repartition = ({ quiz, s }) => {
+    const total = s.total || 0;
+    if (!total || !quiz.results.length) return null;
+
+    const parts = quiz.results.map((r) => ({ r, n: s.profils?.[r.id] || 0 }));
+    const assez = total >= PETIT_ECHANTILLON;
+    const sommet = Math.max(1, ...parts.map((p) => p.n));
+    /* Un profil qui rafle presque tout n'est pas une faute en soi — un
+       « par défaut » bien écrit peut légitimement dominer. On le signale
+       comme une chose à regarder, pas comme une erreur, et seulement quand
+       l'échantillon permet de l'affirmer. */
+    const domine = assez && parts.find((p) => p.n / total >= 0.6);
+
+    return el('div', { class: 'freq' }, [
+      ...parts.map(({ r, n }) => el('div', { class: 'freq__ligne' + (n ? '' : ' is-jamais') }, [
+        el('span', { class: 'freq__nom', text: r.title.trim() || 'Profil sans titre' }),
+        el('span', { class: 'freq__barre' }, [
+          el('span', { class: 'freq__jauge', style: { width: `${(n / sommet) * 100}%` } }),
+        ]),
+        el('span', {
+          class: 'freq__part',
+          title: `${n} parcours sur ${total}`,
+          text: n === 0 ? 'jamais' : (assez ? `${Math.round((n / total) * 100)} %` : String(n)),
+        }),
+      ])),
+      !assez && el('p', { class: 'freq__note', text:
+        `${total} parcours : trop peu pour des pourcentages, on montre les nombres.` }),
+      domine && el('p', { class: 'freq__alerte', text:
+        `« ${domine.r.title.trim() || 'Un profil'} » recueille ${Math.round((domine.n / total) * 100)} % des résultats. `
+        + 'Les autres sortent rarement — à vérifier du côté des pesées, ou des conditions de déclenchement.' }),
+    ]);
+  };
+
   const ligne = ({ quiz, s }) => {
     const taux = tauxDe(s);
     /* Les profils que personne n'atteint : ce que l'auteur cherche
@@ -1951,7 +1997,7 @@ function ouvrirFrequentation() {
       ? quiz.results.filter((r) => !(s.profils?.[r.id] > 0)).length
       : 0;
 
-    return el('div', { class: 'sheet__row' }, [
+    return el('div', { class: 'freq__bloc' }, [el('div', { class: 'sheet__row' }, [
       el('span', { class: 'sheet__emoji', text: quiz.emoji || '✦' }),
       el('span', { class: 'sheet__label' }, [
         el('span', { text: quiz.title }),
@@ -1971,7 +2017,7 @@ function ouvrirFrequentation() {
             title: `${s.total || 0} parcours terminés sur ${s.debuts} commencés.`,
             text: `${taux} %`,
           }),
-    ]);
+    ]), repartition({ quiz, s })]);
   };
 
   const tauxGlobal = tauxDe(cumul);

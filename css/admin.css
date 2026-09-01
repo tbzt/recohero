@@ -109,6 +109,59 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* --- La répartition des profils, dans la fréquentation -----------------------
+   Une petite jauge par profil, sous la ligne du questionnaire. Elle se mesure
+   au profil le PLUS servi et non au total : c'est l'écart entre profils qu'on
+   vient lire, pas leur part absolue. */
+.freq__bloc + .freq__bloc { margin-top: var(--s-3); }
+.freq {
+  display: grid;
+  gap: 2px;
+  margin: var(--s-2) 0 0 var(--s-6);
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--line);
+}
+.freq__ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) 1fr auto;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--t-xs);
+}
+.freq__nom {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-muted);
+}
+.freq__barre {
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--bg-sunk);
+  overflow: hidden;
+}
+.freq__jauge {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+}
+.freq__part {
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+/* Un profil que personne n'atteint : c'est ce qu'on vient chercher, il ne
+   doit pas se lire comme une ligne parmi d'autres. */
+.freq__ligne.is-jamais .freq__nom { color: var(--ink-faint); text-decoration: line-through; }
+.freq__ligne.is-jamais .freq__part { color: var(--warning); }
+.freq__note { font-size: var(--t-xs); color: var(--ink-faint); margin-top: var(--s-1); }
+.freq__alerte {
+  font-size: var(--t-xs);
+  color: var(--warning);
+  margin-top: var(--s-1);
+}
+
 /* Une ligne de vitrine masquée : présente, éditable, mais visiblement
    hors de la page d'accueil. */
 .sheet__row.is-masque { opacity: 0.6; }

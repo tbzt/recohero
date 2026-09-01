@@ -11,7 +11,7 @@ import { el, formatBytes } from '../core/ui.js';
 
 /* En dessous de tant de parcours terminés, on montre le compte plutôt que
    la part : un pourcentage sur sept parcours désigne des personnes. */
-const PETIT_ECHANTILLON = 30;
+export const PETIT_ECHANTILLON = 30;
 
 const tool = (act, id, label, glyph, extra = {}) => el('button', {
   class: 'btn btn--icon btn--quiet', type: 'button',
