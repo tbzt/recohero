@@ -570,13 +570,25 @@ function branche(espace, nom, rest = '') {
    encore de la maison. Confondre les deux faisait dire au backoffice « tu es
    bien membre » à qui ne l'était pas. `gerants` reste tolérant : son absence
    ne coûte qu'une couronne à côté d'un nom.                             */
+/* Rend la liste ET l'ensemble des gérants. Les deux branches étaient déjà
+   lues ici, et la seconde était jetée après avoir servi de drapeau : la
+   garder ne coûte aucun aller-retour de plus.
+
+   Elle est nécessaire ailleurs. Un gérant est protégé du retrait, mais rien
+   ne garantit qu'il figure dans `membres` — les deux branches s'écrivent
+   séparément, et la seconde depuis la console. Qui cherche les fiches restées
+   sans propriétaire doit donc écarter les gérants explicitement, sans quoi il
+   proposerait d'effacer celle de la personne qui tient l'espace. */
 export async function membres(espace) {
   const [liste, gerants] = await Promise.all([
     call(branche(espace, 'membres')),
     call(branche(espace, 'gerants')).catch(() => null),
   ]);
   const proteges = new Set(Object.keys(gerants || {}));
-  return Object.keys(liste || {}).map((uid) => ({ uid, gerant: proteges.has(uid) }));
+  return {
+    liste: Object.keys(liste || {}).map((uid) => ({ uid, gerant: proteges.has(uid) })),
+    gerants: proteges,
+  };
 }
 
 export async function ajouterMembre(espace, uid) {

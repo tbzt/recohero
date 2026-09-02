@@ -46,6 +46,7 @@ const state = {
   espace: null,         /* le nom de l'espace partagé, s'il y en a un */
   guardActive: null,    /* la règle anti-écrasement répond-elle ? null = pas su */
   membres: [],          /* l'équipe de l'espace, lisible des seuls membres */
+  gerants: new Set(),   /* ceux que la console protège : ni retirables, ni orphelins */
   membre: null,         /* suis-je de l'équipe ? null = pas encore su */
   invitations: {},      /* adresses conviées, en attente d'être réclamées */
   demandes: {},         /* comptes qui demandent à entrer, en attente d'un avis */
@@ -1442,6 +1443,7 @@ function onClick(event) {
     case 'symbole':          return ouvrirSymboles(id);
     case 'inviter':          return inviter();
     case 'membre-retirer':   return retirerMembre(id);
+    case 'fiche-effacer':    return effacerFicheOrpheline(id);
     case 'demande-valider':  return validerDemande(id);
     case 'demande-refuser':  return refuserDemande(id);
     case 'invitation-annuler': return annulerInvitation(id);
@@ -1889,6 +1891,68 @@ function filesDAttente() {
   return bloc;
 }
 
+/* Les fiches restées derrière — le passif du correctif précédent.
+
+   Depuis que `retirerMembre()` efface la fiche avec le droit, plus aucune ne
+   s'échoue ici. Mais celles laissées AVANT ce changement y sont encore, et
+   rien ne les nettoiera : le retrait qui aurait dû les emporter a déjà eu
+   lieu. Elles restent lisibles par l'équipe, et leur porteur ne peut plus les
+   atteindre — `profils` ne se lit qu'entre membres.
+
+   La règle publiée permet désormais à un membre de les supprimer. Encore
+   faut-il les voir : elles se déduisent sans rien demander à la base, un
+   profil dont l'uid n'est ni dans `membres` ni dans `gerants` n'ayant plus de
+   propriétaire dans cet espace.
+
+   Pas de purge automatique. L'effacement ne se défait pas — la règle interdit
+   d'écrire le profil d'autrui, c'est elle qui protège de l'usurpation — et il
+   vaut mieux que quelqu'un le déclenche en lisant de qui il s'agit. La
+   section disparaît d'elle-même quand il n'y a plus rien à montrer, comme les
+   files d'attente. */
+function fichesOrphelines() {
+  const rattachees = new Set([
+    ...(state.membres || []).map((m) => m.uid),
+    ...(state.gerants || []),
+  ]);
+  const restees = Object.entries(state.profils || {}).filter(([uid]) => !rattachees.has(uid));
+  if (!restees.length) return [];
+
+  const ligne = ([uid, p]) => {
+    const nom = [p?.prenom, p?.nom].filter(Boolean).join(' ');
+    return el('div', { class: 'sheet__row' }, [
+      el('span', { class: 'sheet__emoji', text: '👤' }),
+      el('span', { class: 'sheet__label' }, [
+        el('span', { text: nom || `${uid.slice(0, 6)}…`,
+          title: nom ? null : uid,
+          style: nom ? '' : 'font-family:var(--font-mono);font-size:var(--t-xs)' }),
+        p?.poste && el('span', { class: 'field__hint', style: { display: 'block' }, text: p.poste }),
+      ]),
+      /* Sa vitrine, elle, ne nous appartient pas : elle porte un consentement
+         public et crédite un travail fait. On le signale — c'est une chose
+         qu'on ne peut apprendre nulle part ailleurs — sans prétendre pouvoir
+         y toucher. */
+      state.vitrines?.[uid] && el('span', { class: 'pill pill--accent',
+        title: 'Encore nommée publiquement sur le kiosque. Elle seule peut l’y retirer.',
+        text: 'public' }),
+      el('button', {
+        class: 'btn btn--icon btn--danger', type: 'button',
+        'data-act': 'fiche-effacer', 'data-id': uid,
+        title: 'Effacer cette fiche — sans retour',
+        'aria-label': `Effacer la fiche de ${nom || 'ce compte'} — sans retour`,
+        text: '✕',
+      }),
+    ]);
+  };
+
+  return [
+    el('h3', { style: 'font-size:var(--t-base);margin-top:var(--s-5);margin-bottom:var(--s-2)',
+      text: `Fiches d’anciens membres — ${restees.length}` }),
+    el('div', { class: 'sheet__list' }, restees.map(ligne)),
+    el('p', { class: 'field__hint', text:
+      'Ces personnes ne font plus partie de l’espace et ne peuvent plus effacer leur fiche elles-mêmes : cet écran ne s’ouvre plus pour elles. Effacer ne se défait pas.' }),
+  ];
+}
+
 /* L'équipe, en panneau plein écran plutôt qu'en feuille modale. Une liste de
    personnes à admettre ou à retirer n'est pas une parenthèse dans autre
    chose : c'est un des écrans de l'espace. */
@@ -1950,6 +2014,7 @@ function contenuEquipe() {
             'La liste des membres n’a pas pu être lue. Recharge la page ; si le message revient, la base ne répond pas.' }),
 
       ...filesDAttente(),
+      ...fichesOrphelines(),
 
       el('p', { class: 'field__hint', style: { marginTop: 'var(--s-4)' }, text:
         'Inviter envoie un courriel, ou dépose une invitation si l’adresse a déjà un compte. Retirer quelqu’un lui ôte le droit de publier ici, sans toucher à son compte.' }),
@@ -2245,6 +2310,25 @@ function inviter() {
 /* Retirer se défait : c'est une ligne dans une liste, pas une suppression
    de compte. Même règle que partout ailleurs — on agit, on laisse un
    chemin de retour. */
+/* Sans « Annuler » : la règle qui autorise ce geste n'autorise QUE la
+   suppression, jamais l'écriture du profil d'autrui. Rien ne pourrait le
+   rétablir, et proposer un retour qu'on ne tiendrait pas serait pire que de
+   n'en proposer aucun. D'où le bouton peint en danger, et la phrase qui le
+   dit avant. */
+async function effacerFicheOrpheline(uid) {
+  const p = state.profils?.[uid];
+  const nom = (p && [p.prenom, p.nom].filter(Boolean).join(' ')) || 'La fiche';
+  try {
+    await remote.effacerProfil(state.espace, uid);
+    await refreshEspace();
+    repaint();
+    toast(`${nom} — fiche effacée.`);
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+  return undefined;
+}
+
 async function retirerMembre(uid) {
   const avaitUneFiche = Boolean(state.profils?.[uid]);
   try {
@@ -3257,7 +3341,7 @@ async function releverLAppartenance() {
   if (!state.remoteSession) return;
 
   try {
-    state.membres = await remote.membres(state.espace);
+    ({ liste: state.membres, gerants: state.gerants } = await remote.membres(state.espace));
     state.membre = true;
   } catch (err) {
     if (!err.refus) return;      /* la base n'a pas répondu : on ne conclut pas */
