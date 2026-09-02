@@ -2246,18 +2246,35 @@ function inviter() {
    de compte. Même règle que partout ailleurs — on agit, on laisse un
    chemin de retour. */
 async function retirerMembre(uid) {
+  const avaitUneFiche = Boolean(state.profils?.[uid]);
   try {
     await remote.retirerMembre(state.espace, uid);
+    /* La fiche part avec le droit, et dans cet ordre : la règle n'autorise sa
+       suppression QUE lorsque l'uid ne figure plus dans `membres`.
+
+       Sans ça, elle restait. Son porteur ne pouvait plus l'effacer — `profils`
+       ne se lit qu'entre membres, l'écran ne s'ouvrait plus pour lui — et
+       personne d'autre n'en avait le droit. Un prénom, un nom, une fonction et
+       une photo demeuraient lisibles indéfiniment par une équipe dont la
+       personne ne faisait plus partie, sans qu'aucun geste ne puisse les
+       retirer. Un échec ici ne doit pas défaire le retrait lui-même : le droit
+       de publier est ce qui compte, la fiche se rattrapera. */
+    if (avaitUneFiche) await remote.effacerProfil(state.espace, uid).catch(() => {});
     await refreshEspace();
     repaint();
-    toast('Membre retiré de l’espace.', {
+    toast(avaitUneFiche ? 'Membre retiré, et sa fiche effacée.' : 'Membre retiré de l’espace.', {
       action: {
         label: 'Annuler',
         onClick: async () => {
           await remote.ajouterMembre(state.espace, uid);
           await refreshEspace();
           repaint();
-          toast('Membre rétabli.');
+          /* On ne promet pas ce qu'on ne rend pas : le droit revient, la fiche
+             non — la règle interdit d'écrire le profil d'autrui, et c'est elle
+             qui empêche de se faire passer pour un collègue. */
+          toast(avaitUneFiche
+            ? 'Membre rétabli. Sa fiche est à renseigner de nouveau.'
+            : 'Membre rétabli.');
         },
       },
     });

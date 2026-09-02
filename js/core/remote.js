@@ -378,6 +378,18 @@ export async function profilsEquipe(espace) {
   return (await call(branche(espace, 'profils')).catch(() => null)) || {};
 }
 
+/* Effacer la fiche de quelqu'un qui n'est plus de l'équipe. La règle ne
+   l'autorise QUE dans ce sens et QUE dans ce cas : un membre peut supprimer —
+   jamais écrire — le profil d'un uid qui ne figure plus dans `membres`. Il
+   faut donc retirer le droit AVANT d'appeler ceci, sans quoi la base refuse.
+
+   Elle ne sert pas au ménage : elle sert à ce que quelqu'un qui part cesse
+   d'être décrit dans un espace où il n'entre plus, et qu'il n'ait pas à le
+   demander à une équipe dont il ne fait plus partie. */
+export async function effacerProfil(espace, uid) {
+  return call(branche(espace, 'profils', `/${encodeURIComponent(uid)}`), { method: 'DELETE' });
+}
+
 export async function enregistrerProfil(espace, uid, profil) {
   return call(branche(espace, 'profils', `/${encodeURIComponent(uid)}`), {
     method: 'PUT',
