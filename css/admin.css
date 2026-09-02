@@ -92,7 +92,7 @@
    simplement pas visibles. */
 .tabbar {
   display: none;
-  gap: var(--s-1);
+  gap: var(--s-2);
   min-width: 0;
 }
 .tabbar.est-espace { display: flex; }
@@ -124,6 +124,15 @@
    affiche qu'au niveau de l'espace, où elle est la navigation principale du
    backoffice. Quatre glyphes muets qu'il faut survoler pour lire ne sont pas
    une navigation principale. */
+/* Le même patron que le rail et que le bouton du document, parce que ces
+   trois-là sont la même chose : la navigation de ce backoffice.
+
+   Les onglets étaient seuls à porter une pilule pleine — bordure visible,
+   fond de surface, rayon entier, et l'accent en aplat quand ils étaient
+   actifs. Posés dans le bandeau du haut, ils y ressemblaient à des boutons
+   qu'on aurait déposés là, et non à la navigation de la page. Bordure
+   transparente au repos, fond transparent, `--r-sm` : ils appartiennent
+   désormais à la barre au lieu de flotter dedans. */
 .tab {
   position: relative;
   display: inline-flex;
@@ -133,10 +142,12 @@
   flex: 0 0 auto;
   min-height: var(--tap);
   min-width: var(--tap);
-  padding: var(--s-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-full);
-  background: var(--surface);
+  /* De l'air. Au large il y a la place, et rien n'obligeait à les serrer :
+     l'espace à droite du fil d'Ariane était vide de toute façon. */
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
   color: var(--ink-muted);
   font-size: var(--t-sm);
   white-space: nowrap;
@@ -144,6 +155,7 @@
               border-color var(--dur-fast) var(--ease-out),
               color var(--dur-fast) var(--ease-out);
 }
+.tab:hover { background: var(--surface-2); color: var(--ink); }
 .tab__label {
   display: block;
   min-width: 0;
@@ -153,10 +165,9 @@
 .tab__emoji { font-size: var(--t-base); line-height: 1; }
 
 .tab.is-active {
-  padding-inline: var(--s-3);
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-deep);
   font-weight: var(--fw-medium);
 }
 .tab.is-active .tab__label {
@@ -179,6 +190,10 @@
      au grand écran ; la règle, elle, n'avait pas suivi. */
   .tab__label { display: none; }
   .tab.is-active { flex: 1 1 auto; min-width: 0; }
+  /* Serré, ici : la place manque, et les onglets réduits à leur glyphe n'ont
+     pas besoin de marges qui les éloigneraient les uns des autres. */
+  .tab { padding-inline: var(--s-2); }
+  .tabbar { gap: var(--s-1); }
 }
 /* --- La répartition des profils, dans la fréquentation -----------------------
    Une petite jauge par profil, sous la ligne du questionnaire. Elle se mesure
@@ -249,10 +264,10 @@
 
 /* Qui a publié, quand, en quelle version. Sous le titre, en retrait : c'est
    un renseignement, pas une étiquette. */
-/* Sur l'onglet ACTIF seulement : là le fond est l'accent, et la pastille doit
-   virer à l'encre inverse. Ailleurs — dans le rail — ce sélecteur avait perdu
-   son préfixe et peignait toutes les pastilles en blanc sur fond clair. */
-.tab.is-active .rail__item__badge { color: var(--accent-ink); border-color: currentColor; }
+/* L'onglet actif ne peint plus l'accent en aplat : sa pastille n'a donc plus
+   à virer à l'encre inverse pour rester lisible. Elle se lit comme celle du
+   rail, sur le même fond teinté — une règle de moins, et un cas de moins où
+   deux navigations divergent. */
 
 /* Sur un onglet réduit, la pastille se pose en coin plutôt que de
    s'ajouter à la largeur : deux sections en défaut ne doivent pas voler
