@@ -1110,18 +1110,43 @@ const DESTINATIONS = [
     lien: (u, t) => `https://bsky.app/intent/compose?text=${encodeURIComponent(`${t} ${u}`)}` },
 ];
 
+/* Un lien qui PORTE le questionnaire au lieu de le désigner : le contenu
+   entier, gzippé, dans le fragment. Près de quatre mille caractères là où une
+   adresse servie en fait soixante.
+
+   On ne peut pas le raccourcir — il n'y a pas de serveur pour ranger une
+   correspondance entre un code court et un contenu, et c'est le prix assumé
+   de la promesse « un questionnaire tient dans une URL ». Mais on peut cesser
+   de le proposer aux canaux qui le maltraitent : un SMS s'arrête à cent
+   soixante caractères, les réseaux tronquent, et un mur de caractères
+   aléatoires dans une conversation ne se lit pas comme un lien de médiathèque
+   — il se lit comme une tentative d'hameçonnage, et personne ne l'ouvre.
+
+   Restent les deux voies qui transportent une longue adresse sans la
+   toucher : le presse-papier et le courriel. */
+const estUnLienPorteur = (url) => url.includes('#k=');
+
 function menuPartage({ url, titre, fichier = null }) {
+  const porteur = estUnLienPorteur(url);
+  const destinations = porteur
+    ? DESTINATIONS.filter((d) => d.id === 'mail')
+    : DESTINATIONS;
+
   const dialog = el('dialog', { class: 'modal partage' }, [
     el('div', { class: 'modal__body stack' }, [
       el('h2', { text: 'Partager' }),
-      el('p', { class: 'partage__url', text: url.replace(/^https?:\/\//, '') }),
+
+      porteur
+        ? el('p', { class: 'partage__note', text:
+            `Ce questionnaire n’est publié nulle part : son lien l’emporte en entier, d’où ses ${url.length} caractères. Les messageries et les réseaux le couperaient — il se copie, ou s’envoie par courriel.` })
+        : el('p', { class: 'partage__url', text: url.replace(/^https?:\/\//, '') }),
 
       navigator.share && el('button', {
         class: 'btn btn--primary btn--block', type: 'button', 'data-partage': 'systeme',
         text: '⤴ Partager…',
       }),
 
-      el('div', { class: 'partage__grille' }, DESTINATIONS.map((d) => el('a', {
+      el('div', { class: 'partage__grille' }, destinations.map((d) => el('a', {
         class: 'partage__cible', href: d.lien(url, titre),
         target: '_blank', rel: 'noopener noreferrer',
       }, [

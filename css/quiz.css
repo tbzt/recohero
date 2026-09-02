@@ -273,6 +273,15 @@ html.a-la-transition .view-enter { animation: none; }
   word-break: break-all;
   margin-bottom: var(--s-2);
 }
+/* Un lien porteur ne s'affiche pas : quatre mille caractères en pâture ne
+   renseignent personne et donnent à l'écran l'allure de ce qu'on redoute. On
+   dit ce qu'il est et pourquoi il est long. */
+.partage__note {
+  font-size: var(--t-sm);
+  color: var(--ink-muted);
+  line-height: var(--lh-snug);
+  margin-bottom: var(--s-2);
+}
 .partage__grille {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));

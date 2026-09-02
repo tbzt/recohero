@@ -3042,10 +3042,41 @@ async function testRun() {
   window.open(`${essai}#${charge}`, '_blank', 'noopener');
 }
 
+/* Deux formes d'adresse, et une seule est supportable à transmettre.
+
+   Un questionnaire SERVI quelque part — au kiosque du dépôt ou dans un espace
+   — a une adresse de soixante caractères qui le désigne, et qui suit ses
+   corrections. Un brouillon n'existe nulle part ailleurs : son contenu voyage
+   dans le fragment, gzippé, et le lien fait alors près de quatre mille
+   caractères.
+
+   Cette fonction prenait TOUJOURS la seconde forme, même quand la première
+   existait. On copiait 3 695 caractères là où 66 suffisaient — cinquante-six
+   fois trop, au-delà de ce qu'une messagerie transporte sans le couper, et
+   avec l'allure d'un lien qu'on n'ouvre pas. `embedSnippet()` faisait déjà le
+   bon choix quelques lignes plus bas ; c'est la même règle, remontée ici. */
+function adresseDuQuestionnaire() {
+  const auKiosque = state.published.some((q) => q.id === state.quiz.id);
+  const dansLEspace = state.remote.some((q) => q.id === state.quiz.id);
+  if (!auKiosque && !dansLEspace) return null;
+
+  const court = new URL(`quiz.html?q=${encodeURIComponent(state.quiz.id)}`, location.href);
+  if (dansLEspace) court.searchParams.set('espace', state.espace);
+  return court.toString();
+}
+
 async function copyLink() {
   flush();
-  const url = await linkFor(state.quiz);
-  toast(await copy(url) ? 'Lien copié — il contient tout le questionnaire.' : 'Copie impossible.', '');
+  const court = adresseDuQuestionnaire();
+  const url = court || await linkFor(state.quiz);
+  const ok = await copy(url);
+  if (!ok) return toast('Copie impossible.', 'danger');
+  /* On dit LAQUELLE des deux on vient de copier : la différence se voit au
+     collage, et une surprise à ce moment-là coûte un envoi raté. */
+  return toast(court
+    ? 'Lien copié.'
+    : 'Lien copié — il emporte tout le questionnaire, d’où sa longueur. Publiez-le pour obtenir une adresse courte.',
+    court ? '' : { duration: 7000 });
 }
 
 /* --- Intégration dans un autre site --------------------------------------
