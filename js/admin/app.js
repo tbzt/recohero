@@ -324,6 +324,17 @@ function renderTopbar() {
      Ils s'effacent plutôt qu'ils ne se grisent. Rien ne bouge en dessous : le
      ressort de la barre les tient à droite, et l'aide comme le verrou — qui
      valent à tous les niveaux — gardent leur place au bord. */
+  /* Le statut d'enregistrement décrit le questionnaire ouvert — « Enregistré ·
+     2 septembre ». Au niveau de l'espace on n'édite rien, et il restait
+     pourtant là, à décrire un document qu'on ne regarde pas.
+
+     Il ne coûtait rien tant qu'il avait sa ligne à lui. Depuis que la rangée
+     d'onglets partage le bandeau, il en prend 204 px — de quoi obliger quatre
+     libellés d'onglet à s'élider pendant qu'il annonce une sauvegarde sans
+     objet. Même règle que pour « Tester » et « Diffuser » : ce qui appartient
+     à l'écran d'un document ne s'affiche pas sur celui du lieu. */
+  dom.saveStatus.hidden = !dansUnQuiz;
+
   for (const button of dom.topActions.querySelectorAll('[data-act="test"], [data-act="panel"]')) {
     /* La VUE, et non la simple présence d'un questionnaire en mémoire :
        remonter à l'espace n'en ferme aucun, et `state.quiz` reste donc garni.

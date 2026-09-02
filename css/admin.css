@@ -92,7 +92,7 @@
    simplement pas visibles. */
 .tabbar {
   display: none;
-  gap: var(--s-2);
+  gap: var(--s-1);
   min-width: 0;
 }
 .tabbar.est-espace { display: flex; }
@@ -124,6 +124,11 @@
    affiche qu'au niveau de l'espace, où elle est la navigation principale du
    backoffice. Quatre glyphes muets qu'il faut survoler pour lire ne sont pas
    une navigation principale. */
+/* La marque ne se comprime pas : c'est le nom du produit, et deux lettres
+   suivies de points de suspension ne renseignent personne. Elle est courte,
+   et son libellé s'efface déjà tout entier sous 34 rem — là où la place
+   manque vraiment, elle sait disparaître proprement. */
+.topbar .brand { flex: none; }
 /* Le même patron que le rail et que le bouton du document, parce que ces
    trois-là sont la même chose : la navigation de ce backoffice.
 
@@ -142,9 +147,17 @@
   flex: 0 0 auto;
   min-height: var(--tap);
   min-width: var(--tap);
-  /* De l'air. Au large il y a la place, et rien n'obligeait à les serrer :
-     l'espace à droite du fil d'Ariane était vide de toute façon. */
-  padding: var(--s-2) var(--s-4);
+  /* Trois paliers, parce que la place n'est pas la même à 1440 et à 1100.
+     Ici le palier moyen ; le large ajoute de l'air plus bas, l'étroit
+     resserre. Sans ce palier intermédiaire, quatre onglets libellés élidaient
+     tous leur texte dès que la barre descendait sous 1200 px. */
+  padding: var(--s-2) var(--s-3);
+  /* MAIS ils cèdent avant les autres. En `0 0 auto`, la rangée ne rendait
+     rien : à quatre onglets et 1100 px, le fil d'Ariane tombait à 39 px et le
+     nom de l'application devenait illisible. C'est l'ordre de compression qui
+     était faux, pas la place — les onglets se serrent, et leurs libellés
+     s'élident avant que le reste de la barre ne souffre. */
+  flex: 0 1 auto;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   background: transparent;
@@ -175,6 +188,20 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* De l'air, là où il y a vraiment la place. Au-delà de 78 rem la barre loge
+   quatre libellés entiers, le fil d'Ariane et les actions sans que rien ne
+   s'élide ; en dessous, chaque pixel rendu aux onglets est un pixel pris au
+   nom de l'espace.
+
+   Cette règle vient APRÈS `.tab` à dessein : une media query n'ajoute aucune
+   spécificité, et posée plus haut dans le fichier elle se faisait battre par
+   la déclaration de base — le palier large ne s'appliquait qu'à l'écart, pas
+   aux marges. */
+@media (min-width: 78rem) {
+  .tabbar { gap: var(--s-2); }
+  .tab { padding-inline: var(--s-4); }
 }
 
 @media (max-width: 62rem) {
@@ -333,6 +360,19 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Le fil d'Ariane garde de quoi se lire. Il porte le nom de l'espace ou du
+   questionnaire ouvert, et `flex: 1` avec `min-width: 0` le laissait tomber à
+   39 px quand quatre onglets partageaient sa ligne — réduit à ça, il ne dit
+   plus où l'on est.
+
+   Le plancher ne vaut qu'au-dessus de 62 rem. En dessous, la rangée d'onglets
+   passe à la ligne suivante et rend toute la barre au fil ; l'y imposer
+   ferait déborder un téléphone, où la marque et les actions tiennent déjà
+   juste. */
+@media (min-width: 62.0625rem) {
+  .topbar__doc { min-width: 9rem; }
+}
+
 @media (max-width: 46rem) {
   .topbar__moi { display: none; }
 }
