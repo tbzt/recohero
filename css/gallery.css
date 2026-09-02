@@ -1,3 +1,20 @@
+/* --- Le bandeau d'aperçu -------------------------------------------------------
+   Une apparence qui n'est pas enregistrée doit se signaler. Sans ce bandeau,
+   un lien d'aperçu ressemblerait au vrai kiosque de la structure — et rien ne
+   distinguerait l'essai de quelqu'un du kiosque de tout le monde.
+
+   Il se pose en tête du document, pas en surcouche : il doit s'imprimer, se
+   copier et survivre au défilement d'une page qu'on est en train de juger. */
+.apercu {
+  margin: 0;
+  padding: var(--s-2) var(--s-4);
+  background: var(--warning);
+  color: #14100D;
+  font-size: var(--t-sm);
+  font-weight: var(--fw-medium);
+  text-align: center;
+}
+
 /* ==========================================================================
    RecoHero — gallery.css — le kiosque : ce qu'on voit en arrivant.
    ========================================================================== */

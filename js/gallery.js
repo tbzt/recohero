@@ -24,11 +24,51 @@ const dom = {
 garderEspace();
 boot();
 
+/* --- L'aperçu -----------------------------------------------------------------
+   Régler l'apparence du kiosque se faisait à l'aveugle : huit champs dans le
+   backoffice, dont une couleur qui repeint TOUT le produit public — vignettes,
+   jauges, halo du résultat — et pas un endroit pour voir le résultat avant
+   d'enregistrer. On posait un jaune vif sans savoir qu'on venait de rendre son
+   propre kiosque illisible.
+
+   L'aperçu est la page elle-même, ouverte avec l'identité dans son fragment.
+   Pas un cadre embarqué : cela demanderait d'ouvrir `frame-src` dans la
+   politique du backoffice, et surtout pas une reconstitution en dur, qui
+   dériverait au premier changement de CSS et mentirait avec autorité. C'est
+   le patron de « Tester », qui ouvre déjà le vrai parcours avec sa charge
+   utile dans le fragment.
+
+   Le fragment ne part jamais au serveur, et rien n'est enregistré. La charge
+   passe par `normaliserIdentite()` — la MÊME porte que celle qui vient de la
+   base : titres plafonnés, accent validé par expression, logo filtré par
+   `safeImage()`, lien de retour contraint à une adresse http(s). */
+function identiteEnApercu() {
+  const trouve = /(?:^|[#&])apercu=([^&]*)/.exec(location.hash || '');
+  if (!trouve) return null;
+  try {
+    return normaliserIdentite(JSON.parse(decodeURIComponent(trouve[1])));
+  } catch {
+    return null;
+  }
+}
+
+/* Une page qui porte une apparence non enregistrée doit le dire. Sans ce
+   bandeau, un lien d'aperçu envoyé à quelqu'un ressemblerait au vrai kiosque
+   de la structure — et l'aperçu de quelqu'un d'autre ressemblerait au sien. */
+function marquerLApercu() {
+  document.body.prepend(el('p', { class: 'apercu', role: 'status' },
+    ['Aperçu — cette apparence n’est pas enregistrée.']));
+}
+
 async function boot() {
   /* L'identité d'abord : elle habille la page avant que la liste
      n'arrive, pour qu'on ne voie pas notre marque céder la place à celle
      de la structure. Un espace sans identité garde la nôtre. */
-  if (espace) habiller(normaliserIdentite(await chargerIdentite(espace)));
+  const apercu = identiteEnApercu();
+  if (apercu) {
+    habiller(apercu);
+    marquerLApercu();
+  } else if (espace) habiller(normaliserIdentite(await chargerIdentite(espace)));
   const presentation = espace ? normaliserPresentation(await chargerPresentation(espace)) : null;
   renderQuizzes(await loadAll({ espace }), presentation);
   renderHistory();

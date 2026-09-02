@@ -2629,6 +2629,17 @@ function sectionApparence() {
 
   const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
   const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Enregistrer' });
+  const apercu = el('button', { class: 'btn btn--ghost', type: 'button', text: '▷ Voir le kiosque' });
+
+  /* Une seule lecture du formulaire, partagée par l'aperçu et l'enregistrement.
+     Normalisée AVANT de servir, comme elle le sera à la lecture : ce qui ne
+     passe pas le filtre ne doit ni partir dans la base, ni s'afficher dans un
+     aperçu qui prétend montrer le résultat. */
+  const lireLeFormulaire = () => normaliserIdentite({
+    titre: titre.value, accroche: accroche.value, intro: intro.value,
+    logo: logo.value, accent: accent.value, pied: pied.value,
+    retour: { url: retourUrl.value.trim(), libelle: retourLib.value },
+  });
 
   const panneau = el('section', { class: 'panel' }, [
     el('div', { class: 'section__head' }, [el('h2', { text: 'Apparence du kiosque' })]),
@@ -2661,9 +2672,30 @@ function sectionApparence() {
       actuelle.titre && el('button', { class: 'btn btn--danger btn--sm', type: 'button', text: 'Rendre l’apparence par défaut',
         onClick: () => enregistrerIdentite(null, valider, erreur) }),
       el('span', { class: 'section__spacer' }),
+      apercu,
       valider,
     ]),
+    el('p', { class: 'field__hint', text:
+      'L’aperçu ouvre le kiosque tel qu’il sera, sans rien enregistrer. La couleur y repeint tout — c’est là qu’on voit si elle tient.' }),
   ]);
+
+  /* L'aperçu ouvre la VRAIE page avec l'identité dans son fragment, comme
+     « Tester » ouvre le vrai parcours avec son questionnaire. Un cadre
+     embarqué demanderait d'ouvrir `frame-src` dans la politique de sécurité
+     de cette page ; une reconstitution dériverait du kiosque au premier
+     changement de CSS, et un aperçu qui ment est pire que pas d'aperçu. */
+  apercu.addEventListener('click', () => {
+    const propre = lireLeFormulaire();
+    if (!propre) {
+      erreur.textContent = 'Le nom de la structure est nécessaire, même pour un aperçu : sans lui, le kiosque garde le nôtre.';
+      erreur.hidden = false;
+      return;
+    }
+    erreur.hidden = true;
+    const cible = new URL(avecEspace('index.html', state.espace), location.href);
+    cible.hash = `apercu=${encodeURIComponent(JSON.stringify(propre))}`;
+    window.open(cible.toString(), '_blank', 'noopener');
+  });
 
   valider.addEventListener('click', () => {
     if (!titre.value.trim()) {
@@ -2671,13 +2703,7 @@ function sectionApparence() {
       erreur.hidden = false;
       return;
     }
-    /* Normalisé AVANT l'envoi comme il le sera à la lecture : ce qui ne
-       passe pas le filtre ne doit pas partir dans la base non plus. */
-    const propre = normaliserIdentite({
-      titre: titre.value, accroche: accroche.value, intro: intro.value,
-      logo: logo.value, accent: accent.value, pied: pied.value,
-      retour: { url: retourUrl.value.trim(), libelle: retourLib.value },
-    });
+    const propre = lireLeFormulaire();
     if (retourUrl.value.trim() && !propre.retour) {
       erreur.textContent = 'Le lien de retour doit être une adresse complète, en http:// ou https://.';
       erreur.hidden = false;
