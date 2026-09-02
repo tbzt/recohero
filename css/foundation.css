@@ -215,6 +215,28 @@
   --ink:        #F6EFE6;
   --ink-muted:  #B0A395;
   --ink-faint:  #9E9083;
+
+  /* Le même accent que le sombre du système, et pour la même raison.
+
+     Ce bloc ne redéfinissait pas --accent : le thème sombre EXPLICITE gardait
+     donc le rouge du thème clair, #C8452B, sur un fond à #14100D. En aplat
+     avec du blanc dessus il passait (4,84:1), et c'est ce qui l'a fait
+     tenir si longtemps. Mais l'accent n'est pas qu'un aplat : il est peint
+     EN TEXTE au survol des liens, sur le kiosque public, dans la marque et
+     dans le statut d'enregistrement. Sur ce fond-là, 3,91:1 — sous le seuil
+     de 4,5, et sur des pages que voient les usagers.
+
+     L'orange clair donne 6,47:1 au même endroit. Il emporte son encre foncée
+     avec lui, sans quoi on retrouverait le défaut inverse : blanc sur orange
+     ne fait que 2,92:1.
+
+     Les deux chemins vers le sombre montrent désormais la même chose. Un
+     questionnaire qui impose sa couleur reste maître de la sienne :
+     `applyAccent()` calcule l'encre par luminance, et passe devant ces deux
+     lignes. */
+  --accent:     #F0714F;
+  --accent-ink: #14100D;
+
   --danger:  #F2776C;
   --warning: #E0A22E;
   --success: #4ADE80;
