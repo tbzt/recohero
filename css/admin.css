@@ -1080,6 +1080,42 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   color: var(--ink);
   transition: background var(--dur-fast) var(--ease-out);
 }
+/* --- La ligne qui ouvre -------------------------------------------------------
+   Le titre est le bouton ; son pseudo-élément étend la surface de clic à la
+   ligne entière. On ne pose pas `role="button"` sur le conteneur : il porte
+   déjà des boutons, et un rôle interactif imbriqué donne deux arrêts de
+   tabulation sur la même chose.
+
+   La règle ne s'applique QU'aux lignes de questionnaire. Celles de l'équipe,
+   des files d'attente et de la corbeille gardent leurs boutons et rien
+   d'autre : un clic large y viserait « retirer », « accepter » ou
+   « supprimer définitivement ». Une ligne devient cliquable quand elle a un
+   geste principal évident et non destructeur — la corbeille en a deux, qui se
+   contredisent, et c'est pourquoi elle n'en a pas. */
+.sheet__row--ouvrable { position: relative; }
+.sheet__row__cible {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sheet__row__cible::after { content: ''; position: absolute; inset: 0; }
+/* Au-dessus du voile, sinon l'export et les pastilles deviendraient
+   inatteignables — c'est la ligne qui les recouvrirait. */
+.sheet__row--ouvrable > .btn,
+.sheet__row--ouvrable > .pill { position: relative; z-index: 1; }
+.sheet__row--ouvrable:hover { background: var(--surface-2); }
+/* L'anneau se pose sur la LIGNE, pas sur les trois mots du titre : c'est la
+   ligne entière qui répondra à la touche Entrée. */
+.sheet__row--ouvrable:has(.sheet__row__cible:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.sheet__row__cible:focus-visible { outline: none; }
+
 /* Le survol est une promesse de clic, et il ne doit se poser que sur les
    lignes qui la tiennent. La règle valait pour toutes : les <div> inertes de
    l'équipe, des files d'attente, de la corbeille et des raccourcis clavier

@@ -675,10 +675,27 @@ function panneauQuestionnaires() {
   const draftIds = new Set(drafts.map((q) => q.id));
   const partage = Boolean(state.espace && state.remoteSession);
 
-  const ligne = (quiz, actions) => el('div', { class: 'sheet__row' }, [
-    el('span', { class: 'sheet__emoji', text: quiz.emoji || '✦' }),
+  /* La ligne entière ouvre. Elle le faisait DÉJÀ dans le rail et dans la
+     feuille des questionnaires — trois rendus de la même liste, et le panneau
+     était le seul à exiger qu'on vise un bouton de soixante pixels au bout
+     d'une ligne qui en fait neuf cents. Le survol le promettait pourtant :
+     `.sheet__row:hover` s'allumait sans que rien ne réponde.
+
+     C'est le TITRE qui devient le bouton, et non un `<div>` habillé en
+     bouton : la ligne porte déjà des boutons, et un rôle interactif imbriqué
+     donne un arbre d'accessibilité imprévisible et deux arrêts de tabulation
+     sur la même chose. Le pseudo-élément étend sa surface à la ligne entière.
+
+     Ce qu'on y gagne en plus du confort : le nom annoncé devient le titre du
+     questionnaire. Une liste de six brouillons présentait jusqu'ici six
+     boutons nommés « Ouvrir », indiscernables hors de leur contexte. */
+  const ligne = (quiz, primaire, actions) => el('div', { class: 'sheet__row sheet__row--ouvrable' }, [
+    el('span', { class: 'sheet__emoji', text: quiz.emoji || '✦', 'aria-hidden': 'true' }),
     el('span', { class: 'sheet__label' }, [
-      el('span', { text: quiz.title }),
+      el('button', {
+        class: 'sheet__row__cible', type: 'button',
+        'data-act': primaire, 'data-id': quiz.id, text: quiz.title,
+      }),
       signature(quiz) && el('span', { class: 'field__hint', style: { display: 'block' }, text: signature(quiz) }),
     ]),
     ...actions,
@@ -700,12 +717,15 @@ function panneauQuestionnaires() {
     liste('Mes brouillons',
       'Gardés sur cet ordinateur. Rien n’en sort tant que tu ne diffuses pas.',
       drafts.length
-        ? el('div', { class: 'sheet__list' }, drafts.map((quiz) => ligne(quiz, [
+        /* Plus de bouton « Ouvrir » : il faisait exactement ce que fait sa
+           ligne, et un raccourci qui double son conteneur n'est pas un
+           raccourci, c'est une question — « si je clique à côté, il se passe
+           autre chose ? ». Ce qu'il disait encore, en revanche, c'est LEQUEL
+           est ouvert : son fond plein le montrait. Une pastille le dit mieux,
+           puisqu'elle décrit un état au lieu d'annoncer une action. */
+        ? el('div', { class: 'sheet__list' }, drafts.map((quiz) => ligne(quiz, 'select', [
             el('span', { class: 'pill', text: `${quiz.questions?.length ?? 0} q.` }),
-            el('button', {
-              class: 'btn btn--sm' + (state.quiz?.id === quiz.id ? ' btn--primary' : ' btn--ghost'),
-              type: 'button', 'data-act': 'select', 'data-id': quiz.id, text: 'Ouvrir',
-            }),
+            state.quiz?.id === quiz.id && el('span', { class: 'pill pill--accent', text: 'ouvert' }),
           ])))
         : el('div', { class: 'empty' }, [
             el('div', { class: 'empty__icon', text: '✦' }),
@@ -717,17 +737,16 @@ function panneauQuestionnaires() {
   if (partage && state.remote.length) {
     blocs.push(liste(`Publiés dans ${nomDeLEspace()}`,
       'Ce que vos usagers voient. Modifier en crée une copie locale ; la version diffusée ne bouge qu’à la prochaine diffusion.',
-      el('div', { class: 'sheet__list' }, state.remote.map((quiz) => ligne(quiz, [
-        el('button', {
-          class: 'btn btn--icon btn--quiet', type: 'button',
-          'data-act': 'export-one', 'data-id': quiz.id, title: 'Exporter en JSON', text: '↓',
-        }),
-        el('button', {
-          class: 'btn btn--sm btn--ghost', type: 'button',
-          'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-remote', 'data-id': quiz.id,
-          text: draftIds.has(quiz.id) ? 'Copie ouverte' : 'Modifier',
-        }),
-      ])))));
+      /* La ligne reprend EXACTEMENT l'action que portait son bouton, sans en
+         inventer une : ouvrir la copie si elle existe, la fabriquer sinon. */
+      el('div', { class: 'sheet__list' }, state.remote.map((quiz) => ligne(quiz,
+        draftIds.has(quiz.id) ? 'select' : 'edit-remote', [
+          draftIds.has(quiz.id) && el('span', { class: 'pill', text: 'copie en cours' }),
+          el('button', {
+            class: 'btn btn--icon btn--quiet', type: 'button',
+            'data-act': 'export-one', 'data-id': quiz.id, title: 'Exporter en JSON', text: '↓',
+          }),
+        ])))));
   }
 
   /* Les retraits, dans l'onglet où l'on cherche les questionnaires — et non
@@ -774,17 +793,14 @@ function panneauQuestionnaires() {
   if (!partage && state.published.length) {
     blocs.push(liste('Au kiosque de ce dépôt',
       'Les questionnaires livrés avec l’application. Modifier en crée une copie locale.',
-      el('div', { class: 'sheet__list' }, state.published.map((quiz) => ligne(quiz, [
-        el('button', {
-          class: 'btn btn--icon btn--quiet', type: 'button',
-          'data-act': 'export-one', 'data-id': quiz.id, title: 'Exporter en JSON', text: '↓',
-        }),
-        el('button', {
-          class: 'btn btn--sm btn--ghost', type: 'button',
-          'data-act': draftIds.has(quiz.id) ? 'select' : 'edit-published', 'data-id': quiz.id,
-          text: draftIds.has(quiz.id) ? 'Copie ouverte' : 'Reprendre',
-        }),
-      ])))));
+      el('div', { class: 'sheet__list' }, state.published.map((quiz) => ligne(quiz,
+        draftIds.has(quiz.id) ? 'select' : 'edit-published', [
+          draftIds.has(quiz.id) && el('span', { class: 'pill', text: 'copie en cours' }),
+          el('button', {
+            class: 'btn btn--icon btn--quiet', type: 'button',
+            'data-act': 'export-one', 'data-id': quiz.id, title: 'Exporter en JSON', text: '↓',
+          }),
+        ])))));
   }
 
   return blocs;
@@ -1295,7 +1311,18 @@ function onClick(event) {
 
   switch (act) {
     case 'new-quiz': return assistantCreation();
-    case 'select': return (select(id), structural());
+    /* Ouvrir remplace le panneau entier : le bouton qu'on vient de presser
+       n'existe plus, et le focus retomberait sur <body> — au clavier, on
+       repartirait du haut du document. `reorder()` documente déjà ce piège
+       pour ses flèches ; il se paie ici aussi, et la souris ne le voit
+       jamais. On le repose sur le titre de l'écran ouvert. */
+    case 'select': {
+      select(id);
+      structural();
+      const titre = dom.panel.querySelector('h1, h2');
+      if (titre) { titre.setAttribute('tabindex', '-1'); titre.focus({ preventScroll: true }); }
+      return undefined;
+    }
     case 'panel': {
       state.panel = PANELS.some((p) => p.id === id) ? id : 'identite';
       return (renderRail(), renderPanel());
