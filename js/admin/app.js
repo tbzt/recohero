@@ -1488,6 +1488,7 @@ function onClick(event) {
     case 'test':      return testRun();
     case 'copy-link': return copyLink();
     case 'affiche':   return montrerAffiche();
+    case 'cotes':     return listeDesCotes();
     case 'embed':     return showEmbed();
     case 'remote-signin':    return showSignIn();
     case 'remote-signout':   return signOutRemote();
@@ -3662,6 +3663,98 @@ function assistantCreation() {
   dialog.addEventListener('close', () => dialog.remove());
 
   dessiner();
+  document.body.append(dialog);
+  dialog.showModal();
+  return undefined;
+}
+
+/* --- La liste des cotes -------------------------------------------------------
+   Ce qu'on emporte dans les rayons avant d'ouvrir. Le champ `location` est
+   saisi dans l'éditeur et n'apparaissait NULLE PART ailleurs dans le
+   backoffice — il ne ressortait qu'au dos du parcours, chez l'usager. Or
+   c'est le seul champ qui transforme une recommandation en prêt : si le
+   document n'est pas en rayon, le kiosque envoie quelqu'un vers une étagère
+   vide, et personne dans l'équipe ne peut le savoir sans rouvrir chaque
+   recommandation.
+
+   Ce n'est PAS une image, contrairement à l'affiche : une cote se relit, se
+   copie, se coche au crayon. Du texte, donc, imprimable tel quel.
+
+   Ce que la liste ne fait pas : juger. Elle ne dit pas qu'il « manque » des
+   cotes ni qu'un questionnaire serait incomplet — elle sépare ce qui en a de
+   ce qui n'en a pas, et c'est à la personne de décider si ça compte. Une
+   recommandation d'exposition ou de podcast n'a aucune raison d'en porter. */
+function listeDesCotes() {
+  flush();
+  const quiz = state.quiz;
+  if (!quiz) return undefined;
+
+  let total = 0;
+  let cotees = 0;
+
+  const ligne = (reco) => {
+    const cote = reco.location?.trim();
+    total += 1;
+    if (cote) cotees += 1;
+    const type = RECO_TYPES.find((t) => t.id === reco.type);
+    const meta = [reco.creator, reco.year].filter(Boolean).join(', ');
+    return el('tr', { class: cote ? null : 'cotes__orpheline' }, [
+      el('td', { class: 'cotes__cote', text: cote || '—' }),
+      el('td', {}, [
+        el('span', { class: 'cotes__titre', text: reco.title || 'Sans titre' }),
+        meta && el('span', { class: 'cotes__meta', text: ` — ${meta}` }),
+      ]),
+      el('td', { class: 'cotes__type', text: type ? type.label : '' }),
+    ]);
+  };
+
+  const groupes = (quiz.results || []).map((profil) => {
+    const recos = (profil.recos || []).filter((r) => r.title?.trim());
+    if (!recos.length) return null;
+    return el('section', { class: 'cotes__groupe' }, [
+      /* Pas de glyphe par défaut : selon d'où vient le questionnaire, l'emoji
+         du profil vit dans son champ ou déjà dans son titre. Un repli sur ✦
+         affichait « ✦ 🌊 L'amateur de fins douces ». */
+      el('h3', { class: 'cotes__profil', text:
+        [profil.emoji, profil.title || 'Profil sans titre'].filter(Boolean).join(' ') }),
+      el('table', { class: 'cotes__table' }, [
+        el('tbody', {}, recos.map(ligne)),
+      ]),
+    ]);
+  }).filter(Boolean);
+
+  const corps = el('div', { class: 'modal__body stack' }, [
+    el('h2', { text: `Cotes — ${quiz.title}` }),
+    ...groupes,
+  ]);
+
+  /* Le récapitulatif se calcule EN construisant les lignes : il se pose donc
+     après, quand les compteurs ont vu passer toutes les recommandations. */
+  corps.append(groupes.length
+    ? el('p', { class: 'cotes__bilan', text:
+        `${total} recommandation${total > 1 ? 's' : ''} · ${cotees} avec cote`
+        + (total > cotees ? ` · ${total - cotees} sans` : '') })
+    : el('div', { class: 'empty' }, [
+        el('div', { class: 'empty__icon', text: '🏷' }),
+        el('p', { text: 'Aucune recommandation dans ce questionnaire : il n’y a pas encore de rayon à préparer.' }),
+      ]));
+
+  const dialog = el('dialog', { class: 'modal cotes' }, [
+    corps,
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', 'data-cotes': 'close', text: 'Fermer' }),
+      el('span', { class: 'section__spacer' }),
+      groupes.length && el('button', { class: 'btn btn--primary', type: 'button', 'data-cotes': 'print', text: '🖨 Imprimer' }),
+    ]),
+  ]);
+
+  dialog.addEventListener('click', (event) => {
+    const action = event.target.closest('[data-cotes]')?.dataset.cotes;
+    if (!action) return;
+    if (action === 'print') { window.print(); return; }
+    dismiss(dialog);
+  });
+  dialog.addEventListener('close', () => dialog.remove());
   document.body.append(dialog);
   dialog.showModal();
   return undefined;

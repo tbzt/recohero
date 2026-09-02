@@ -647,6 +647,17 @@ function ficheCard(quiz) {
       el('p', { class: 'fiche__compte', text:
         `${compte(quiz.questions?.length ?? 0, 'question')} · ${compte(quiz.results?.length ?? 0, 'profil')}` }),
     ]),
+    el('span', { class: 'section__spacer' }),
+    /* Le seul champ qui transforme une recommandation en prêt est la cote, et
+       elle ne se relisait nulle part : on la saisit dans l'éditeur, puis elle
+       ne ressort qu'au dos du parcours, chez l'usager. Le samedi matin, le
+       kiosque promet « Jeunesse · R MAN » pour un document sorti depuis trois
+       semaines, et rien dans l'outil ne permettait de s'en apercevoir sans
+       rouvrir les vingt-deux recommandations une par une. */
+    el('button', {
+      class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'cotes',
+      text: '🏷 Liste des cotes',
+    }),
   ]);
 }
 

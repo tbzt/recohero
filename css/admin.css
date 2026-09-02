@@ -1237,6 +1237,80 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   color: var(--ink-faint);
 }
 
+/* --- La liste des cotes -------------------------------------------------------
+   Un tableau, pas une carte : on la lit en marchant le long d'un rayon, le
+   regard saute d'une cote à l'autre. La colonne de gauche est donc en chasse
+   fixe et alignée, pour que les cotes se comparent verticalement. */
+.cotes__groupe + .cotes__groupe { margin-top: var(--s-5); }
+.cotes__profil {
+  font-size: var(--t-base);
+  margin-bottom: var(--s-2);
+  padding-bottom: var(--s-1);
+  border-bottom: 1px solid var(--line);
+}
+.cotes__table { width: 100%; border-collapse: collapse; }
+.cotes__table td {
+  padding: var(--s-1) var(--s-2) var(--s-1) 0;
+  vertical-align: baseline;
+  border-bottom: 1px solid var(--line);
+}
+.cotes__cote {
+  width: 8rem;
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  white-space: nowrap;
+}
+.cotes__meta { color: var(--ink-muted); }
+.cotes__type {
+  width: 5rem;
+  text-align: right;
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+}
+/* Sans cote : signalé, pas fautif. Une exposition ou un podcast n'en a pas à
+   porter, et l'écran n'a pas à en faire un manquement. */
+.cotes__orpheline .cotes__cote { color: var(--ink-faint); }
+.cotes__bilan {
+  margin-top: var(--s-5);
+  font-size: var(--t-sm);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- L'impression ------------------------------------------------------------
+   Une seule chose s'imprime dans ce backoffice : la liste des cotes, parce
+   qu'elle est faite pour quitter l'écran et suivre quelqu'un dans les rayons.
+   Tout le reste disparaît — y compris le pied du dialogue, dont les boutons
+   ne veulent rien dire sur du papier. */
+@media print {
+  body > *:not(.cotes) { display: none !important; }
+
+  .cotes {
+    position: static;
+    display: block;
+    max-width: none;
+    width: auto;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: #FFFFFF;
+    color: #000000;
+    overflow: visible;
+  }
+  .cotes::backdrop { display: none; }
+  .cotes .modal__actions { display: none; }
+  .cotes .modal__body { overflow: visible; }
+
+  /* Un groupe de profil ne se coupe pas en deux entre deux pages si on peut
+     l'éviter : on cherche une cote sous le nom du profil qui la porte. */
+  .cotes__groupe { break-inside: avoid; }
+  .cotes__table td { border-bottom: 1px solid #CCCCCC; }
+  .cotes__meta, .cotes__type, .cotes__bilan { color: #555555; }
+  .cotes__orpheline .cotes__cote { color: #888888; }
+}
+
 /* La fiche du questionnaire, en tête du panneau de diffusion. Bande
    horizontale : c'est la forme que le pli demande — plus large que 1,21 fois
    sa hauteur — et c'est aussi celle d'une fiche qu'on pose sur une table. */
