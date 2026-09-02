@@ -623,6 +623,33 @@ function crediterBloc(quiz, ctx) {
   ]);
 }
 
+/* La fiche du questionnaire — le sujet de cet écran, montré avant les moyens
+   de le diffuser, et ce qui s'envole quand on publie.
+
+   Elle a été construite pour ça. L'envol pliait jusqu'ici la carte de
+   l'espace, c'est-à-dire le pupitre qui porte le bouton : le geste annonçait
+   « ma fiche part vers les usagers » et jouait « la boîte à boutons se plie ».
+   On ne peut pas plier ce qu'on ne montre pas, et rien dans ce panneau ne
+   montrait le questionnaire.
+
+   Sa forme n'est pas libre. Le pli ne tombe juste que sur une carte plus
+   large que 1,21 fois sa hauteur — c'est la seule condition de
+   `oriGeometrie()`, et en dessous l'envol renonce plutôt que de plier faux.
+   Une bande horizontale la tient à toutes les largeurs utiles. */
+function ficheCard(quiz) {
+  const compte = (n, un) => `${n} ${un}${n > 1 ? 's' : ''}`;
+
+  return el('div', { class: 'card fiche' }, [
+    el('span', { class: 'fiche__emoji', 'aria-hidden': 'true', text: quiz.emoji || '✦' }),
+    el('div', { class: 'fiche__corps' }, [
+      el('h3', { class: 'fiche__titre', text: quiz.title || 'Questionnaire sans titre' }),
+      quiz.tagline && el('p', { class: 'fiche__accroche', text: quiz.tagline }),
+      el('p', { class: 'fiche__compte', text:
+        `${compte(quiz.questions?.length ?? 0, 'question')} · ${compte(quiz.results?.length ?? 0, 'profil')}` }),
+    ]),
+  ]);
+}
+
 /* La carte de l'espace ne traite que d'une chose : mettre CE questionnaire
    en ligne, ou l'en retirer. Tout ce qui relève du compte — profil, mot de
    passe, équipe, déconnexion — a migré dans les paramètres du compte : ce
@@ -637,7 +664,7 @@ function espaceCard(ctx) {
         el('h3', { text: `Espace « ${ctx.espace} »` }),
         ctx.remoteSession
           ? el('div', {}, [
-              el('p', { text: 'Publier le met en ligne sur le kiosque. Retirer l’envoie à la corbeille, d’où il se restaure.' }),
+              el('p', { text: 'Publier le met en ligne sur le kiosque. Retirer le range dans « Retirés du kiosque », d’où il se restaure — la liste garde les vingt derniers.' }),
               el('div', { class: 'row', style: { marginTop: 'var(--s-3)' } }, [
                 el('button', { class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'remote-publish', text: '⇧ Publier dans l’espace' }),
                 ctx.inEspace && el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'remote-unpublish', text: '⌫ Retirer de l’espace' }),
@@ -647,10 +674,10 @@ function espaceCard(ctx) {
                  son apparence publique, et ce qu'on en a retiré. */
               el('div', { class: 'row', style: { marginTop: 'var(--s-4)' } }, [
                 el('button', { class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'espace',
-                  text: '🗄 Réglages de l’espace' }),
+                  text: '🗄 Ouvrir l’espace' }),
               ]),
               el('p', { class: 'field__hint', text:
-                'L’identité du kiosque, sa vitrine, sa corbeille, sa fréquentation et qui peut y publier : tout cela concerne l’espace entier et non ce questionnaire. « Mon espace », dans le rail, y mène en toutes circonstances — même sans questionnaire ouvert.' }),
+                'La vitrine du kiosque et son apparence, ce qu’on en a retiré, la fréquentation et qui peut y publier : tout cela concerne l’espace entier et non ce questionnaire. « Mon espace », dans le rail, y mène en toutes circonstances — même sans questionnaire ouvert.' }),
 
               /* Une règle de base de données absente ne se voit nulle part :
                  l'espace a exactement la même apparence, protégé ou non.
@@ -680,6 +707,7 @@ export function publier(quiz, ctx = {}) {
   return el('section', { class: 'panel' }, [
     head('Diffuser'),
 
+    ficheCard(quiz),
     espaceCard(ctx),
 
     el('div', { class: 'card' }, [

@@ -1226,6 +1226,25 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
    découpe tranche : c'est la carte elle-même qui se plie, pas une feuille
    qui la représente. Le fond reste peint dessous, pour que le verso d'un
    volet retourné ne soit pas transparent. */
+/* La fiche du questionnaire, en tête du panneau de diffusion. Bande
+   horizontale : c'est la forme que le pli demande — plus large que 1,21 fois
+   sa hauteur — et c'est aussi celle d'une fiche qu'on pose sur une table. */
+.fiche {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+.fiche__emoji { flex: none; font-size: var(--t-2xl); line-height: 1; }
+.fiche__corps { min-width: 0; }
+.fiche__titre { margin: 0; }
+.fiche__accroche { margin: var(--s-1) 0 0; color: var(--ink-muted); }
+.fiche__compte {
+  margin: var(--s-2) 0 0;
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
 /* La carte réelle, le temps du vol. Sans elle, on pliait une copie POSÉE SUR
    son original resté visible : la feuille semblait se replier sur elle-même
    au lieu de quitter la table. `visibility` plutôt que `display` — la boîte

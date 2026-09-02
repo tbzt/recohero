@@ -59,7 +59,7 @@
           "$uid": {
             ".read": "auth != null && auth.uid === $uid",
             ".write": "auth != null && (auth.uid === $uid || root.child('espaces').child($espace).child('membres').child(auth.uid).exists())",
-            ".validate": "newData.hasChildren(['courriel', 'prenom', 'le']) && $uid === auth.uid && newData.child('courriel').val() === auth.token.email && newData.child('le').val() <= now"
+            ".validate": "newData.hasChildren(['courriel', 'prenom', 'le']) && $uid === auth.uid && newData.child('courriel').val() === auth.token.email && auth.token.email_verified === true && newData.child('le').val() <= now"
           }
         },
 

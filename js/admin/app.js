@@ -393,6 +393,15 @@ function entrerDansLEspace() {
   if (e.demande) {
     return [item('⏳', 'Demande envoyée', 'l’équipe doit encore l’accepter', null)];
   }
+  /* Même exigence que pour les invitations, et pour la même raison. La règle
+     de `attente` réclame désormais une adresse confirmée : sans elle,
+     n'importe qui pouvait déclarer « direction@ville.fr » sans jamais ouvrir
+     cette boîte, et l'équipe lisait une adresse crédible en croyant qu'elle
+     avait été vérifiée — c'est ce que l'écran affirmait. Ici comme au-dessus,
+     on nomme ce qui manque plutôt que de laisser la base refuser sans dire. */
+  if (!e.verifie) {
+    return [item('📮', 'Vérifie ton adresse', 'il en faut une confirmée pour demander l’accès', 'entrer-verifier')];
+  }
   return [item('🔔', 'Demander l’accès', 'un membre de l’équipe décidera', 'entrer-demander')];
 }
 
@@ -484,12 +493,12 @@ function renderRail() {
       el('div', { class: 'rail__list' }, [
         el('button', {
           class: 'rail__item', type: 'button', 'data-act': 'espace',
-          title: `Kiosque, vitrine, corbeille et équipe de « ${state.espace} »`,
+          title: `Questionnaires, vitrine et équipe de « ${state.espace} »`,
         }, [
           el('span', { class: 'rail__item__emoji', text: '🗄' }),
           el('span', { class: 'rail__item__label' }, [
             el('span', { style: { display: 'block' }, text: state.identite?.titre || state.espace }),
-            el('span', { class: 'rail__item__signature', text: 'kiosque, vitrine, corbeille, équipe' }),
+            el('span', { class: 'rail__item__signature', text: 'questionnaires, vitrine, équipe' }),
           ]),
           /* Une demande d'accès attend une décision ; la corbeille attend
              seulement qu'on s'en souvienne. Quand les deux ont quelque chose
@@ -555,7 +564,6 @@ const ONGLETS_ESPACE = [
   { id: 'vitrine',        label: 'Vitrine',        emoji: '▦', partout: true },
   { id: 'frequentation',  label: 'Fréquentation',  emoji: '📊', partout: false },
   { id: 'equipe',         label: 'Équipe',         emoji: '👥', partout: false },
-  { id: 'reglages',       label: 'Réglages',       emoji: '⚙', partout: true },
 ];
 
 function ongletsEspace() {
@@ -679,6 +687,47 @@ function panneauQuestionnaires() {
       ])))));
   }
 
+  /* Les retraits, dans l'onglet où l'on cherche les questionnaires — et non
+     derrière un bouton d'un onglet « Réglages ». Le commentaire qui les y
+     rangeait disait « ce qu'on va rechercher rarement ». C'est faux du métier :
+     on travaille à la saison, on rouvre en janvier la Nuit de la lecture de
+     l'an dernier et en juin l'été précédent. Ce n'est pas rare, c'est
+     cyclique — et c'est le geste le plus rentable de l'outil, reprendre
+     plutôt que réécrire. La mémoire de saison d'une équipe n'a rien à faire
+     dans un tiroir appelé Réglages. */
+  if (partage && state.corbeille.length) {
+    const retire = (q) => el('div', { class: 'sheet__row' }, [
+      el('span', { class: 'sheet__emoji', text: q.emoji || '✦' }),
+      el('span', { class: 'sheet__label' }, [
+        el('span', { text: q.title || 'Questionnaire sans titre' }),
+        el('span', { class: 'field__hint', style: { display: 'block' }, text:
+          `Retiré ${q.supprimeLe ? formatDate(q.supprimeLe) : 'à une date inconnue'}`
+          + (q.supprimePar ? ` par ${nommer(q.supprimePar)}` : '') }),
+      ]),
+      el('button', { class: 'btn btn--ghost btn--sm', type: 'button',
+        'data-act': 'corbeille-restaurer', 'data-id': q.id, text: '↺ Restaurer' }),
+      /* Sorti de sa fenêtre, ce geste est plus facile à atteindre — et il est
+         le seul du produit qui ne s'annule pas. Il se peint donc en danger au
+         lieu du « ✕ » discret qu'il portait, où il se lisait comme un renvoi
+         de la ligne plutôt que comme une destruction. */
+      el('button', { class: 'btn btn--icon btn--danger', type: 'button',
+        'data-act': 'corbeille-jeter', 'data-id': q.id,
+        title: 'Supprimer définitivement — sans retour',
+        'aria-label': `Supprimer définitivement « ${q.title || 'Questionnaire sans titre'} » — sans retour`,
+        text: '✕' }),
+    ]);
+
+    blocs.push(liste('Retirés du kiosque',
+      'Restaurer remet en ligne tel quel. La corbeille garde les vingt derniers retraits ; au-delà, le plus ancien s’efface. Seul l’export sauvegarde.',
+      el('div', {}, [
+        el('div', { class: 'sheet__list' }, state.corbeille.map(retire)),
+        el('div', { class: 'row', style: { marginTop: 'var(--s-4)' } }, [
+          el('button', { class: 'btn btn--danger btn--sm', type: 'button',
+            'data-act': 'corbeille-vider', text: 'Vider la corbeille' }),
+        ]),
+      ])));
+  }
+
   if (!partage && state.published.length) {
     blocs.push(liste('Au kiosque de ce dépôt',
       'Les questionnaires livrés avec l’application. Modifier en crée une copie locale.',
@@ -705,7 +754,6 @@ function renderEspace() {
   const panneaux = {
     questionnaires: panneauQuestionnaires,
     equipe: contenuEquipe,
-    reglages: contenuReglages,
     frequentation: contenuFrequentation,
     vitrine: contenuVitrine,
   };
@@ -1359,7 +1407,7 @@ function onClick(event) {
     }
     case 'aide':             return afficherRaccourcis();
     case 'compte':           return monCompte();
-    case 'espace':           return reglagesEspace();
+    case 'espace':           return ouvrirLEspace();
     case 'mon-profil':       return monProfil();
     case 'onglet-espace': {
       const vise = ongletsEspace().some((o) => o.id === id) ? id : 'questionnaires';
@@ -1379,8 +1427,9 @@ function onClick(event) {
     case 'entrer-verifier':  return verifierMonCourriel();
     case 'copier-uid':       return copierUid();
     case 'mon-mot-de-passe': return changerMonMotDePasse();
-    case 'identite-espace':  return editerIdentite();
-    case 'corbeille':        return ouvrirCorbeille();
+    case 'corbeille-restaurer': return restaurerDeLaCorbeille(id);
+    case 'corbeille-jeter':     return jeterDeLaCorbeille(id);
+    case 'corbeille-vider':     return viderLaCorbeille();
     case 'frequentation':
       state.ongletEspace = 'frequentation';
       return allerA('espace');
@@ -1787,7 +1836,7 @@ function filesDAttente() {
       }),
     ]))));
     bloc.push(el('p', { class: 'field__hint', text:
-      'Accepter donne le droit de publier ici. L’adresse affichée est celle du compte, vérifiée par la base.' }));
+      'Accepter donne le droit de publier ici. L’adresse est celle du compte, pas une saisie libre : la base refuse les demandes venues d’une adresse non confirmée.' }));
   }
 
   if (conviees.length) {
@@ -1884,47 +1933,17 @@ function contenuEquipe() {
   ];
 }
 
-/* Les réglages de l'espace. Vitrine et fréquentation ont désormais leur
-   onglet : les répéter ici en ferait des raccourcis vers soi-même. Ne restent
-   que l'apparence du kiosque et la corbeille — ce qu'on règle une fois, et ce
-   qu'on va rechercher rarement. */
-function contenuReglages() {
-  const partage = Boolean(state.espace && state.remoteSession);
+/* L'espace n'a plus de panneau « Réglages ». Il ne contenait que deux boutons
+   ouvrant deux fenêtres, et ses deux contenus sont retournés là où on les
+   cherche : la corbeille dans les questionnaires, dont elle est l'archive de
+   saison, et l'apparence du kiosque dans la vitrine, dont elle est le cadre.
+   Un onglet qui n'est qu'un menu de menus n'est pas une section, c'est un
+   détour.
 
-  return [
-    el('section', { class: 'panel' }, [
-      el('div', { class: 'section__head' }, [el('h2', { text: 'Réglages' })]),
-
-      partage && el('span', { class: 'field__label', text: 'Apparence du kiosque' }),
-      partage && el('div', { class: 'row' }, [
-        el('button', {
-          class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'identite-espace',
-          text: state.identite ? '✦ Modifier l’apparence' : '✦ Personnaliser le kiosque',
-        }),
-      ]),
-      partage && !state.identite && el('p', { class: 'field__hint', text:
-        'Sans identité, le kiosque affiche la marque RecoHero à vos usagers.' }),
-
-      partage && el('span', { class: 'field__label', style: { marginTop: 'var(--s-5)' }, text: 'Corbeille' }),
-      partage && el('div', { class: 'row' }, [
-        el('button', {
-          class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'corbeille',
-          text: state.corbeille.length
-            ? `🗑 Ouvrir · ${state.corbeille.length} questionnaire${state.corbeille.length > 1 ? 's' : ''}`
-            : '🗑 Ouvrir — elle est vide',
-        }),
-      ]),
-
-      !partage && el('p', { class: 'panel__hint', text:
-        'Rien à régler sans espace : les questionnaires vivent en local. Ouvre un espace pour son apparence, sa corbeille, son équipe et sa fréquentation.' }),
-    ]),
-  ];
-}
-
-/* Reste joignable depuis l'ancien bouton du rail et depuis l'écran vide :
-   ces chemins mènent maintenant au bon onglet plutôt qu'à une fenêtre. */
-function reglagesEspace() {
-  state.ongletEspace = 'equipe';
+   Ce chemin-ci reste : le bouton « Mon espace » du rail et l'écran vide y
+   mènent, et il ouvre maintenant l'accueil de l'espace. */
+function ouvrirLEspace() {
+  state.ongletEspace = 'questionnaires';
   return allerA('espace');
 }
 
@@ -2400,8 +2419,20 @@ function changerMonMotDePasse() {
    Le titre est le seul champ nécessaire : sans lui il n'y a pas d'identité,
    et le kiosque garde la nôtre, ce qui vaut mieux qu'une page anonyme. */
 
-function editerIdentite() {
-  if (!state.remoteSession) return showSignIn();
+/* Elle était une fenêtre atteinte depuis un bouton d'un onglet « Réglages » :
+   trois clics pour arriver au seul écran qui décide si le kiosque porte le
+   nom de la médiathèque ou le nôtre. Une médiathèque dont l'adjointe à la
+   culture ouvre le lien et lit « RecoHero » a payé cet enfouissement.
+
+   Elle est maintenant une section de l'onglet Vitrine, où elle a toujours eu
+   sa place : la vitrine range ce que le kiosque montre, l'apparence dit à
+   quoi il ressemble. Même objet public, même écran.
+
+   Le panneau se garde comme celui de la vitrine, et pour la même raison :
+   `repaint()` remplace le DOM, et une saisie en cours ne doit pas disparaître
+   parce qu'on a enregistré l'ordre des vignettes juste à côté. */
+function sectionApparence() {
+  if (state.apparencePanneau) return state.apparencePanneau;
   const actuelle = state.identite || {};
 
   const titre = el('input', { class: 'input', value: actuelle.titre || '', placeholder: 'Médiathèque Maupassant', maxlength: '80' });
@@ -2417,40 +2448,37 @@ function editerIdentite() {
   const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
   const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Enregistrer' });
 
-  const dialog = el('dialog', { class: 'modal' }, [
-    el('div', { class: 'modal__body stack' }, [
-      el('h2', { text: `Le kiosque de « ${state.espace} »` }),
-      el('p', { class: 'panel__hint', text:
-        'Ce que voient les usagers en arrivant. Ce qu’on laisse vide reste à RecoHero.' }),
-      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Nom de la structure' }), titre]),
-      el('label', { class: 'field' }, [
-        el('span', { class: 'field__label', text: 'Accroche' }), accroche,
-        el('span', { class: 'field__hint', text: 'Le grand titre de la page.' }),
-      ]),
-      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Mot d’accueil' }), intro]),
-      el('label', { class: 'field' }, [
-        el('span', { class: 'field__label', text: 'Logo' }), logo,
-        el('span', { class: 'field__hint', text:
-          'Remplace le signe ✦ dans le bandeau. Un SVG en ligne (data:) est refusé : donnez une adresse https, ou un PNG.' }),
-      ]),
-      el('div', { class: 'field' }, [
-        el('span', { class: 'field__label', text: 'Couleur' }),
-        el('div', { class: 'row' }, [accent]),
-      ]),
-      el('div', { class: 'card', style: { background: 'var(--surface-2)' } }, [
-        el('span', { class: 'field__label', text: 'Lien de retour' }),
-        el('span', { class: 'field__hint', style: { display: 'block', marginBottom: 'var(--s-3)' }, text:
-          'Remplace le bouton « Backoffice » dans le bandeau.' }),
-        retourUrl, el('div', { style: { height: 'var(--s-2)' } }), retourLib,
-      ]),
-      el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Pied de page' }), pied]),
-      erreur,
+  const panneau = el('section', { class: 'panel' }, [
+    el('div', { class: 'section__head' }, [el('h2', { text: 'Apparence du kiosque' })]),
+    el('p', { class: 'panel__hint', text:
+      'Ce que voient les usagers en arrivant. Ce qu’on laisse vide reste à RecoHero.' }),
+    el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Nom de la structure' }), titre]),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'field__label', text: 'Accroche' }), accroche,
+      el('span', { class: 'field__hint', text: 'Le grand titre de la page.' }),
     ]),
-    el('div', { class: 'modal__actions' }, [
+    el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Mot d’accueil' }), intro]),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'field__label', text: 'Logo' }), logo,
+      el('span', { class: 'field__hint', text:
+        'Remplace le signe ✦ dans le bandeau. Un SVG en ligne (data:) est refusé : donnez une adresse https, ou un PNG.' }),
+    ]),
+    el('div', { class: 'field' }, [
+      el('span', { class: 'field__label', text: 'Couleur' }),
+      el('div', { class: 'row' }, [accent]),
+    ]),
+    el('div', { class: 'card', style: { background: 'var(--surface-2)' } }, [
+      el('span', { class: 'field__label', text: 'Lien de retour' }),
+      el('span', { class: 'field__hint', style: { display: 'block', marginBottom: 'var(--s-3)' }, text:
+        'Remplace le bouton « Backoffice » dans le bandeau.' }),
+      retourUrl, el('div', { style: { height: 'var(--s-2)' } }), retourLib,
+    ]),
+    el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Pied de page' }), pied]),
+    erreur,
+    el('div', { class: 'panel__actions' }, [
       actuelle.titre && el('button', { class: 'btn btn--danger btn--sm', type: 'button', text: 'Rendre l’apparence par défaut',
-        onClick: () => enregistrerIdentite(dialog, null, valider, erreur) }),
+        onClick: () => enregistrerIdentite(null, valider, erreur) }),
       el('span', { class: 'section__spacer' }),
-      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler', onClick: () => dismiss(dialog) }),
       valider,
     ]),
   ]);
@@ -2473,25 +2501,22 @@ function editerIdentite() {
       erreur.hidden = false;
       return;
     }
-    enregistrerIdentite(dialog, propre, valider, erreur);
+    enregistrerIdentite(propre, valider, erreur);
   });
 
-  dialog.addEventListener('close', () => dialog.remove());
-  document.body.append(dialog);
-  dialog.showModal();
-  titre.focus();
-  return undefined;
+  state.apparencePanneau = panneau;
+  return panneau;
 }
 
-async function enregistrerIdentite(dialog, valeurs, valider, erreur) {
+async function enregistrerIdentite(valeurs, valider, erreur) {
   valider.disabled = true;
   try {
     await remote.enregistrerIdentite(state.espace, valeurs);
+    /* `refreshEspace()` jette le panneau gardé : il se rebâtira sur ce qui
+       vient d'être enregistré, et non sur ce qu'on avait tapé. */
     await refreshEspace();
-    dismiss(dialog, () => {
-      toast(valeurs ? 'Le kiosque porte désormais votre identité.' : 'Le kiosque a repris l’apparence par défaut.');
-      repaint();
-    });
+    toast(valeurs ? 'Le kiosque porte désormais votre identité.' : 'Le kiosque a repris l’apparence par défaut.');
+    repaint();
   } catch (err) {
     erreur.textContent = err.message;
     erreur.hidden = false;
@@ -2508,71 +2533,49 @@ async function enregistrerIdentite(dialog, valeurs, valider, erreur) {
    personne ne fait le ménage à minuit, et une promesse que rien n'exécute
    vaudrait moins que ce plafond-là. */
 
-function ouvrirCorbeille() {
+/* Les trois gestes, sortis de leur fenêtre. Ils vivent maintenant dans le
+   panneau des questionnaires, donc ils passent par l'aiguillage délégué
+   comme tout le reste : un écouteur posé à la main sur un contenu de panneau
+   ne survivrait pas au premier `repaint()`, qui remplace le DOM entier. */
+async function restaurerDeLaCorbeille(id) {
   if (!state.remoteSession) return showSignIn();
-  const items = state.corbeille;
+  try {
+    const repris = await remote.restaurerQuiz(state.espace, id);
+    await refreshEspace();
+    toast(`« ${repris.title} » est de retour sur le kiosque.`);
+    repaint();
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+  return undefined;
+}
 
-  const ligne = (q) => el('div', { class: 'sheet__row' }, [
-    el('span', { class: 'sheet__emoji', text: q.emoji || '✦' }),
-    el('span', { class: 'sheet__label' }, [
-      el('span', { text: q.title || 'Questionnaire sans titre' }),
-      el('span', { class: 'field__hint', style: { display: 'block' }, text:
-        `Retiré ${q.supprimeLe ? formatDate(q.supprimeLe) : 'à une date inconnue'}`
-        + (q.supprimePar ? ` par ${nommer(q.supprimePar)}` : '') }),
-    ]),
-    el('button', { class: 'btn btn--quiet btn--sm', type: 'button',
-      'data-poubelle': 'jeter', 'data-id': q.id, title: 'Supprimer définitivement', text: '✕' }),
-    el('button', { class: 'btn btn--ghost btn--sm', type: 'button',
-      'data-poubelle': 'restaurer', 'data-id': q.id, text: '↺ Restaurer' }),
-  ]);
+/* Le seul geste du produit qui ne s'annule pas — la corbeille EST le chemin
+   de retour des autres, et rien ne rattrape celui-ci. D'où le bouton peint
+   en danger plutôt qu'un « ✕ » de renvoi. */
+async function jeterDeLaCorbeille(id) {
+  if (!state.remoteSession) return showSignIn();
+  try {
+    await remote.jeterDefinitivement(state.espace, id);
+    await refreshEspace();
+    toast('Supprimé définitivement.');
+    repaint();
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+  return undefined;
+}
 
-  const dialog = el('dialog', { class: 'modal sheet' }, [
-    el('div', { class: 'modal__body stack' }, [
-      el('h2', { text: 'Corbeille de l’espace' }),
-      el('p', { class: 'panel__hint', text: items.length
-        ? 'Restaurer remet en ligne tel quel.'
-        : 'Vide. Ce qu’on retire du kiosque atterrit ici.' }),
-      items.length ? el('div', { class: 'sheet__list' }, items.map(ligne)) : null,
-      items.length ? el('p', { class: 'field__hint', text:
-        'Les vingt derniers retraits, au-delà le plus ancien s’efface. Seul l’export du catalogue sauvegarde.' }) : null,
-    ]),
-    el('div', { class: 'modal__actions' }, [
-      items.length && el('button', { class: 'btn btn--danger btn--sm', type: 'button', 'data-poubelle': 'vider', text: 'Vider la corbeille' }),
-      el('span', { class: 'section__spacer' }),
-      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
-    ]),
-  ]);
-
-  dialog.addEventListener('click', async (event) => {
-    const cible = event.target.closest('[data-poubelle]');
-    if (!cible) return;
-    const { poubelle, id } = cible.dataset;
-    cible.disabled = true;
-    try {
-      if (poubelle === 'restaurer') {
-        const repris = await remote.restaurerQuiz(state.espace, id);
-        await refreshEspace();
-        dismiss(dialog, () => { toast(`« ${repris.title} » est de retour sur le kiosque.`); repaint(); });
-        return;
-      }
-      if (poubelle === 'jeter') {
-        await remote.jeterDefinitivement(state.espace, id);
-        await refreshEspace();
-        dismiss(dialog, () => { toast('Supprimé définitivement.'); repaint(); ouvrirCorbeille(); });
-        return;
-      }
-      await remote.viderCorbeille(state.espace);
-      await refreshEspace();
-      dismiss(dialog, () => { toast('Corbeille vidée.'); repaint(); });
-    } catch (err) {
-      cible.disabled = false;
-      toast(err.message, 'danger');
-    }
-  });
-
-  dialog.addEventListener('close', () => dialog.remove());
-  document.body.append(dialog);
-  dialog.showModal();
+async function viderLaCorbeille() {
+  if (!state.remoteSession) return showSignIn();
+  try {
+    await remote.viderCorbeille(state.espace);
+    await refreshEspace();
+    toast('Corbeille vidée.');
+    repaint();
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
   return undefined;
 }
 
@@ -2784,13 +2787,18 @@ function contenuVitrine() {
       el('p', { text: 'Il faut être connecté à un espace pour régler sa vitrine.' }),
     ])])];
   }
+  /* L'apparence d'abord : elle décrit le lieu, la vitrine range ce qu'on y
+     pose. Et elle doit rester atteignable sans aucun questionnaire en ligne —
+     on nomme sa médiathèque avant de publier, pas après. */
+  const apparence = sectionApparence();
+
   if (!state.remote.length) {
-    return [el('section', { class: 'panel' }, [el('div', { class: 'empty' }, [
+    return [apparence, el('section', { class: 'panel' }, [el('div', { class: 'empty' }, [
       el('div', { class: 'empty__icon', text: '▦' }),
       el('p', { text: 'Cet espace n’a aucun questionnaire en ligne : il n’y a pas encore de vitrine à ranger.' }),
     ])])];
   }
-  if (state.vitrinePanneau) return [state.vitrinePanneau];
+  if (state.vitrinePanneau) return [apparence, state.vitrinePanneau];
 
   /* On travaille sur une copie : tant qu'on n'a pas enregistré, le kiosque
      ne bouge pas. */
@@ -2970,7 +2978,7 @@ function contenuVitrine() {
 
   dessiner();
   state.vitrinePanneau = panneau;
-  return [panneau];
+  return [apparence, panneau];
 }
 
 /* Jeter le panneau gardé : au prochain passage, il se reconstruit sur les
@@ -2980,6 +2988,10 @@ function contenuVitrine() {
 function oublierVitrine() {
   state.vitrinePanneau = null;
   state.vitrineSale = false;
+  /* Le formulaire d'apparence se garde pour la même raison et se jette au
+     même moment : il tient les valeurs de `state.identite`, et l'espace
+     rechargé peut en apporter d'autres. */
+  state.apparencePanneau = null;
 }
 
 /* L'ordre à éditer : celui qui est enregistré, complété par ce qui a été
@@ -3738,9 +3750,11 @@ async function publishRemote() {
        rattraper. Le réseau court pendant le vol, seul le redessin patiente,
        et le bandeau de confirmation ne fait attendre personne.
 
-       C'est la carte qui porte le bouton qui s'envole — celle qui parle de
-       l'espace où l'on vient de publier. */
-    const envol = envolerLaFiche(dom.panel.querySelector('[data-act="remote-publish"]')?.closest('.card'));
+       Ce qui s'envole est la FICHE du questionnaire, en tête du panneau —
+       pas la carte de l'espace, qui portait le bouton et qu'on pliait faute
+       de mieux. Le geste dit maintenant ce qu'il fait : cette fiche-là part
+       vers les usagers. */
+    const envol = envolerLaFiche(dom.panel.querySelector('.fiche'));
     await refreshEspace();
     toast(`« ${state.quiz.title} » est en ligne dans l’espace.`);
     await envol;
