@@ -380,6 +380,29 @@ function entrerDansLEspace() {
     ]),
   ]);
 
+  /* Un courriel de vérification peut ne jamais arriver : filtré, rangé dans
+     les indésirables, ou retenu par la messagerie de la collectivité. On ne
+     peut pas lever l'exigence — c'est elle qui empêche d'entrer sous une
+     adresse qu'on ne possède pas — mais on peut poser la sortie juste à côté
+     plutôt que de laisser quelqu'un devant une porte muette.
+
+     L'ajout par identifiant ne passe par AUCUNE boîte aux lettres : un membre
+     colle ces caractères dans « Inviter » et c'est fait. C'est le seul chemin
+     d'entrée qui ne dépend de rien, et il doit donc être lisible là où les
+     autres échouent — pas derrière le bouton de compte, que personne ne
+     pense à ouvrir quand on vient de lui dire d'aller voir ses courriels. */
+  const secours = () => [
+    el('p', { class: 'rail__secours', text:
+      'Le courriel peut atterrir dans les indésirables. S’il ne vient pas, donne ton identifiant à quelqu’un de l’équipe : il peut t’ajouter sans courriel.' }),
+    el('button', { class: 'rail__item', type: 'button', 'data-act': 'copier-uid' }, [
+      el('span', { class: 'rail__item__emoji', text: '⧉' }),
+      el('span', { class: 'rail__item__label' }, [
+        el('span', { style: { display: 'block' }, text: 'Copier mon identifiant' }),
+        el('span', { class: 'rail__item__signature', text: 'à transmettre à un membre' }),
+      ]),
+    ]),
+  ];
+
   if (e.invitation && e.verifie) {
     return [item('✉️', 'Rejoindre cet espace', 'une invitation t’y attend', 'entrer-rejoindre')];
   }
@@ -388,7 +411,7 @@ function entrerDansLEspace() {
      conviée entrerait. On ne peut donc pas passer outre — mais on peut dire
      exactement ce qui manque, plutôt que de refuser sans expliquer. */
   if (e.invitation) {
-    return [item('📮', 'Vérifie ton adresse', 'l’invitation t’attend derrière', 'entrer-verifier')];
+    return [item('📮', 'Vérifie ton adresse', 'l’invitation t’attend derrière', 'entrer-verifier'), ...secours()];
   }
   if (e.demande) {
     return [item('⏳', 'Demande envoyée', 'l’équipe doit encore l’accepter', null)];
@@ -400,7 +423,7 @@ function entrerDansLEspace() {
      avait été vérifiée — c'est ce que l'écran affirmait. Ici comme au-dessus,
      on nomme ce qui manque plutôt que de laisser la base refuser sans dire. */
   if (!e.verifie) {
-    return [item('📮', 'Vérifie ton adresse', 'il en faut une confirmée pour demander l’accès', 'entrer-verifier')];
+    return [item('📮', 'Vérifie ton adresse', 'il en faut une confirmée pour demander l’accès', 'entrer-verifier'), ...secours()];
   }
   return [item('🔔', 'Demander l’accès', 'un membre de l’équipe décidera', 'entrer-demander')];
 }
@@ -2363,7 +2386,7 @@ function demanderLAcces() {
 async function verifierMonCourriel() {
   try {
     await remote.envoyerCourrielVerification();
-    toast(`Courriel de vérification envoyé à ${state.remoteSession.email}.`);
+    toast(`Courriel envoyé à ${state.remoteSession.email}. Regarde aussi dans les indésirables.`);
   } catch (err) {
     toast(err.message, 'danger');
   }

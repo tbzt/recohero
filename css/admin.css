@@ -1226,6 +1226,17 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
    découpe tranche : c'est la carte elle-même qui se plie, pas une feuille
    qui la représente. Le fond reste peint dessous, pour que le verso d'un
    volet retourné ne soit pas transparent. */
+/* La note de secours du rail, quand une adresse non vérifiée bloque l'entrée.
+   Elle n'est pas un `field__hint` posé au hasard : dans une liste de boutons,
+   un paragraphe a besoin de sa propre marge pour ne pas se lire comme le
+   sous-titre du bouton d'au-dessus. */
+.rail__secours {
+  margin: var(--s-2) var(--s-2) var(--s-3);
+  font-size: var(--t-xs);
+  line-height: var(--lh-snug);
+  color: var(--ink-faint);
+}
+
 /* La fiche du questionnaire, en tête du panneau de diffusion. Bande
    horizontale : c'est la forme que le pli demande — plus large que 1,21 fois
    sa hauteur — et c'est aussi celle d'une fiche qu'on pose sur une table. */
