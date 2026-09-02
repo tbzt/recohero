@@ -171,6 +171,7 @@
 /* --- La scène -------------------------------------------------------------
    Une seule vue à la fois, centrée verticalement quand la place le permet. */
 .stage {
+  position: relative;   /* ancre l'astuce posée, qui ne doit rien décaler */
   flex: 1;
   display: flex;
   align-items: center;
@@ -182,6 +183,26 @@
   overflow-x: clip;
 }
 .stage__inner { width: 100%; }
+
+/* UNE QUESTION NE SE CENTRE PAS, ELLE S'ANCRE.
+
+   Le centrage vertical est juste pour la couverture et le résultat, qu'on ne
+   voit qu'une fois chacun. Il est faux pour les questions, qu'on traverse par
+   dizaines : chaque écran a sa hauteur propre — un intitulé sur deux lignes
+   plutôt qu'une, trois options plutôt que quatre — et un contenu centré se
+   déplace de toute la moitié de cette différence. Mesuré sur ce parcours :
+   le titre descendait de 48 px entre la première question et la deuxième, et
+   frémissait de 2 à 6 px ensuite. La transition de vue faisait alors son
+   fondu entre deux positions différentes, ce qui se voit comme un
+   tressautement et non comme un feuilletage.
+
+   Ancrée en haut, la question ne bouge plus du tout : seules les options
+   changent, sous un titre immobile. Le supplément de marge remet le bloc à
+   peu près là où le centrage le posait, pour ne pas coller au bandeau. */
+.stage:has(.question) {
+  align-items: flex-start;
+  padding-block-start: var(--s-8);
+}
 
 /* --- Le passage d'un écran à l'autre ------------------------------------------
    Deux mécaniques, et la seconde est un supplément.
@@ -241,6 +262,45 @@ html.a-la-transition .view-enter { animation: none; }
 @keyframes entree-vue {
   from { opacity: 0; transform: translateX(calc(var(--sens, 1) * 26px)); }
 }
+
+/* --- Le partage ---------------------------------------------------------------
+   Une grille de destinations, pas une rangée de boutons de marque : ce sont
+   des liens ordinaires, sans script tiers ni pistage. La feuille du système
+   reste au-dessus quand elle existe — elle seule connaît ce qui est installé. */
+.partage__url {
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  word-break: break-all;
+  margin-bottom: var(--s-2);
+}
+.partage__grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: var(--s-2);
+  margin-block: var(--s-3);
+}
+.partage__cible {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-1);
+  min-height: var(--tap);
+  padding: var(--s-3) var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--t-sm);
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+.partage__cible:hover {
+  background: var(--surface-2);
+  border-color: var(--accent-line);
+}
+.partage__emoji { font-size: var(--t-lg); line-height: 1; }
 
 /* --- Écran de couverture -------------------------------------------------- */
 /* `isolation` n'est pas cosmétique ici : la lueur se pose en z-index négatif
@@ -523,6 +583,17 @@ html.a-la-transition .view-enter { animation: none; }
   color: var(--ink-faint);
   text-align: center;
 }
+/* Elle informe, elle ne structure pas : posée au bas de la scène, elle ne
+   participe plus à la hauteur de la question et ne peut plus la déplacer. */
+.astuce--pose {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--s-2);
+  margin: 0;
+  pointer-events: none;
+}
+
 .astuce__tactile { display: none; }
 @media (hover: none) {
   .astuce__clavier { display: none; }

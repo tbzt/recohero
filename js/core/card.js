@@ -6,14 +6,20 @@
    coûterait plus cher que ces deux cents lignes.
    ========================================================================== */
 
+import { encoder } from './qr.js';
+import { dessinerQR } from './affiche.js';
+
 const W = 1080;
 const H = 1350;
 const PAD = 88;
 
-/* La signature est ancrée en bas. Rien ne descend au-delà de cette ligne :
-   un profil au titre long fait sauter des recommandations, il ne se
-   superpose pas à la signature. */
-const FLOOR = H - PAD - 62;
+/* Le pied de carte : la marque du lieu, l'adresse du questionnaire et son QR.
+   Il occupait 62 px quand il ne portait qu'une signature ; il en prend 224
+   depuis qu'il porte de quoi refaire le parcours. Rien ne descend au-delà de
+   cette ligne : un profil au titre long fait sauter des recommandations, il
+   ne se superpose pas au pied. */
+const PIED = 224;
+const FLOOR = H - PAD - PIED;
 
 /* Palette figée : l'image exportée ne doit pas dépendre du thème de celui
    qui l'a générée. Seul l'accent du questionnaire la traverse.          */
@@ -116,7 +122,11 @@ function loadImage(src) {
   });
 }
 
-export async function renderResultCard(quiz, profile, scores) {
+/* `identite` est celle de l'espace, `url` l'adresse où refaire le parcours.
+   Les deux sont facultatives : un brouillon ouvert depuis un lien n'a ni
+   l'une ni l'autre, et la carte doit rester juste sans elles. */
+export async function renderResultCard(quiz, profile, scores, options = {}) {
+  const { identite = null, url = '' } = options;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -237,13 +247,51 @@ export async function renderResultCard(quiz, profile, scores) {
     }
   }
 
-  /* La signature, ancrée en bas quoi qu'il arrive au-dessus. */
-  ctx.font = sans(26, 600);
+  /* --- Le pied : à qui c'est, et comment le refaire ------------------------
+     C'est le seul objet du produit qui SORT du bâtiment. Il portait notre
+     marque et notre accroche — la médiathèque avait fait le travail, et la
+     carte qu'un lecteur envoie à trois amis nommait un outil que personne ne
+     connaît. Elle porte donc le nom du lieu quand il en a un, et le nôtre
+     seulement à défaut : la même règle de repli que le kiosque.
+
+     Et elle porte de quoi refaire le parcours. Une carte qui donne envie sans
+     dire où aller est une affiche sans adresse. */
+  const basPied = H - PAD - PIED;
+  const marque = identite?.titre?.trim();
+  const cote = 168;
+
+  let qr = null;
+  if (url) {
+    /* Une adresse trop longue pour un QR de ce format lève : un brouillon
+       voyage dans son lien et pèse des kilo-octets. On renonce au carré, pas
+       à la carte. */
+    try { qr = encoder(url); } catch { qr = null; }
+  }
+
+  const largeurTexte = (qr ? W - PAD * 2 - cote - 40 : W - PAD * 2);
+
+  ctx.fillStyle = mix(accent, PAPER, 0.35);
+  ctx.fillRect(PAD, basPied, W - PAD * 2, 2);
+
+  let yPied = basPied + 30;
+  ctx.font = sans(34, 700);
   ctx.fillStyle = accent;
-  ctx.fillText('✦ RecoHero', PAD, H - PAD - 34);
-  ctx.font = sans(26);
-  ctx.fillStyle = FAINT;
-  ctx.fillText('la reco dont vous êtes le héros', PAD + ctx.measureText('✦ RecoHero').width + 40, H - PAD - 34);
+  drawLines(ctx, wrap(ctx, marque ? `✦ ${marque}` : '✦ RecoHero', largeurTexte, 2), PAD, yPied, 42);
+  yPied += marque && wrap(ctx, `✦ ${marque}`, largeurTexte, 2).length > 1 ? 84 : 42;
+
+  if (url) {
+    ctx.font = sans(25);
+    ctx.fillStyle = MUTED;
+    ctx.fillText('Refaire le questionnaire :', PAD, yPied);
+    yPied += 34;
+    ctx.font = sans(25, 600);
+    ctx.fillStyle = FAINT;
+    /* Sans le protocole : ce n'est pas une adresse à recopier au clavier,
+       c'est un repère à reconnaître sous le carré qu'on va scanner. */
+    drawLines(ctx, wrap(ctx, url.replace(/^https?:\/\//, ''), largeurTexte, 2), PAD, yPied, 32);
+  }
+
+  if (qr) dessinerQR(ctx, qr.modules, qr.taille, W - PAD - cote, basPied + 28, cote);
 
   return canvas;
 }

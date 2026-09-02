@@ -79,7 +79,7 @@ function ecrire(ctx, lignes, x, y, interligne) {
    décoratifs : sans eux, un lecteur ne trouve pas les bords du symbole. On
    les dessine ici parce que qr.js rend une matrice nue — lui seul ne sait
    pas sur quel fond il atterrit. */
-function dessinerQR(ctx, matrice, taille, x, y, cote) {
+export function dessinerQR(ctx, matrice, taille, x, y, cote) {
   const SILENCE = 4;
   const modules = taille + SILENCE * 2;
   const pas = cote / modules;

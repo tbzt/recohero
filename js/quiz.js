@@ -6,9 +6,9 @@
    ========================================================================== */
 
 import { resolveQuiz, loadAll } from './core/catalog.js';
-import { vitrines as chargerVitrines, compterParcours, compterDebut } from './core/remote.js';
+import { vitrines as chargerVitrines, compterParcours, compterDebut, identite as chargerIdentite } from './core/remote.js';
 import { tally, resolve, proximite, indices } from './core/scoring.js';
-import { RECO_TYPES, slugify, dureeEstimee } from './core/schema.js';
+import { RECO_TYPES, slugify, dureeEstimee, normaliserIdentite } from './core/schema.js';
 import { questionView } from './core/views.js';
 import * as store from './core/store.js';
 import { linkFor } from './core/share.js';
@@ -23,6 +23,10 @@ const isEmbed = params.has('embed');
    voir § « Le mode borne » plus bas. */
 const isKiosque = params.has('kiosque');
 const espace = params.get('espace');
+
+/* L'apparence publique du lieu. Chargée à l'amorçage quand il y a un espace,
+   et seulement lue par la carte de résultat. */
+let identiteEspace = null;
 
 /* Le kiosque d'origine, celui du dépôt ou celui d'un espace : toute sortie
    doit y revenir, sinon le visiteur d'une médiathèque atterrit chez nous. */
@@ -67,6 +71,15 @@ async function boot() {
 
     state.quiz = quiz;
     if (espace && quiz.auteurs?.length) state.vitrines = await chargerVitrines(espace);
+    /* L'identité du lieu, pour la carte de résultat : c'est le seul objet du
+       produit qui sort du bâtiment, et il doit porter le nom de la
+       médiathèque. Lecture publique, comme au kiosque. Un échec ne coûte que
+       le repli sur notre marque — il n'empêche pas de répondre. */
+    if (espace) {
+      identiteEspace = await chargerIdentite(espace)
+        .then((brute) => normaliserIdentite(brute))
+        .catch(() => null);
+    }
     document.title = `${quiz.title} — RecoHero`;
     applyAccent(quiz.accent);
     dom.title.textContent = quiz.title;
@@ -423,8 +436,14 @@ function renderQuestion(question, index) {
      annonçait. Une mention sur la première question seulement : passé ce
      point, ou bien la personne s'en sert, ou bien elle a choisi de ne pas
      s'en servir — et la répéter serait du bruit. */
+  /* Hors du flux, et c'est tout l'objet du changement. Posée dans la colonne,
+     elle ajoutait 97 px à la seule première question : la vue étant centrée
+     verticalement, le titre descendait de 48 px en passant à la deuxième, et
+     la transition faisait son fondu entre deux positions différentes. C'est
+     ce saut qu'on voyait comme un tressautement. Elle se pose donc au bas de
+     la scène, où elle ne pousse rien. */
   if (index === 0) {
-    view.append(el('p', { class: 'astuce' }, [
+    view.append(el('p', { class: 'astuce astuce--pose' }, [
       el('span', { class: 'astuce__clavier', text: 'Touches 1 à 9 pour répondre, ← → pour naviguer' }),
       el('span', { class: 'astuce__tactile', text: 'Balayez pour passer d’une question à l’autre' }),
     ]));
@@ -801,14 +820,35 @@ function pick(button) {
     if (current.size) state.answers[question.id] = [...current];
     else delete state.answers[question.id];
     persist();
-    render();
-    /* Cocher fait voler les points ; décocher ne fait rien voler — on ne
-       met pas en scène un retrait. Le rendu a lieu avant, pour que le
-       bouton visé et le compteur soient à leur place définitive. */
+
+    /* Cocher une case n'est pas changer d'écran. Ici passait un `render()`
+       complet — donc `startViewTransition`, donc l'écran entier qui glisse de
+       26 px et se refond pour un ✓. C'était le geste le plus heurté du
+       parcours, et le seul où l'on coche plusieurs fois de suite.
+
+       On met à jour ce qui a changé, et rien d'autre : le bouton, son état
+       annoncé, et le libellé de validation qui dépend du nombre de coches. */
+    button.classList.toggle('is-picked', ajoute);
+    button.setAttribute('aria-pressed', String(ajoute));
     if (ajoute) {
-      const revenu = dom.stage.querySelector(`[data-option="${CSS.escape(optionId)}"]`);
-      if (revenu) envoler(revenu, gains);
+      button.classList.remove('is-confirmed');
+      void button.offsetWidth;          /* redémarre l'animation de confirmation */
+      button.classList.add('is-confirmed');
     }
+
+    const valider = dom.stage.querySelector('[data-act="next"]');
+    if (valider) {
+      const dernier = state.step + 1 === state.quiz.questions.length;
+      valider.textContent = current.size
+        ? (dernier ? 'Voir le résultat' : 'Suivant →')
+        : 'Choisissez au moins une réponse';
+      if (current.size) valider.removeAttribute('aria-disabled');
+      else valider.setAttribute('aria-disabled', 'true');
+    }
+    updateBar();
+
+    /* Décocher ne fait rien voler : on ne met pas en scène un retrait. */
+    if (ajoute) envoler(button, gains);
     return undefined;
   }
 
@@ -1029,22 +1069,100 @@ function postHeight() {
   window.parent.postMessage({ type: 'recohero:height', height }, EMBED_TARGET);
 }
 
-async function shareQuiz() {
-  /* Un questionnaire qui vit sur un serveur ou dans le dépôt se partage
-     par son adresse : elle reste courte, et elle suit les corrections.
-     Un brouillon local n'existe nulle part ailleurs : il voyage entier. */
+/* Un questionnaire qui vit sur un serveur ou dans le dépôt se partage par son
+   adresse : elle reste courte, et elle suit les corrections. Un brouillon
+   local n'existe nulle part ailleurs : il voyage entier, dans son lien. */
+async function adresseDuParcours() {
   const addressable = state.quiz.source === 'published' || state.quiz.source === 'remote';
-  const url = addressable
+  return addressable
     ? new URL(avecEspace(`quiz.html?q=${encodeURIComponent(state.quiz.id)}`, espace), location.href).toString()
-    : await linkFor(state.quiz);
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: state.quiz.title, url });
+    : linkFor(state.quiz);
+}
+
+async function shareQuiz() {
+  const url = await adresseDuParcours();
+  return menuPartage({ url, titre: state.quiz.title });
+}
+
+/* --- Le partage --------------------------------------------------------------
+   `navigator.share` est la bonne porte quand elle existe : elle ouvre la
+   feuille du système, qui connaît les applications réellement installées et
+   gère SMS, messageries et réseaux sans que nous ayons à les nommer. Elle
+   n'existe pas sur la plupart des navigateurs de bureau — et c'est là qu'on
+   partage un lien à ses collègues.
+
+   D'où les deux étages : la feuille du système en premier quand elle est là,
+   et des destinations nommées en dessous. On ne liste que ce qui s'ouvre par
+   une simple adresse : pas de script tiers, pas de bouton officiel, rien qui
+   pisterait le répondant. Un lien reste un lien.                          */
+const DESTINATIONS = [
+  { id: 'whatsapp', label: 'WhatsApp', emoji: '💬',
+    lien: (u, t) => `https://wa.me/?text=${encodeURIComponent(`${t} ${u}`)}` },
+  { id: 'sms', label: 'SMS', emoji: '✉️',
+    lien: (u, t) => `sms:?&body=${encodeURIComponent(`${t} ${u}`)}` },
+  { id: 'mail', label: 'Courriel', emoji: '📧',
+    lien: (u, t) => `mailto:?subject=${encodeURIComponent(t)}&body=${encodeURIComponent(`${t}\n\n${u}`)}` },
+  { id: 'facebook', label: 'Facebook', emoji: '🔵',
+    lien: (u) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(u)}` },
+  { id: 'x', label: 'X', emoji: '✖️',
+    lien: (u, t) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(t)}&url=${encodeURIComponent(u)}` },
+  { id: 'bluesky', label: 'Bluesky', emoji: '🦋',
+    lien: (u, t) => `https://bsky.app/intent/compose?text=${encodeURIComponent(`${t} ${u}`)}` },
+];
+
+function menuPartage({ url, titre, fichier = null }) {
+  const dialog = el('dialog', { class: 'modal partage' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Partager' }),
+      el('p', { class: 'partage__url', text: url.replace(/^https?:\/\//, '') }),
+
+      navigator.share && el('button', {
+        class: 'btn btn--primary btn--block', type: 'button', 'data-partage': 'systeme',
+        text: '⤴ Partager…',
+      }),
+
+      el('div', { class: 'partage__grille' }, DESTINATIONS.map((d) => el('a', {
+        class: 'partage__cible', href: d.lien(url, titre),
+        target: '_blank', rel: 'noopener noreferrer',
+      }, [
+        el('span', { class: 'partage__emoji', 'aria-hidden': 'true', text: d.emoji }),
+        el('span', { text: d.label }),
+      ]))),
+
+      el('button', {
+        class: 'btn btn--ghost btn--block', type: 'button', 'data-partage': 'copier',
+        text: '⧉ Copier le lien',
+      }),
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('span', { class: 'section__spacer' }),
+      el('button', { class: 'btn btn--quiet', type: 'button', 'data-partage': 'fermer', text: 'Fermer' }),
+    ]),
+  ]);
+
+  dialog.addEventListener('click', async (event) => {
+    /* Un lien de destination n'est pas une action : on le laisse s'ouvrir et
+       on referme derrière lui. */
+    if (event.target.closest('.partage__cible')) { dialog.close(); return; }
+    const action = event.target.closest('[data-partage]')?.dataset.partage;
+    if (!action) return;
+    if (action === 'systeme') {
+      try {
+        await navigator.share(fichier && navigator.canShare?.({ files: [fichier] })
+          ? { files: [fichier], title: titre, text: titre }
+          : { title: titre, url });
+      } catch { /* partage annulé : rien à signaler */ }
       return;
-    } catch { /* partage annulé : on retombe sur le presse-papier */ }
-  }
-  const ok = await copy(url);
-  toast(ok ? 'Lien copié.' : 'Copie impossible.', ok ? '' : 'danger');
+    }
+    if (action === 'copier') {
+      const ok = await copy(url);
+      toast(ok ? 'Lien copié.' : 'Copie impossible.', ok ? '' : 'danger');
+    }
+    dialog.close();
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
 /* La carte de résultat : on la montre avant de l'enregistrer. Sur mobile
@@ -1057,8 +1175,9 @@ async function showCard() {
 
   let canvas;
   let blob;
+  const url = await adresseDuParcours().catch(() => '');
   try {
-    canvas = await renderResultCard(state.quiz, profile, scores);
+    canvas = await renderResultCard(state.quiz, profile, scores, { identite: identiteEspace, url });
     blob = await toBlob(canvas);
   } catch (err) {
     return toast(`Carte impossible à produire : ${err.message}`, 'danger');
@@ -1066,7 +1185,6 @@ async function showCard() {
 
   const filename = `recohero-${slugify(profile.title, 'resultat')}.png`;
   const file = new File([blob], filename, { type: 'image/png' });
-  const canShareFile = Boolean(navigator.canShare?.({ files: [file] }));
 
   canvas.className = 'cardview__canvas';
   canvas.setAttribute('role', 'img');
@@ -1076,7 +1194,7 @@ async function showCard() {
     el('div', { class: 'modal__body' }, [canvas]),
     el('div', { class: 'modal__actions' }, [
       el('button', { class: 'btn btn--quiet', type: 'button', 'data-card': 'close', text: 'Fermer' }),
-      canShareFile && el('button', { class: 'btn btn--ghost', type: 'button', 'data-card': 'send', text: '⤴ Partager' }),
+      el('button', { class: 'btn btn--ghost', type: 'button', 'data-card': 'send', text: '⤴ Partager' }),
       el('button', { class: 'btn btn--primary', type: 'button', 'data-card': 'save', text: '↓ Enregistrer' }),
     ]),
   ]);
@@ -1089,9 +1207,11 @@ async function showCard() {
       toast('Carte enregistrée.');
     }
     if (action === 'send') {
-      try {
-        await navigator.share({ files: [file], title: profile.title, text: state.quiz.title });
-      } catch { /* partage annulé : rien à signaler */ }
+      /* Même menu que pour le questionnaire : la feuille du système quand elle
+         existe — c'est la seule qui sait envoyer l'IMAGE — et les destinations
+         nommées en dessous, qui ne portent que le lien. */
+      dialog.close();
+      menuPartage({ url, titre: `${profile.title} — ${state.quiz.title}`, fichier: file });
       return;
     }
     dialog.close();
