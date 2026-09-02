@@ -95,7 +95,7 @@ boot();
 
 async function boot() {
   for (const id of ['gate', 'gateForm', 'gatePass', 'shell', 'rail', 'panel',
-                    'quizName', 'saveStatus', 'topActions', 'tabbar']) {
+                    'quizName', 'saveStatus', 'topActions', 'tabbar', 'tabbarInner']) {
     dom[id] = document.getElementById(id);
   }
   state.espace = espaceCourant();
@@ -316,9 +316,21 @@ function renderTopbar() {
     dom.quizName.before(retour);
   }
   if (retour) retour.hidden = !dansUnQuiz;
-  /* Le verrou reste actif même sans questionnaire ouvert. */
+  /* « Tester » et « Diffuser » agissent sur le questionnaire ouvert. Au niveau
+     de l'espace il n'y en a pas, et ils restaient là, grisés : deux boutons
+     morts qui occupaient la moitié de la barre à l'écran d'accueil, et qui
+     lui donnaient l'air de porter des commandes sans objet.
+
+     Ils s'effacent plutôt qu'ils ne se grisent. Rien ne bouge en dessous : le
+     ressort de la barre les tient à droite, et l'aide comme le verrou — qui
+     valent à tous les niveaux — gardent leur place au bord. */
   for (const button of dom.topActions.querySelectorAll('[data-act="test"], [data-act="panel"]')) {
-    button.disabled = !state.quiz;
+    /* La VUE, et non la simple présence d'un questionnaire en mémoire :
+       remonter à l'espace n'en ferme aucun, et `state.quiz` reste donc garni.
+       Ces deux boutons appartiennent à l'écran d'un document, pas à celui du
+       lieu qui les contient. */
+    button.hidden = !dansUnQuiz;
+    button.disabled = !dansUnQuiz;
   }
 }
 
@@ -611,7 +623,7 @@ function renderTabbar(bySection) {
   dom.tabbar.classList.toggle('est-espace', state.vue === 'espace');
 
   if (state.vue === 'espace') {
-    dom.tabbar.replaceChildren(...ongletsEspace().map((o) => el('button', {
+    dom.tabbarInner.replaceChildren(...ongletsEspace().map((o) => el('button', {
       class: 'tab' + (state.ongletEspace === o.id ? ' is-active' : ''),
       type: 'button', 'data-act': 'onglet-espace', 'data-id': o.id,
       'aria-current': state.ongletEspace === o.id ? 'page' : null,
@@ -629,10 +641,10 @@ function renderTabbar(bySection) {
   }
 
   if (!state.quiz) {
-    dom.tabbar.replaceChildren();
+    dom.tabbarInner.replaceChildren();
     return;
   }
-  dom.tabbar.replaceChildren(...PANELS.map((panel) => el('button', {
+  dom.tabbarInner.replaceChildren(...PANELS.map((panel) => el('button', {
     class: 'tab' + (state.panel === panel.id ? ' is-active' : ''),
     type: 'button', 'data-act': 'panel', 'data-id': panel.id,
     'aria-current': state.panel === panel.id ? 'page' : null,

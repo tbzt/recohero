@@ -82,19 +82,32 @@
   position: sticky;
   top: 60px;
   z-index: var(--z-sticky);
-  gap: var(--s-1);
-  padding: var(--s-2) var(--s-4);
+  padding-block: var(--s-2);
   background: color-mix(in oklab, var(--bg) 92%, transparent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
   display: none;
 }
-.tabbar.est-espace { display: flex; }
-.tabbar:empty { display: none; }
+/* La bande traverse l'écran — c'est elle qui porte le fond et le filet, comme
+   celle du haut. La RANGÉE, elle, s'aligne sur le reste de la page.
+
+   Sans ce conteneur, les onglets se collaient au bord gauche de la fenêtre
+   pendant que la marque, le fil et le contenu commençaient 184 px plus loin,
+   dans leur colonne centrée. Deux pastilles dans un coin sous un bandeau
+   aligné : la seconde barre n'avait pas l'air de faire partie de la même
+   page. */
+.tabbar__inner {
+  display: flex;
+  gap: var(--s-1);
+}
+.tabbar.est-espace { display: block; }
+/* `:empty` ne peut plus rien voir : la bande contient toujours son conteneur.
+   C'est le conteneur qu'on regarde. */
+.tabbar:has(.tabbar__inner:empty) { display: none; }
 
 @media (max-width: 62rem) {
-  .tabbar { display: flex; }
-  .tabbar:empty { display: none; }
+  .tabbar { display: block; }
+  .tabbar:has(.tabbar__inner:empty) { display: none; }
   /* Le rail garde ses autres blocs, mais plus la navigation de section :
      elle ferait doublon avec les onglets, à un écran de distance. */
   .rail > div:has(.rail__item[data-act="panel"]) { display: none; }

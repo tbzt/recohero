@@ -88,7 +88,9 @@
   <!-- La barre d'onglets ne s'affiche qu'en dessous de 62rem, où le rail
        passe sous le panneau. Elle est dans le flux, pas dans le rail : elle
        doit rester en tête quand celui-ci descend. -->
-  <nav class="tabbar" id="tabbar" aria-label="Sections du questionnaire"></nav>
+  <nav class="tabbar" id="tabbar" aria-label="Sections du questionnaire">
+    <div class="page tabbar__inner" id="tabbarInner"></div>
+  </nav>
 
   <div class="page">
     <div class="admin-shell" id="shell" hidden>
