@@ -1836,7 +1836,12 @@ function contenuEquipe() {
     return el('div', { class: 'sheet__row' }, [
       el('span', { class: 'sheet__emoji', text: m.gerant ? '🔑' : '👤' }),
       el('span', { class: 'sheet__label' }, [
-        el('span', { text: (nom || m.uid) + (m.uid === moi ? ' — toi' : ''),
+        /* Vingt-huit caractères de monospace ne désignent personne, et cette
+           ligne est celle où l'on retire quelqu'un de l'espace. Six suffisent
+           à distinguer deux comptes dans une équipe de médiathèque ; le reste
+           est dans l'infobulle pour qui doit vraiment le lire. */
+        el('span', { text: (nom || `${m.uid.slice(0, 6)}…`) + (m.uid === moi ? ' — toi' : ''),
+          title: nom ? null : m.uid,
           style: nom ? '' : 'font-family:var(--font-mono);font-size:var(--t-xs)' }),
         p?.poste && el('span', { class: 'field__hint', style: { display: 'block' }, text: p.poste }),
         !p && el('span', { class: 'field__hint', style: { display: 'block' }, text: 'sans profil' }),
@@ -3338,13 +3343,18 @@ function oriGeometrie(L, H) {
    la découpe du morceau tranche donc la carte sur le pli, et chaque
    fragment part avec son volet. C'est la carte elle-même qui se plie —
    une feuille de papier qui la représenterait ne serait qu'une image. */
+/* Rend une promesse tenue quand le vol est fini et la carte rendue à l'écran.
+   Les trois sorties anticipées la rendent DÉJÀ TENUE : l'appelant attend ce
+   vol avant de redessiner, et une promesse jamais tenue — chez quelqu'un qui
+   a coupé les animations, sur une carte trop carrée — lui gèlerait le
+   panneau au lieu de lui épargner un mouvement. */
 function envolerLaFiche(carte) {
-  if (MOUVEMENT_REDUIT?.matches || !carte) return;
+  if (MOUVEMENT_REDUIT?.matches || !carte) return Promise.resolve();
 
   const rect = carte.getBoundingClientRect();
   const L = Math.round(rect.width);
   const H = Math.round(rect.height);
-  if (!L || !H) return;
+  if (!L || !H) return Promise.resolve();
 
   /* UNE FEUILLE SE PLIE DANS SA LONGUEUR, quelle que soit son orientation.
      Le pliage est décrit une seule fois, dans un repère toujours couché —
@@ -3359,7 +3369,7 @@ function envolerLaFiche(carte) {
   const debout = H > L;
   const Lw = debout ? H : L;
   const Lh = debout ? L : H;
-  if (Lw <= ORI_COT_225 * (Lh / 2)) return;   /* trop carrée pour ce pli */
+  if (Lw <= ORI_COT_225 * (Lh / 2)) return Promise.resolve();  /* trop carrée */
 
   const g = oriGeometrie(Lw, Lh);
 
@@ -3424,6 +3434,10 @@ function envolerLaFiche(carte) {
   /* L'origine du pli des coins dépend de la carte : elle se pose après
      coup, sur les deux volets. */
   document.body.append(couche);
+  /* La copie prend la place de l'original le temps du vol. Sans ça, on pliait
+     une feuille posée sur une carte restée visible : le pli se lisait comme
+     un repli sur soi, et non comme un départ. */
+  carte.classList.add('est-envolee');
   for (const coin of couche.querySelectorAll('.ori-coin')) {
     coin.style.transformOrigin = g.origineCoin;
   }
@@ -3434,10 +3448,22 @@ function envolerLaFiche(carte) {
      une animation ne progresse pas dans un onglet qui ne compose pas, et
      sa promesse ne se résoudrait alors jamais. */
   const feuille = couche.querySelector('.ori-feuille');
-  let retiree = false;
-  const retirer = () => { if (retiree) return; retiree = true; clearTimeout(secours); couche.remove(); };
-  const secours = setTimeout(retirer, 6000);
-  feuille.getAnimations?.().forEach((a) => a.finished.then(retirer, retirer));
+  return new Promise((fini) => {
+    let retiree = false;
+    const retirer = () => {
+      if (retiree) return;
+      retiree = true;
+      clearTimeout(secours);
+      /* La carte revient AVANT que la promesse soit tenue : si la publication
+         échoue après l'envol, le panneau n'est jamais redessiné, et une carte
+         restée invisible serait un écran mort. */
+      carte.classList.remove('est-envolee');
+      couche.remove();
+      fini();
+    };
+    const secours = setTimeout(retirer, 6000);
+    feuille.getAnimations?.().forEach((a) => a.finished.then(retirer, retirer));
+  });
 }
 
 /* --- L'assistant de création ---------------------------------------------------
@@ -3705,13 +3731,19 @@ async function publishRemote() {
        redessine le panneau, et le geste doit accompagner la publication,
        pas la rattraper une seconde plus tard.
 
+       Mais le redessin, lui, doit ATTENDRE la fin du vol. `refreshEspace()`
+       enchaîne huit allers-retours, puis `repaint()` remplace le panneau —
+       une carte neuve et pleinement visible réapparaissait donc au milieu
+       d'une animation de 2,6 s, ce qu'aucun masquage au départ ne pouvait
+       rattraper. Le réseau court pendant le vol, seul le redessin patiente,
+       et le bandeau de confirmation ne fait attendre personne.
+
        C'est la carte qui porte le bouton qui s'envole — celle qui parle de
-       l'espace où l'on vient de publier. La surcouche en est un calque posé
-       à sa place exacte : le panneau peut se redessiner dessous, elle ne
-       bouge pas, et l'original réapparaît à mesure que la copie s'éloigne. */
-    envolerLaFiche(dom.panel.querySelector('[data-act="remote-publish"]')?.closest('.card'));
+       l'espace où l'on vient de publier. */
+    const envol = envolerLaFiche(dom.panel.querySelector('[data-act="remote-publish"]')?.closest('.card'));
     await refreshEspace();
     toast(`« ${state.quiz.title} » est en ligne dans l’espace.`);
+    await envol;
     repaint();
   } catch (err) {
     if (err.name === 'ConflitError') return resoudreConflit(err.distant);

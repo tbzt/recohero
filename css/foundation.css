@@ -178,6 +178,16 @@
     --ink-faint:  #9E9083;
 
     --accent: #F0714F;
+    /* L'accent s'éclaircit ici pour tenir sur un fond sombre. L'encre qui se
+       pose DESSUS doit donc faire le chemin inverse — restée blanche, elle
+       donnait 2,9:1 sur cet orange, sous le seuil de 4,5, sur tout bouton
+       primaire et sur l'onglet actif. En noir : 6,5:1.
+
+       Le thème sombre EXPLICITE n'a jamais eu ce défaut : il ne redéfinit pas
+       --accent et garde le rouge foncé du thème clair, sur lequel le blanc
+       tient. Les deux sombres n'ont donc pas la même palette d'accent — ça
+       reste à trancher, mais ça ne se paie plus en lisibilité. */
+    --accent-ink: #14100D;
     --danger:  #F2776C;
     --warning: #E0A22E;
     --success: #4ADE80;

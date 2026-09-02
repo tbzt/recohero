@@ -142,8 +142,6 @@
 .tab__emoji { font-size: var(--t-base); line-height: 1; }
 
 .tab.is-active {
-  flex: 1 1 auto;
-  min-width: 0;
   padding-inline: var(--s-3);
   background: var(--accent);
   border-color: var(--accent);
@@ -159,8 +157,17 @@
 
 @media (max-width: 62rem) {
   /* Le repli étroit : les libellés s'effacent, l'actif garde le sien par la
-     spécificité de la règle ci-dessus. */
+     spécificité de la règle ci-dessus.
+
+     C'est ICI, et seulement ici, que l'onglet actif s'étire : il est le seul
+     à porter du texte, il lui faut la place. Cette paire de règles vivait
+     hors de toute media query alors que la barre s'affiche à toute largeur
+     au niveau de l'espace — sur un écran de bureau, la pilule active
+     absorbait donc toute la largeur restante à côté de quatre pastilles.
+     Le commentaire d'en-tête décrivait déjà pourquoi ça ne convenait pas
+     au grand écran ; la règle, elle, n'avait pas suivi. */
   .tab__label { display: none; }
+  .tab.is-active { flex: 1 1 auto; min-width: 0; }
 }
 /* --- La répartition des profils, dans la fréquentation -----------------------
    Une petite jauge par profil, sous la ligne du questionnaire. Elle se mesure
@@ -1062,7 +1069,13 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   color: var(--ink);
   transition: background var(--dur-fast) var(--ease-out);
 }
-.sheet__row:hover { background: var(--surface-2); }
+/* Le survol est une promesse de clic, et il ne doit se poser que sur les
+   lignes qui la tiennent. La règle valait pour toutes : les <div> inertes de
+   l'équipe, des files d'attente, de la corbeille et des raccourcis clavier
+   s'allumaient au passage de la souris sans rien faire. Restent les lignes
+   qui sont vraiment un bouton (la feuille des questionnaires) ou un label
+   qui coche (les recos qu'on crédite). */
+.sheet__row:is(button, label):hover { background: var(--surface-2); }
 .sheet__row.is-active {
   background: var(--accent-soft);
   border-color: var(--accent-line);
@@ -1213,6 +1226,13 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
    découpe tranche : c'est la carte elle-même qui se plie, pas une feuille
    qui la représente. Le fond reste peint dessous, pour que le verso d'un
    volet retourné ne soit pas transparent. */
+/* La carte réelle, le temps du vol. Sans elle, on pliait une copie POSÉE SUR
+   son original resté visible : la feuille semblait se replier sur elle-même
+   au lieu de quitter la table. `visibility` plutôt que `display` — la boîte
+   reste, donc rien ne saute autour. Le repli est rendu à la fin du vol, ce
+   qui laisse la carte revenir si la publication échoue avant le redessin. */
+.est-envolee { visibility: hidden; }
+
 .ori-papier { position: absolute; inset: 0; background: var(--surface); overflow: hidden; }
 .ori-copie { position: absolute; left: 0; }
 .ori-copie > * { margin: 0 !important; }
