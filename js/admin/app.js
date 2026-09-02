@@ -95,7 +95,7 @@ boot();
 
 async function boot() {
   for (const id of ['gate', 'gateForm', 'gatePass', 'shell', 'rail', 'panel',
-                    'quizName', 'saveStatus', 'topActions', 'tabbar', 'tabbarInner']) {
+                    'quizName', 'saveStatus', 'topActions', 'tabbar']) {
     dom[id] = document.getElementById(id);
   }
   state.espace = espaceCourant();
@@ -621,9 +621,16 @@ function renderTabbar(bySection) {
      écran : le rail y est masqué, ils sont la seule navigation. Le CSS a
      besoin de le savoir pour les afficher à toute largeur. */
   dom.tabbar.classList.toggle('est-espace', state.vue === 'espace');
+  /* Le nom du repère suivait les onglets, pas la vue : au niveau de l'espace,
+     la barre navigue entre Questionnaires, Vitrine, Fréquentation et Équipe
+     sous une étiquette qui annonçait des sections de questionnaire. C'est le
+     seul repère de navigation de cet écran, et on le sautait en le lisant. */
+  dom.tabbar.setAttribute('aria-label', state.vue === 'espace'
+    ? `Sections de ${nomDeLEspace()}`
+    : 'Sections du questionnaire');
 
   if (state.vue === 'espace') {
-    dom.tabbarInner.replaceChildren(...ongletsEspace().map((o) => el('button', {
+    dom.tabbar.replaceChildren(...ongletsEspace().map((o) => el('button', {
       class: 'tab' + (state.ongletEspace === o.id ? ' is-active' : ''),
       type: 'button', 'data-act': 'onglet-espace', 'data-id': o.id,
       'aria-current': state.ongletEspace === o.id ? 'page' : null,
@@ -641,10 +648,10 @@ function renderTabbar(bySection) {
   }
 
   if (!state.quiz) {
-    dom.tabbarInner.replaceChildren();
+    dom.tabbar.replaceChildren();
     return;
   }
-  dom.tabbarInner.replaceChildren(...PANELS.map((panel) => el('button', {
+  dom.tabbar.replaceChildren(...PANELS.map((panel) => el('button', {
     class: 'tab' + (state.panel === panel.id ? ' is-active' : ''),
     type: 'button', 'data-act': 'panel', 'data-id': panel.id,
     'aria-current': state.panel === panel.id ? 'page' : null,

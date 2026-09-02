@@ -65,6 +65,13 @@
         <span>RecoHero</span>
       </a>
       <button class="topbar__doc" id="quizName" type="button" data-act="quiz-menu"></button>
+      <!-- Les onglets vivent DANS le bandeau, à un seul endroit du document.
+           Au large ils tiennent sur la même ligne que le reste ; sous 62rem
+           ils passent à la ligne suivante — même bandeau, deux rangées. Les
+           déplacer d'un conteneur à l'autre selon la largeur aurait demandé
+           deux emplacements à tenir d'accord, ce qui est exactement la panne
+           du commit b0d6ff1. -->
+      <nav class="tabbar" id="tabbar" aria-label="Sections du questionnaire"></nav>
       <span class="topbar__spacer"></span>
       <span class="status" id="saveStatus"></span>
       <span class="topbar__actions" id="topActions">
@@ -84,13 +91,6 @@
       </span>
     </div>
   </header>
-
-  <!-- La barre d'onglets ne s'affiche qu'en dessous de 62rem, où le rail
-       passe sous le panneau. Elle est dans le flux, pas dans le rail : elle
-       doit rester en tête quand celui-ci descend. -->
-  <nav class="tabbar" id="tabbar" aria-label="Sections du questionnaire">
-    <div class="page tabbar__inner" id="tabbarInner"></div>
-  </nav>
 
   <div class="page">
     <div class="admin-shell" id="shell" hidden>

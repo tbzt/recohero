@@ -78,36 +78,34 @@
    chemin vers l'équipe, la vitrine ou la fréquentation. Les onglets étaient
    bien dans le document, et un clic par script les atteignait ; ils étaient
    simplement invisibles. */
-.tabbar {
-  position: sticky;
-  top: 60px;
-  z-index: var(--z-sticky);
-  padding-block: var(--s-2);
-  background: color-mix(in oklab, var(--bg) 92%, transparent);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--line);
-  display: none;
-}
-/* La bande traverse l'écran — c'est elle qui porte le fond et le filet, comme
-   celle du haut. La RANGÉE, elle, s'aligne sur le reste de la page.
+/* Elle n'est plus une bande : elle est une rangée DANS le bandeau du haut.
 
-   Sans ce conteneur, les onglets se collaient au bord gauche de la fenêtre
-   pendant que la marque, le fil et le contenu commençaient 184 px plus loin,
-   dans leur colonne centrée. Deux pastilles dans un coin sous un bandeau
-   aligné : la seconde barre n'avait pas l'air de faire partie de la même
-   page. */
-.tabbar__inner {
-  display: flex;
+   Deux barres empilées prenaient 122 px de hauteur sur l'écran d'accueil pour
+   porter, en tout, un nom de lieu et quatre onglets. Fondues, elles tiennent
+   sur une ligne au large — et sous 62 rem, où la place manque, la rangée
+   passe simplement à la ligne suivante du MÊME bandeau.
+
+   Un seul emplacement dans le document, quelle que soit la largeur. Les
+   déplacer d'un conteneur à l'autre selon l'écran aurait demandé deux
+   emplacements tenus d'accord : c'est exactement la panne du commit b0d6ff1,
+   où les onglets existaient, répondaient au clic par script, et n'étaient
+   simplement pas visibles. */
+.tabbar {
+  display: none;
   gap: var(--s-1);
+  min-width: 0;
 }
-.tabbar.est-espace { display: block; }
-/* `:empty` ne peut plus rien voir : la bande contient toujours son conteneur.
-   C'est le conteneur qu'on regarde. */
-.tabbar:has(.tabbar__inner:empty) { display: none; }
+.tabbar.est-espace { display: flex; }
+.tabbar:empty { display: none; }
 
 @media (max-width: 62rem) {
-  .tabbar { display: block; }
-  .tabbar:has(.tabbar__inner:empty) { display: none; }
+  .tabbar { display: flex; }
+  .tabbar:empty { display: none; }
+  /* La rangée descend d'un cran. `order` la fait passer APRÈS les actions —
+     sans quoi, occupant toute la largeur, elle chasserait le reste de la
+     barre sur une troisième ligne. */
+  .topbar__inner { flex-wrap: wrap; }
+  .tabbar { order: 1; flex-basis: 100%; }
   /* Le rail garde ses autres blocs, mais plus la navigation de section :
      elle ferait doublon avec les onglets, à un écran de distance. */
   .rail > div:has(.rail__item[data-act="panel"]) { display: none; }
