@@ -160,6 +160,22 @@ function render() {
   const nettoyer = () => {
     if (transitionEnCours !== geste) return;
     transitionEnCours = null;
+
+    /* L'ORDRE EST LE SUJET. `html.a-la-transition` neutralise l'animation
+       d'entrée maison le temps que la transition de vue fasse son travail —
+       les deux se superposeraient. Mais la classe `view-enter`, elle, restait
+       sur l'écran une fois celui-ci posé : retirer `a-la-transition`
+       RÉVEILLAIT donc `view-in` sur un contenu déjà arrivé et immobile.
+
+       Chaque question se terminait ainsi par une seconde animation de 460 ms —
+       opacité ramenée à zéro, glissement de 22 px — juste après la transition
+       de 240 ms qui venait de la poser. C'était ça, le tressautement : pas un
+       défaut de la transition, mais une animation de trop derrière elle.
+
+       On désarme donc l'élément AVANT de rendre la main au CSS. */
+    for (const vue of dom.stage.querySelectorAll('.view-enter')) {
+      vue.classList.remove('view-enter', 'view-enter--back');
+    }
     document.documentElement.classList.remove('a-la-transition');
   };
 
