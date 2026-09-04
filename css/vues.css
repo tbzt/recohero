@@ -31,9 +31,16 @@
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-1);
 }
+/* Le titre porte la police d'affichage lui-même : dans l'aperçu du
+   backoffice il est un <p>, pas un <h1>, et sans ceci il tombait en sans. */
 .question__text {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.015em;
+  text-wrap: balance;
   font-size: clamp(var(--t-xl), 4.6vw, var(--t-3xl));
-  margin-bottom: var(--s-3);
+  margin: 0 0 var(--s-3);
 }
 .question__hint {
   color: var(--ink-muted);
@@ -62,7 +69,7 @@
   line-height: var(--lh-snug);
   transition: border-color var(--dur-fast) var(--ease-out),
               background var(--dur-fast) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out),
+              transform var(--dur-press) var(--spring),
               box-shadow var(--dur-fast) var(--ease-out);
 }
 .option:hover {
@@ -70,7 +77,8 @@
   background: var(--surface-2);
   transform: translateX(3px);
 }
-.option:active { transform: translateX(1px) scale(0.995); }
+/* L'enfoncement, sur le ressort : c'est le geste le plus répété du produit. */
+.option:active { transform: translateX(1px) scale(0.98); }
 
 .option.is-picked {
   border-color: var(--accent);

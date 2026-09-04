@@ -97,10 +97,10 @@ export function toast(message, options = '') {
     if (closed) return;
     closed = true;
     clearTimeout(timer);
-    node.style.transition = 'opacity 200ms, transform 200ms';
-    node.style.opacity = '0';
-    node.style.transform = 'translateY(6px)';
-    setTimeout(() => node.remove(), 220);
+    /* Le geste de sortie est en CSS (.est-partie) : un style en ligne
+       ignorait les jetons de mouvement, mouvement réduit compris. */
+    node.classList.add('est-partie');
+    setTimeout(() => node.remove(), 260);
   };
 
   toastHost.append(node);

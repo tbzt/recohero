@@ -25,11 +25,16 @@
   transition: background var(--dur-fast) var(--ease-out),
               border-color var(--dur-fast) var(--ease-out),
               color var(--dur-fast) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out),
+              transform var(--dur-press) var(--spring),
               box-shadow var(--dur-fast) var(--ease-out);
 }
 .btn:hover { background: var(--bg-sunk); }
-.btn:active { transform: translateY(1px); }
+/* --- L'enfoncement ------------------------------------------------------------
+   Tout ce qui se presse s'enfonce un peu et revient sur le ressort : bouton,
+   réponse, vignette, ligne de navigation, onglet. Une seule règle, une seule
+   physique. `translateY(1px)` ne se voyait pas ; une échelle se sent. */
+.btn:active { transform: scale(0.96); }
+.btn--icon:active { transform: scale(0.9); }
 .btn[disabled], .btn[aria-disabled="true"] {
   opacity: 0.45;
   pointer-events: none;
@@ -306,6 +311,13 @@
   animation: toast-in var(--dur-base) var(--ease-spring);
 }
 .toast--danger { background: var(--danger); color: #fff; }
+/* La sortie : ui.js pose la classe, le CSS fait le geste. */
+.toast.est-partie {
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+  transition: opacity var(--dur-base) var(--ease-out),
+              transform var(--dur-base) var(--ease-out);
+}
 
 /* Un bandeau porteur d'action doit être cliquable : l'hôte, lui, reste
    transparent aux clics pour ne pas masquer la page derrière. */
@@ -365,9 +377,28 @@
 }
 .modal[open] .modal__body { overflow-y: auto; min-height: 0; }
 .modal[open] .modal__actions { flex: none; }
+/* L'entrée. Une fenêtre arrivait d'un coup, comme un `alert()`. Elle monte
+   maintenant de douze pixels sur le ressort et le fond s'assombrit avec
+   elle. `@starting-style` donne la valeur de départ au moment où `[open]`
+   apparaît ; un navigateur qui ne le connaît pas affiche la fenêtre
+   directement, comme avant. La sortie reste immédiate : les fenêtres sont
+   retirées du document à la fermeture, et c'est le bon moment pour partir. */
+.modal[open] {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--dur-base) var(--ease-out),
+              transform var(--dur-slow) var(--spring);
+}
+@starting-style {
+  .modal[open] { opacity: 0; transform: translateY(12px) scale(0.98); }
+}
 .modal::backdrop {
   background: rgba(20, 14, 10, 0.5);
   backdrop-filter: blur(3px);
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+@starting-style {
+  .modal[open]::backdrop { opacity: 0; }
 }
 .modal__body { padding: var(--s-5); }
 .modal__actions {
@@ -419,6 +450,26 @@
   background: color-mix(in oklab, var(--bg) 88%, transparent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
+}
+/* --- Le flou progressif ---------------------------------------------------------
+   Sous un bandeau collant, le contenu passait d'un coup de net à flou, sur
+   une ligne : une vitre posée sur la page. Une bande de dix-huit pixels
+   prolonge le flou sous le bord et s'efface en dégradé, ce qui donne à la
+   barre une épaisseur au lieu d'une arête. Elle passe derrière le contenu
+   du bandeau (`z-index: -1` dans son propre contexte) pour ne rien flouter
+   de ce qu'il porte, la barre de progression comprise. */
+.topbar, .quizbar { isolation: isolate; }
+.topbar::after, .quizbar::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  top: 100%;
+  height: 18px;
+  z-index: -1;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent);
+  mask-image: linear-gradient(to bottom, black, transparent);
 }
 .topbar__inner {
   display: flex;

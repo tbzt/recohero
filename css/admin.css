@@ -436,6 +436,14 @@
               color var(--dur-fast) var(--ease-out);
 }
 .rail__item:hover { background: var(--surface-2); color: var(--ink); }
+/* La même physique que les boutons : ce qui se presse s'enfonce. */
+.rail__item, .tab, .sheet__row:is(button, label), .symbole, .swatch {
+  transition-property: background, border-color, color, transform;
+  transition-duration: var(--dur-fast), var(--dur-fast), var(--dur-fast), var(--dur-press);
+  transition-timing-function: var(--ease-out), var(--ease-out), var(--ease-out), var(--spring);
+}
+.rail__item:active, .tab:active, .sheet__row:is(button, label):active, .symbole:active { transform: scale(0.97); }
+.swatch:active { transform: scale(0.95); }
 .rail__item.is-active {
   background: var(--accent-soft);
   border-color: var(--accent-line);
