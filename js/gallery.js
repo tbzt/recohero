@@ -5,7 +5,7 @@
 import { loadAll } from './core/catalog.js';
 import * as store from './core/store.js';
 import { identite as chargerIdentite, presentation as chargerPresentation } from './core/remote.js';
-import { normaliserIdentite, normaliserPresentation, grouperLaVitrine } from './core/schema.js';
+import { normaliserIdentite, normaliserPresentation, grouperLaVitrine, dureeEstimee } from './core/schema.js';
 import { el, formatDate, toast, espaceCourant, avecEspace, garderEspace, applyAccent } from './core/ui.js';
 
 /* L'espace vient de l'adresse, jamais du code : une même page sert le
@@ -241,9 +241,12 @@ function card(quiz, alaune = false, retard = 0) {
     el('div', { class: 'quiz-card__axes', 'aria-hidden': 'true' },
       quiz.axes.map((a) => el('span', { class: 'glyph', style: { '--axis': a.color }, text: a.glyph }))),
     el('div', { class: 'quiz-card__foot' }, [
+      /* La durée d'abord : « huit questions » ne dit pas si on a le temps,
+         et c'est ce que se demande quelqu'un qui hésite devant une vignette
+         — la couverture le dit déjà, la vignette le disait après coup. */
       quiz.source === 'draft'
         ? el('span', { class: 'pill pill--warn', text: 'Brouillon local' })
-        : el('span', { text: `${questions} question${questions > 1 ? 's' : ''}` }),
+        : el('span', { text: `${dureeEstimee(quiz)} min · ${questions} question${questions > 1 ? 's' : ''}` }),
       el('span', { class: 'quiz-card__go', text: 'Commencer →' }),
     ]),
   ]);

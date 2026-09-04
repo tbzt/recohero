@@ -1,0 +1,119 @@
+/* ==========================================================================
+   RecoHero — vues.css — la vue d'une question.
+   Chargée par le parcours ET par le backoffice : views.js promet que
+   l'aperçu de l'éditeur est le même rendu que le parcours, et cette
+   promesse ne tient que si les deux pages lisent la même feuille. Elle
+   vivait dans quiz.css, que le backoffice ne charge pas — l'aperçu y
+   affichait les réponses en texte nu.
+   Ce qui est propre au parcours (mode borne, mention des gestes, barre de
+   navigation) reste dans quiz.css.
+   ========================================================================== */
+
+/* --- Question -------------------------------------------------------------- */
+.question { max-width: var(--content); margin-inline: auto; }
+.question__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--t-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: var(--s-3);
+}
+.question__image {
+  width: 100%;
+  max-height: 30vh;
+  aspect-ratio: 16 / 7;
+  object-fit: cover;
+  margin-bottom: var(--s-4);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+}
+.question__text {
+  font-size: clamp(var(--t-xl), 4.6vw, var(--t-3xl));
+  margin-bottom: var(--s-3);
+}
+.question__hint {
+  color: var(--ink-muted);
+  font-size: var(--t-md);
+  margin-bottom: var(--s-5);
+}
+
+.options {
+  display: grid;
+  gap: var(--s-3);
+  margin-bottom: var(--s-6);
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  width: 100%;
+  min-height: 62px;
+  padding: var(--s-3) var(--s-4);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  font-size: var(--t-md);
+  line-height: var(--lh-snug);
+  transition: border-color var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+.option:hover {
+  border-color: var(--accent-line);
+  background: var(--surface-2);
+  transform: translateX(3px);
+}
+.option:active { transform: translateX(1px) scale(0.995); }
+
+.option.is-picked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.option.is-confirmed {
+  animation: option-confirm var(--dur-base) var(--ease-spring);
+}
+@keyframes option-confirm {
+  50% { transform: scale(1.015); }
+}
+
+.option__key {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  transition: inherit;
+}
+.option.is-picked .option__key {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+@media (hover: none) {
+  .option__key { display: none; }
+}
+.option__emoji { flex: none; font-size: var(--t-lg); line-height: 1; }
+.option__thumb {
+  flex: none;
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+/* Une réponse illustrée mérite plus d'air qu'une réponse en texte seul. */
+.option:has(.option__thumb) { min-height: 74px; }
+.option__text { flex: 1; min-width: 0; }

@@ -615,9 +615,13 @@ function renderResult() {
     /* Rempli après coup, quand le catalogue a répondu — voir `suite()`. */
     el('section', { class: 'suite' }),
 
-    el('div', { class: 'result__actions' }, [
+    /* Deux rangées : ce qu'on emporte (la carte, le partage), puis ce qu'on
+       fait ensuite. Sur téléphone la première colle au bas de l'écran. */
+    el('div', { class: 'result__actions result__actions--primaires' }, [
       el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'card', text: '🖼 Ma carte de résultat' }),
       el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'share', text: '⤴ Partager ce questionnaire' }),
+    ]),
+    el('div', { class: 'result__actions result__actions--suite' }, [
       el('button', { class: 'btn btn--quiet', type: 'button', 'data-act': 'restart', text: '↺ Refaire' }),
       /* `isKiosque` autant qu'`isEmbed`. Sur une borne, le bandeau a perdu
          sa sortie (`wireKiosque`), mais celle-ci restait — et `avecEspace()`

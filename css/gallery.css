@@ -54,16 +54,8 @@
 }
 
 .section { padding-block: var(--s-5) var(--s-7); }
-.section__head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s-3);
-  margin-bottom: var(--s-5);
-  padding-bottom: var(--s-3);
-  border-bottom: 1px solid var(--line);
-}
-.section__head h2 { font-size: var(--t-xl); }
-.section__spacer { flex: 1; }
+/* `.section__head` et `.section__spacer` : dans components.css. Le
+   backoffice les utilise aussi, et il ne charge pas cette feuille. */
 
 /* --- Grille de questionnaires --------------------------------------------- */
 .quiz-grid {

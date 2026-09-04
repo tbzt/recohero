@@ -252,6 +252,21 @@
   transition: width var(--dur-slow) var(--ease-out);
 }
 
+/* --- Tête de section ---------------------------------------------------------
+   Un titre, un ressort, et ce qu'on veut poser à droite : compteur, bouton.
+   Elle vivait dans gallery.css ; le backoffice l'appelle cinq fois sans
+   charger cette feuille, et « + Nouveau » tombait sous « Mes brouillons ». */
+.section__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  margin-bottom: var(--s-5);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+}
+.section__head h2 { font-size: var(--t-xl); }
+.section__spacer { flex: 1; }
+
 /* --- État vide ------------------------------------------------------------ */
 .empty {
   padding: var(--s-7) var(--s-5);

@@ -474,114 +474,7 @@ html.a-la-transition .view-enter { animation: none; }
 .is-kiosque [data-act="card"],
 .is-kiosque [data-act="share"] { display: none; }
 
-/* --- Question -------------------------------------------------------------- */
-.question { max-width: var(--content); margin-inline: auto; }
-.question__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  font-size: var(--t-xs);
-  font-weight: var(--fw-medium);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-bottom: var(--s-3);
-}
-.question__image {
-  width: 100%;
-  max-height: 30vh;
-  aspect-ratio: 16 / 7;
-  object-fit: cover;
-  margin-bottom: var(--s-4);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-1);
-}
-.question__text {
-  font-size: clamp(var(--t-xl), 4.6vw, var(--t-3xl));
-  margin-bottom: var(--s-3);
-}
-.question__hint {
-  color: var(--ink-muted);
-  font-size: var(--t-md);
-  margin-bottom: var(--s-5);
-}
-
-.options {
-  display: grid;
-  gap: var(--s-3);
-  margin-bottom: var(--s-6);
-}
-.option {
-  display: flex;
-  align-items: center;
-  gap: var(--s-4);
-  width: 100%;
-  min-height: 62px;
-  padding: var(--s-3) var(--s-4);
-  text-align: left;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  color: var(--ink);
-  font-size: var(--t-md);
-  line-height: var(--lh-snug);
-  transition: border-color var(--dur-fast) var(--ease-out),
-              background var(--dur-fast) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-fast) var(--ease-out);
-}
-.option:hover {
-  border-color: var(--accent-line);
-  background: var(--surface-2);
-  transform: translateX(3px);
-}
-.option:active { transform: translateX(1px) scale(0.995); }
-
-.option.is-picked {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-.option.is-confirmed {
-  animation: option-confirm var(--dur-base) var(--ease-spring);
-}
-@keyframes option-confirm {
-  50% { transform: scale(1.015); }
-}
-
-.option__key {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--line-strong);
-  font-family: var(--font-mono);
-  font-size: var(--t-xs);
-  color: var(--ink-faint);
-  transition: inherit;
-}
-.option.is-picked .option__key {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-@media (hover: none) {
-  .option__key { display: none; }
-}
-.option__emoji { flex: none; font-size: var(--t-lg); line-height: 1; }
-.option__thumb {
-  flex: none;
-  width: 54px;
-  height: 54px;
-  object-fit: cover;
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
-}
-/* Une réponse illustrée mérite plus d'air qu'une réponse en texte seul. */
-.option:has(.option__thumb) { min-height: 74px; }
-.option__text { flex: 1; min-width: 0; }
+/* --- Question : voir css/vues.css, partagée avec le backoffice --- */
 
 /* La mention des gestes. Elle dit au doigt ce qui vaut au doigt, et au
    clavier ce qui vaut au clavier : annoncer des touches à quelqu'un qui
@@ -615,6 +508,14 @@ html.a-la-transition .view-enter { animation: none; }
   gap: var(--s-3);
 }
 .navrow__spacer { flex: 1; }
+
+/* Le titre de chaque écran reçoit le focus au changement de vue (quiz.js),
+   pour que la synthèse vocale le lise. Après une réponse au clavier, le
+   navigateur tient ce focus pour « visible » et peignait l'anneau global
+   autour de la question : huit cadres pour huit questions, et un titre qui
+   avait l'air d'un champ. Un titre n'est pas un contrôle. Le focus reste,
+   l'anneau s'en va. */
+.stage h1[tabindex="-1"]:focus-visible { outline: none; }
 
 /* --- Résultat --------------------------------------------------------------- */
 .result { max-width: var(--content); margin-inline: auto; }
@@ -1034,6 +935,38 @@ html.a-la-transition .view-enter { animation: none; }
   padding-top: var(--s-5);
   border-top: 1px solid var(--line);
 }
+/* La seconde rangée suit la première sans refaire le filet. */
+.result__actions--suite { margin-top: var(--s-3); padding-top: 0; border-top: none; }
+/* Les deux gestes qui font revenir — la carte et le partage — vivaient au
+   bout de trois écrans de défilement. Sur téléphone ils collent au bas de
+   la fenêtre, dans la zone du pouce ; refaire et sortir restent en pied de
+   page, où l'on va quand on a fini. */
+@media (max-width: 34rem) {
+  .result__actions--primaires {
+    position: sticky;
+    bottom: 0;
+    z-index: var(--z-raised);
+    flex-wrap: nowrap;
+    margin: var(--s-6) calc(var(--s-4) * -1) 0;
+    padding: var(--s-3) var(--s-4) calc(var(--s-3) + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: color-mix(in oklab, var(--bg) 92%, transparent);
+    backdrop-filter: blur(12px);
+  }
+  /* Deux boutons dans 375 px : le libellé passe à la ligne plutôt que de
+     sortir du bouton. */
+  .result__actions--primaires .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: var(--s-2);
+    white-space: normal;
+    font-size: var(--t-sm);
+    line-height: 1.15;
+  }
+  .result__actions--suite { margin-top: var(--s-4); }
+}
+/* Sur une borne, ces deux gestes n'existent pas : la barre non plus. */
+.is-kiosque .result__actions--primaires { display: none; }
 
 /* --- Écran d'erreur -------------------------------------------------------- */
 .failure { text-align: center; max-width: 32rem; margin-inline: auto; }

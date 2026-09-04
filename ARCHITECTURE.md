@@ -136,13 +136,14 @@ questionnaire, fermeture de l'onglet.
 
 ## Le CSS
 
-Quatre fichiers dans un ordre qui ne change pas.
+Cinq fichiers dans un ordre qui ne change pas.
 
 | Fichier | Contient | Sélecteurs autorisés |
 |---|---|---|
 | `foundation.css` | les tokens : couleur, typo, espace, mouvement, z-index | `:root` uniquement |
 | `base.css` | la remise à zéro, les éléments nus, les primitives de page | éléments, `.page`, `.stack` |
 | `components.css` | ce qui sert à **au moins deux** pages | classes de composant |
+| `vues.css` | la vue d'une question, rendue par `views.js` — chargée par le parcours **et** le backoffice, sans quoi l'aperçu de l'éditeur ne ressemble pas au parcours | `.question*`, `.option*` |
 | `gallery` / `quiz` / `admin.css` | ce qui ne sert qu'à cette page | classes de page |
 
 Un composant qui n'apparaît que sur une page n'a rien à faire dans
