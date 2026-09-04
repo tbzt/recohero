@@ -135,6 +135,55 @@ async function boot() {
   return undefined;
 }
 
+/* --- Le mot de passe oublié ----------------------------------------------------
+   Il n'existait pas. Le seul chemin vers un mot de passe était le courriel
+   d'invitation, envoyé une fois : qui le perdait — ou ne le recevait jamais,
+   filtre antispam aidant — restait dehors, et il fallait la console Firebase
+   pour l'y ramener. La fonction d'envoi, elle, était déjà là.
+
+   La réponse est la MÊME que l'adresse ait un compte ou non. Un formulaire
+   qui répond « adresse inconnue » est un annuaire : on lui soumet des
+   adresses jusqu'à savoir qui travaille ici. Le message neutre coûte une
+   hésitation à qui s'est trompé de casse ou de domaine ; l'aveu coûte la
+   liste de l'équipe à qui prend la peine de demander.
+
+   Mesuré sur le projet : Firebase répond DÉJÀ « succès » pour une adresse
+   sans compte — sa protection contre l'énumération est active, et
+   EMAIL_NOT_FOUND ne remonte jamais. La branche ci-dessous n'est donc pas
+   ce qui protège aujourd'hui ; elle garantit que la protection survivrait
+   à ce réglage s'il changeait de côté dans la console. */
+async function motDePasseOublie(adresse) {
+  const email = String(adresse || '').trim();
+  if (!email) return toast('Renseignez d’abord votre adresse e-mail.', 'danger');
+
+  /* Le même retour que l'invitation : le nom de l'espace ne peut pas entrer
+     dans le texte du courriel, mais il entre dans le lien. */
+  const retour = new URL('admin.html', location.href);
+  if (state.espace) retour.searchParams.set('espace', state.espace);
+
+  try {
+    await remote.envoyerCourrielMotDePasse(email, retour.toString());
+  } catch (err) {
+    /* Seule une panne réelle se dit. L'adresse inconnue se tait. */
+    if (err.code !== 'EMAIL_NOT_FOUND') {
+      return toast(`Envoi impossible : ${err.message}`, 'danger');
+    }
+  }
+  return toast(`Si un compte existe pour ${email}, le courriel vient de partir.`);
+}
+
+/* Le bouton, monté sur le champ d'adresse déjà saisi : personne ne retape
+   son adresse pour la deuxième fois de suite. */
+function boutonOubli(champEmail, classes = 'btn btn--quiet btn--sm') {
+  const bouton = el('button', { class: classes, type: 'button', text: 'Mot de passe oublié' });
+  bouton.addEventListener('click', async () => {
+    bouton.disabled = true;
+    await motDePasseOublie(champEmail.value);
+    bouton.disabled = false;
+  });
+  return bouton;
+}
+
 /* La porte d'un espace : le compte, et rien d'autre. */
 function gateCompte() {
   if (remote.session()) return open();
@@ -158,6 +207,7 @@ function gateCompte() {
     el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Mot de passe' }), pass]),
     erreur,
     valider,
+    boutonOubli(email, 'btn btn--quiet btn--sm btn--block'),
     el('p', { class: 'gate__note' }, [
       'Pas de compte ? Il s’en crée un depuis la console Firebase du projet — ',
       'voir la marche à suivre dans le README, § « Monter son propre espace ».',
@@ -3670,6 +3720,8 @@ function showSignIn() {
       erreur,
     ]),
     el('div', { class: 'modal__actions' }, [
+      boutonOubli(email, 'btn btn--quiet btn--sm'),
+      el('span', { class: 'section__spacer' }),
       el('button', {
         class: 'btn btn--quiet', type: 'button', text: 'Annuler',
         onClick: () => dismiss(dialog),
