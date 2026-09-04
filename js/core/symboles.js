@@ -38,18 +38,27 @@
 
    Choisis dans les blocs que les polices système servent depuis toujours —
    Geometric Shapes, Dingbats, Miscellaneous Symbols, Arrows, Enclosed
-   Alphanumerics — et passés à un banc plutôt qu'à l'œil : chacun est dessiné
-   sur un canvas en rouge pur, et l'on vérifie deux choses. Qu'il y ait de
-   l'encre, et qu'elle ne ressemble pas au rectangle du caractère manquant
-   (sinon aucune police ne le connaît). Et que cette encre soit VRAIMENT
-   rouge : un pixel dont le vert ou le bleu s'écarte de l'alpha vient d'une
-   police en couleur, c'est-à-dire d'un emoji déguisé — qui imposerait sa
-   teinte et refuserait celle de l'axe.
+   Alphanumerics — et passés à un banc plutôt qu'à l'œil. Deux contrôles :
+   qu'il y ait de l'encre, et qu'elle ne ressemble pas au rectangle du
+   caractère manquant (sinon aucune police ne connaît le signe) ; puis que le
+   signe prenne bien la couleur qu'on lui donne.
 
-   Le banc a mordu sur trois candidats, dont ⚓ — qui était dans cette liste
-   depuis toujours. Sur un axe, l'ancre n'a jamais pris la couleur de l'axe,
-   et personne ne l'avait vu : une pastille bleue au milieu de pastilles
-   colorées ne ressemble pas à un défaut.
+   Ce second contrôle se fait en DEUX passes, une rouge et une bleue, et l'on
+   compare les deux images. C'est le seul moyen honnête : un vrai monochrome
+   rend deux images différentes, un emoji rend deux fois la même.
+
+   La première version du banc ne peignait qu'en rouge et cherchait du vert ou
+   du bleu dans l'encre — et se faisait donc berner par tout emoji rouge. Le
+   gant de boxe 🥊 est passé pour un monochrome exemplaire. Personne n'aurait
+   vu l'erreur : elle ne se déclenche que sur les signes dont la couleur
+   propre est justement celle du test. Repassé au banc réparé, aucun des 196
+   glyphes livrés n'est en défaut — mais c'était de la chance, pas de la
+   méthode.
+
+   Le banc a tout de même mordu sur trois candidats, dont ⚓ — qui était dans
+   cette liste depuis toujours. Sur un axe, l'ancre n'a jamais pris la couleur
+   de l'axe, et personne ne l'avait vu : une pastille bleue au milieu de
+   pastilles colorées ne ressemble pas à un défaut.
 
    Ce que le banc NE prouve pas : il ne connaît que les polices de CETTE
    machine. D'où le choix de blocs anciens et largement servis plutôt que de
@@ -403,10 +412,47 @@ export const EMOJIS = [
       ['🃏', 'joker carte jeu'],
       ['🀄', 'mahjong tuile jeu'],
       ['🎯', 'cible juste pertinent'],
-      ['🎳', 'bowling loisir'],
       ['🪁', 'cerf-volant dehors jeu'],
       ['🧸', 'peluche tout-petit doudou'],
-      ['🏓', 'tennis de table sport loisir'],
+    ],
+  },
+  {
+    nom: 'Sport et mouvement',
+    signes: [
+      ['⚽', 'football ballon sport'],
+      ['🏀', 'basket ballon sport'],
+      ['🏈', 'football américain sport'],
+      ['⚾', 'baseball sport'],
+      ['🎾', 'tennis raquette sport'],
+      ['🏐', 'volley ballon sport plage'],
+      ['🏉', 'rugby ballon sport'],
+      ['🏸', 'badminton raquette sport'],
+      ['🏓', 'tennis de table ping-pong sport'],
+      ['🏒', 'hockey crosse glace sport'],
+      ['🎳', 'bowling quilles loisir sport'],
+      ['🎱', 'billard boule loisir'],
+      ['⛳', 'golf parcours sport'],
+      ['🏹', 'tir à l’arc archerie viser'],
+      ['🎣', 'pêche rivière patience'],
+      ['🥊', 'boxe combat sport'],
+      ['🥋', 'judo karaté arts martiaux'],
+      ['🤺', 'escrime épée sport'],
+      ['🤼', 'lutte combat sport'],
+      ['⛸️', 'patinage glace hiver sport'],
+      ['🎿', 'ski neige montagne hiver'],
+      ['🏂', 'snowboard neige glisse hiver'],
+      ['🏊', 'natation nager piscine'],
+      ['🏄', 'surf vague mer glisse'],
+      ['🚴', 'cyclisme vélo course sport'],
+      ['🏃', 'course courir running'],
+      ['🚶', 'marche promenade flâner'],
+      ['🥾', 'randonnée marche montagne'],
+      ['🧗', 'escalade grimper montagne'],
+      ['🤸', 'gymnastique acrobatie souplesse'],
+      ['🏋️', 'musculation haltères force'],
+      ['🧘', 'yoga méditation calme respiration'],
+      ['🛹', 'skateboard glisse ville'],
+      ['🏇', 'équitation cheval course'],
     ],
   },
   {
@@ -529,7 +575,7 @@ export const EMOJIS = [
       ['🛏️', 'lit soir coucher histoire du soir'],
       ['🌳', 'arbre nature parc dehors'],
       ['🏖️', 'plage été vacances soleil'],
-      ['⛰️', 'montagne randonnée hauteur'],
+      ['⛰️', 'montagne randonnée hauteur sport'],
       ['🌊', 'mer vague océan large'],
       ['🏝️', 'île évasion voyage'],
       ['🌉', 'pont ville nuit'],
@@ -542,13 +588,13 @@ export const EMOJIS = [
       ['🛶', 'canoë rivière aventure'],
       ['☕', 'café pause chaud matin'],
       ['🍵', 'thé pause calme'],
-      ['🕯️', 'bougie veillée douceur soir'],
+      ['🕯️', 'bougie veillée douceur soir noël'],
       ['🌙', 'nuit lune coucher rêve'],
       ['🌞', 'soleil jour été lumière'],
       ['🌅', 'aube lever matin commencement'],
       ['🌆', 'crépuscule soir ville'],
       ['🍂', 'automne feuilles saison'],
-      ['⛄', 'hiver neige froid'],
+      ['⛄', 'hiver neige froid noël bonhomme'],
       ['🌷', 'printemps fleur renouveau'],
       ['🌈', 'arc-en-ciel espoir diversité'],
     ],
@@ -561,7 +607,7 @@ export const EMOJIS = [
       ['🎉', 'fête événement inauguration'],
       ['🎊', 'fête confettis célébration'],
       ['🎈', 'ballon fête enfance'],
-      ['🎁', 'cadeau surprise offrir'],
+      ['🎁', 'cadeau surprise offrir noël'],
       ['🎂', 'anniversaire gâteau fête'],
       ['🧶', 'laine tricot atelier'],
       ['🧵', 'fil couture atelier série suite'],
@@ -570,10 +616,34 @@ export const EMOJIS = [
       ['📅', 'agenda date rendez-vous'],
       ['📆', 'calendrier programme saison'],
       ['⏰', 'heure horaire rappel'],
-      ['🔔', 'cloche annonce rappel'],
+      ['🔔', 'cloche annonce rappel noël'],
       ['🎟️', 'billet entrée réservation'],
       ['🪑', 'chaise atelier salle rencontre'],
       ['🗣️', 'parole rencontre conférence lecture à voix haute'],
+    ],
+  },
+  {
+    nom: 'Noël et fin d’année',
+    signes: [
+      ['🎄', 'sapin noël décembre fête décoration'],
+      ['🎅', 'père noël noël cadeaux'],
+      ['🤶', 'mère noël noël'],
+      ['🦌', 'renne noël forêt animal'],
+      ['🛷', 'luge neige hiver noël'],
+      ['🧦', 'chaussette noël cheminée'],
+      ['❄️', 'flocon neige hiver noël froid'],
+      ['🧣', 'écharpe hiver froid'],
+      ['🧤', 'gants hiver froid'],
+      ['🌰', 'marron châtaigne automne hiver'],
+      ['🦃', 'dinde repas de fête noël'],
+      ['⛪', 'église village noël patrimoine'],
+      ['🕎', 'hanoukka fête des lumières'],
+      ['🍾', 'champagne nouvel an fête'],
+      ['🥂', 'trinquer fête nouvel an'],
+      ['🎆', 'feu d’artifice nouvel an fête'],
+      ['🎇', 'étincelles feu d’artifice fête'],
+      ['🥳', 'fête célébration réjouissance'],
+      ['🪅', 'piñata fête anniversaire'],
     ],
   },
   {
@@ -610,6 +680,7 @@ export const EMOJIS = [
     signes: [
       ['🍫', 'chocolat gourmandise douceur'],
       ['🍪', 'biscuit goûter enfance'],
+      ['🥧', 'tourte tarte pâtisserie gourmandise'],
       ['🥐', 'croissant matin français'],
       ['🍎', 'pomme fruit santé école'],
       ['🍍', 'ananas fruit tropical exotique été soleil'],
@@ -625,7 +696,7 @@ export const EMOJIS = [
     nom: 'Repères',
     signes: [
       ['⭐', 'étoile favori sélection'],
-      ['🌟', 'étoile brillante coup de cœur'],
+      ['🌟', 'étoile brillante coup de cœur noël'],
       ['🔥', 'feu tendance populaire'],
       ['🏆', 'prix récompense trophée primé'],
       ['🥇', 'premier médaille or prix'],
