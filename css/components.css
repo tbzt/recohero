@@ -401,6 +401,11 @@
   .modal[open]::backdrop { opacity: 0; }
 }
 .modal__body { padding: var(--s-5); }
+/* Une fenêtre qui s'ouvre d'elle-même pose le focus sur son titre, pour
+   qu'il soit annoncé et que la ligne qui dit ce qui l'amène reste à
+   l'écran. Un titre n'est pas un contrôle : le focus reste, l'anneau s'en
+   va — même règle que sur le titre d'écran du parcours (quiz.css). */
+.modal__body > h2[tabindex="-1"]:focus-visible { outline: none; }
 .modal__actions {
   display: flex;
   justify-content: flex-end;

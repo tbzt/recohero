@@ -250,6 +250,16 @@ produit.
 L'éditeur le dit à l'endroit où ça compte — sur la ligne de la personne, au
 moment de cocher, pas dans une note en bas de page.
 
+**Se nommer se propose.** Le profil ne s'atteignait que par le bouton de
+compte, qui porte l'adresse e-mail de la personne connectée : on n'y cherche
+pas une fiche qu'on ne sait pas manquante, et une équipe entière se lit alors
+en identifiants tronqués. À l'ouverture, un membre sans fiche voit donc la
+fenêtre venir à lui, sur son propre identifiant — ce que ses collègues lisent
+à sa place. « Plus tard » ne note rien : sans serveur, la connexion suivante
+est le seul rappel dont nous disposions. La proposition attend d'être sûre que
+la personne est membre, puisque les règles refusent le profil d'un compte qui
+ne l'est pas.
+
 ---
 
 ## Le garde-fou contre l'écrasement

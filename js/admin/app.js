@@ -59,6 +59,7 @@ const state = {
   stats: {},            /* parcours terminés, par questionnaire et par profil */
   remote: [],           /* les questionnaires de cet espace */
   remoteSession: null,  /* { email, uid } une fois connecté */
+  profilPropose: false, /* la proposition de se nommer a déjà été faite, cette fois-ci */
   /* --- Deux niveaux de navigation ------------------------------------------
      Le backoffice n'avait qu'un écran : l'éditeur de questionnaire. Tout ce
      qui relève de l'espace — vitrine, corbeille, identité, fréquentation,
@@ -225,14 +226,14 @@ async function open() {
   dom.shell.addEventListener('click', onClick);
   dom.shell.addEventListener('input', onInput);
   dom.shell.addEventListener('change', onChange);
-  dom.topActions.addEventListener('click', onClick);
-  dom.tabbar.addEventListener('click', onClick);
   /* La délégation est posée sur des éléments précis, pas sur le document :
      un bouton ajouté dans le bandeau à côté du fil d'Ariane — le retour vers
-     l'espace — tombait donc hors de toute écoute. Visible, et inerte. On
-     écoute la ligne entière du bandeau, ce qui couvre le fil lui-même : une
-     écoute de plus sur `quizName` le ferait répondre deux fois par remontée
-     d'événement. */
+     l'espace — tombait donc hors de toute écoute. Visible, et inerte.
+
+     Une seule écoute, sur la ligne entière du bandeau : les onglets et les
+     actions sont DEDANS, et les écouter en plus faisait répondre deux fois à
+     chaque clic. Deux « Mon compte » s'ouvraient l'un sur l'autre, et celui
+     du dessous restait derrière la fenêtre choisie dans celui du dessus. */
   dom.quizName.parentElement?.addEventListener('click', onClick);
   window.addEventListener('beforeunload', flush);
   dom.shell.addEventListener('focusin', (event) => {
@@ -276,6 +277,8 @@ async function open() {
     event.preventDefault();
     undo();
   });
+
+  proposerMonProfil();
 }
 
 /* --- Rendu ------------------------------------------------------------------ */
@@ -2264,11 +2267,11 @@ async function copierUid() {
    distinction évidente : renseigner son profil le montre à l'ÉQUIPE ;
    cocher la case le montre au MONDE. Le second n'est jamais présélectionné,
    et le décocher efface la vitrine plutôt que d'y poser un drapeau. */
-function monProfil() {
-  const uid = state.remoteSession?.uid;
-  if (!uid) return;
-  const actuel = state.profils?.[uid] || {};
-  const enVitrine = Boolean(state.vitrines?.[uid]);
+function monProfil({ accueil = false } = {}) {
+  const moi = state.remoteSession?.uid;
+  if (!moi) return;
+  const actuel = state.profils?.[moi] || {};
+  const enVitrine = Boolean(state.vitrines?.[moi]);
 
   const exemple = autriceAuHasard();
   const prenom = el('input', { class: 'input', value: actuel.prenom || '', placeholder: exemple.prenom });
@@ -2281,10 +2284,17 @@ function monProfil() {
   const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
   const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Enregistrer' });
 
-  const dialog = el('dialog', { class: 'modal' }, [
+  const titreId = uid('titre');
+  const titre = el('h2', { id: titreId, text: 'Mon profil' });
+  const dialog = el('dialog', { class: 'modal', 'aria-labelledby': titreId }, [
     el('div', { class: 'modal__body stack' }, [
-      el('h2', { text: 'Mon profil' }),
-      el('p', { class: 'panel__hint', text: 'Te nomme auprès de ton équipe. Visible des seuls membres de cet espace.' }),
+      titre,
+      /* Ouverte d'elle-même, la fenêtre doit porter ce qui l'amène.
+         L'identifiant tronqué y suffit : c'est exactement ce que l'équipe
+         lit à la place d'un nom. */
+      el('p', { class: 'panel__hint', text: accueil
+        ? `Tu apparais comme « ${moi.slice(0, 8)}… » — dans l’équipe, et sous les questionnaires que tu publies.`
+        : 'Te nomme auprès de ton équipe. Visible des seuls membres de cet espace.' }),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Prénom' }), prenom]),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Nom' }), nom]),
       el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Fonction' }), poste]),
@@ -2313,7 +2323,8 @@ function monProfil() {
       erreur,
     ]),
     el('div', { class: 'modal__actions' }, [
-      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Annuler', onClick: () => dismiss(dialog) }),
+      el('button', { class: 'btn btn--quiet', type: 'button',
+        text: accueil ? 'Plus tard' : 'Annuler', onClick: () => dismiss(dialog) }),
       valider,
     ]),
   ]);
@@ -2332,10 +2343,10 @@ function monProfil() {
         poste: poste.value.trim(),
         image: photo.value.trim(),
       };
-      await remote.enregistrerProfil(state.espace, uid, profil);
+      await remote.enregistrerProfil(state.espace, moi, profil);
       /* La vitrine ne reprend que ce que la personne a saisi, et n'existe
          que si elle l'a demandé. Décocher efface. */
-      await remote.publierVitrine(state.espace, uid, publier.checked ? normaliserVitrine({
+      await remote.publierVitrine(state.espace, moi, publier.checked ? normaliserVitrine({
         nom: [profil.prenom, profil.nom].filter(Boolean).join(' '),
         poste: profil.poste,
         image: profil.image,
@@ -2355,7 +2366,33 @@ function monProfil() {
   dialog.addEventListener('close', () => dialog.remove());
   document.body.append(dialog);
   dialog.showModal();
-  prenom.focus();
+  /* Ouverte d'elle-même, la fenêtre commence par son titre : le curseur posé
+     dans le prénom fait défiler une fenêtre courte, et la ligne qui dit ce
+     qui l'amène sort de l'écran. Le titre prend le focus, la tabulation
+     descend dans le formulaire. */
+  if (accueil) { titre.setAttribute('tabindex', '-1'); titre.focus({ preventScroll: true }); }
+  else prenom.focus();
+}
+
+/* Se nommer ne s'atteignait que par le bouton de compte, dont le seul indice
+   est l'adresse e-mail de la personne connectée : un profil qu'on ne sait pas
+   manquant ne se cherche pas. Faute de l'avoir trouvé, une équipe se lit en
+   identifiants tronqués — dans la liste des membres, et sous chaque
+   questionnaire qu'elle publie.
+
+   La proposition vient donc à la personne, à l'ouverture, tant qu'elle n'a
+   pas de fiche. « Plus tard » referme pour cette fois ; la connexion suivante
+   la repose, et sans serveur c'est le seul rappel dont nous disposions. */
+function proposerMonProfil() {
+  if (state.profilPropose) return;
+  const moi = state.remoteSession?.uid;
+  /* Membre, et su comme tel : les règles refusent le profil d'un compte qui
+     n'est pas de l'équipe, et qui frappe encore à la porte a son propre
+     chemin dans le rail. */
+  if (!state.espace || !moi || state.membre !== true) return;
+  if (state.profils?.[moi]?.prenom) return;
+  state.profilPropose = true;
+  monProfil({ accueil: true });
 }
 
 /* Inviter : créer le compte, faire envoyer le courriel, inscrire la
@@ -2593,6 +2630,7 @@ async function rejoindreLEspace() {
     await refreshEspace();
     repaint();
     toast('Te voilà chez toi.');
+    proposerMonProfil();
   } catch (err) {
     toast(err.message, 'danger');
   }
@@ -3607,6 +3645,7 @@ function showSignIn() {
       dismiss(dialog, () => {
         toast(`Connecté — ${state.remoteSession.email}`);
         repaint();
+        proposerMonProfil();
       });
     } catch (err) {
       erreur.textContent = err.message;
