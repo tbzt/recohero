@@ -8,7 +8,9 @@
    lignes et ne bouge plus jamais — la norme a trente ans.
 
    Périmètre volontairement étroit : mode OCTET, correction de niveau M,
-   versions 1 à 10. Cela couvre 216 octets, soit n'importe quelle adresse
+   versions 1 à 10. Cela couvre 213 octets — la version 10 dépense seize
+   bits à compter ses caractères là où les précédentes en dépensent huit,
+   et trois octets de charge utile y passent — soit n'importe quelle adresse
    de questionnaire, espace et paramètres compris. Le reste de la norme
    (numérique, alphanumérique, kanji, versions 11 à 40) n'a pas d'emploi
    ici et serait du code que personne n'exécute.
@@ -419,7 +421,7 @@ export function encoder(texte) {
   const octets = versLesOctets(String(texte));
   const version = choisirVersion(octets.length);
   if (!version) {
-    throw new Error('Adresse trop longue pour un QR code de ce format (216 octets au plus).');
+    throw new Error('Adresse trop longue pour un QR code de ce format (213 octets au plus).');
   }
 
   const mots = encoderDonnees(octets, version);

@@ -17,15 +17,29 @@ const PAD = 88;
    Rien ne descend au-delà de sa ligne : un profil au titre long fait sauter
    des recommandations, il ne se superpose pas au pied.
 
-   DEUX hauteurs, et c'est le QR qui tranche. Le pied a besoin de 224 px
-   lorsqu'il porte un carré de 168 ; il n'en prend que 62 quand il ne porte
+   DEUX hauteurs, et c'est le QR qui tranche. Le pied a besoin de 268 px
+   lorsqu'il porte un carré de 240 ; il n'en prend que 68 quand il ne porte
    qu'une signature — sa hauteur d'origine, avant que la carte n'emporte de
-   quoi refaire le parcours. Réserver 224 dans les deux cas coûtait 162 px de
-   blanc, soit deux recommandations, sur toutes les cartes SANS carré : celles
-   d'un brouillon, dont le lien porte le questionnaire entier et dépasse ce
-   qu'un QR de ce format sait encoder. Ce sont précisément les cartes qui
-   avaient le moins à montrer. */
-const PIED = 224;
+   quoi refaire le parcours. Réserver 268 dans les deux cas coûterait 200 px
+   de blanc, soit deux recommandations, sur toutes les cartes SANS carré :
+   celles d'un brouillon, dont le lien porte le questionnaire entier et
+   dépasse ce qu'un QR de ce format sait encoder. Ce sont précisément les
+   cartes qui avaient le moins à montrer.
+
+   Le carré valait 168 px, et c'était trop peu. À quarante-cinq modules de
+   large — une adresse qui porte son espace — cela ne laissait que 3,2 px par
+   module, et la carte ne s'affiche jamais en pleine définition : réduite à
+   432 px par `.cardview`, elle montrait un QR de 67 px. Un capteur récent
+   s'en sortait, un plus ancien renonçait ; c'est le « ça marche sur certains
+   téléphones » du terrain.
+
+   Il passe à 240 px et n'en coûte que 44 au corps, parce que l'air autour de
+   lui tombe de 28 px à 14 : cet air faisait DOUBLE EMPLOI. La zone de
+   silence de quatre modules qu'exige la norme est déjà dessinée DANS le
+   carré — `dessinerQR` s'en charge — et on la payait une seconde fois en
+   marge de mise en page. Quatorze pixels suffisent à ce que le carré ne
+   touche pas le filet ; le lecteur, lui, a son silence. */
+const PIED = 268;
 const PIED_NU = 68;   /* filet + air + UNE ligne ; la seconde s'ajoute si besoin */
 
 /* Palette figée : l'image exportée ne doit pas dépendre du thème de celui
@@ -171,7 +185,7 @@ export async function renderResultCard(quiz, profile, scores, options = {}) {
     try { qr = encoder(url); } catch { qr = null; }
   }
 
-  const cote = 168;
+  const cote = 240;
   const marque = identite?.titre?.trim();
   /* Le signe de la structure, à défaut le nôtre. Une médiathèque sans fichier
      de logo signait la carte de son public avec notre étoile. */
@@ -314,7 +328,7 @@ export async function renderResultCard(quiz, profile, scores, options = {}) {
      Et elle porte de quoi refaire le parcours. Une carte qui donne envie sans
      dire où aller est une affiche sans adresse. */
   const basPied = plancher;
-  const yQR = basPied + 28;
+  const yQR = basPied + 14;
 
   ctx.fillStyle = mix(accent, PAPER, 0.35);
   ctx.fillRect(PAD, basPied, W - PAD * 2, 2);

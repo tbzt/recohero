@@ -508,7 +508,7 @@ depuis une clé USB » pour une quarantaine de kilo-octets, et que la norme a
 trente ans : ce code ne bougera plus.
 
 **Le périmètre est étroit exprès.** Mode octet, correction de niveau M,
-versions 1 à 10 — 216 octets, soit n'importe quelle adresse de questionnaire.
+versions 1 à 10 — 213 octets, soit n'importe quelle adresse de questionnaire.
 Le reste de la norme (numérique, alphanumérique, kanji, versions 11 à 40)
 serait du code que personne n'exécute. Le niveau M plutôt que L parce qu'une
 affiche se froisse et prend le soleil : M récupère 15 % du symbole, L

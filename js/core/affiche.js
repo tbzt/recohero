@@ -84,8 +84,13 @@ export function dessinerQR(ctx, matrice, taille, x, y, cote) {
   const modules = taille + SILENCE * 2;
   const pas = cote / modules;
 
+  /* Le fond se pose sur la MÊME grille entière que les modules : posé en
+     coordonnées fractionnaires, son bord grisonne, et c'est justement le
+     bord que le lecteur cherche pour délimiter la zone de silence. */
+  const x0 = Math.round(x);
+  const y0 = Math.round(y);
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(x, y, cote, cote);
+  ctx.fillRect(x0, y0, Math.round(x + cote) - x0, Math.round(y + cote) - y0);
   ctx.fillStyle = '#000000';
   for (let l = 0; l < taille; l += 1) {
     for (let c = 0; c < taille; c += 1) {
@@ -146,10 +151,18 @@ export async function rendreAffiche(quiz, adresse, { structure = '', accroche = 
   }
 
   /* Le QR prend ce qui reste, borné : trop petit il ne se scanne pas de
-     loin, trop grand il chasse le texte hors de la feuille. */
+     loin, trop grand il chasse le texte hors de la feuille.
+
+     Le plafond était à 700, et la feuille n'a jamais moins de 754 px à
+     offrir : le carré tombait donc TOUJOURS sur son plafond, en laissant
+     une bande vide sous l'adresse. Or c'est la taille du module qui décide
+     si un téléphone lit ou renonce, et une adresse portant son espace
+     demande une version 7 — quarante-cinq modules, plus huit de silence.
+     À 700 le module faisait 2,2 mm sur A4 ; à 900 il en fait 2,9. Le
+     plafond ne borne plus que la largeur utile de la feuille (1024 px). */
   const basDuTexte = y + 40;
   const placeRestante = H - basDuTexte - 300;
-  const cote = Math.max(420, Math.min(700, placeRestante));
+  const cote = Math.max(420, Math.min(900, placeRestante));
   const qr = encoder(adresse);
   const qrX = (W - cote) / 2;
   dessinerQR(ctx, qr.modules, qr.taille, qrX, basDuTexte, cote);
