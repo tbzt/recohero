@@ -391,6 +391,164 @@
    contenu d'un <input>. Sans ce min-width, la ligne déborde à 375px. */
 .opt > *, .axis-row > *, .reco-edit__top > *, .rule > * { min-width: 0; }
 
+/* --- Les onglets, sur téléphone -------------------------------------------------
+   Sous 48 rem, la rangée d'onglets quitte le bandeau du haut pour le bas de
+   l'écran, dans la zone du pouce, et chaque onglet retrouve son nom sous
+   son glyphe. Le nœud ne bouge pas dans le document — même emplacement à
+   toute largeur, c'est la règle de ce bandeau — seul son positionnement
+   change. Tout ce qui colle au bas de la fenêtre remonte d'autant. */
+@media (max-width: 48rem) {
+  /* Un `backdrop-filter` fait de son élément le conteneur de tout descendant
+     en `position: fixed`. La rangée vit dans le bandeau ; avec le flou du
+     bandeau, « bottom: 0 » la collait au bas du BANDEAU, c'est-à-dire en
+     haut de l'écran, par-dessus la marque. Sur téléphone, le bandeau perd
+     donc son flou (sa teinte reste presque opaque) et la rangée retrouve
+     la fenêtre. */
+  .topbar { backdrop-filter: none; isolation: auto; }
+  .topbar::after { display: none; }
+  .tabbar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: var(--z-sticky);
+    order: 0;
+    flex-basis: auto;
+    gap: 0;
+    justify-content: space-around;
+    padding: var(--s-1) var(--s-2) calc(var(--s-1) + env(safe-area-inset-bottom));
+    background: color-mix(in oklab, var(--bg) 94%, transparent);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line);
+  }
+  .tab, .tab.is-active {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 52px;
+    padding: var(--s-1);
+    background: transparent;
+    border-color: transparent;
+  }
+  .tab .tab__label, .tab.is-active .tab__label {
+    display: block;
+    max-width: 100%;
+    font-size: var(--t-xs);
+    line-height: 1.1;
+  }
+  .tab.is-active { color: var(--accent-deep); }
+  .tab.is-active .tab__emoji { scale: 1.15; }
+  .tab__emoji { transition: scale var(--dur-press) var(--spring); }
+  .tab:not(.is-active) .rail__item__badge { top: 0; right: 10%; }
+  .admin-shell { padding-bottom: calc(var(--s-8) + 64px); }
+  .panel__actions { bottom: 64px; }
+  .toast-host { bottom: calc(var(--s-5) + 60px); }
+}
+
+/* --- L'accueil de l'espace : des cartes --------------------------------------
+   Le premier écran de l'équipe était une liste de lignes qui ressemblait à
+   une page de réglages. Chaque questionnaire est maintenant une carte : son
+   emoji ou sa couverture, sa couleur en filet, son état en pastille, et sa
+   fréquentation quand elle existe. Le titre est le bouton et sa surface
+   s'étend à la carte entière, sur le patron de la ligne ouvrable. */
+.grille-quiz {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: var(--s-4);
+}
+.fiche-quiz {
+  --card-accent: var(--accent);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-height: 9rem;
+  padding: var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  text-align: left;
+  color: var(--ink);
+  transition: transform var(--dur-press) var(--spring),
+              border-color var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out);
+}
+.fiche-quiz::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--card-accent);
+}
+.fiche-quiz:hover { border-color: var(--card-accent); box-shadow: var(--shadow-2); transform: translateY(-2px); }
+.fiche-quiz:active { transform: scale(0.985); }
+.fiche-quiz.is-ouverte { box-shadow: inset 0 0 0 1px var(--accent-line); background: var(--accent-soft); }
+.fiche-quiz:has(.fiche-quiz__titre:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.fiche-quiz__titre:focus-visible { outline: none; }
+.fiche-quiz__cover {
+  width: calc(100% + var(--s-4) * 2);
+  margin: calc(var(--s-4) * -1) calc(var(--s-4) * -1) 0;
+  aspect-ratio: 16 / 7;
+  object-fit: cover;
+}
+.fiche-quiz__emoji {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--card-accent) 12%, var(--surface));
+  font-size: var(--t-lg);
+  line-height: 1;
+}
+.fiche-quiz__titre {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--t-md);
+  line-height: var(--lh-tight);
+  text-align: left;
+  cursor: pointer;
+  text-wrap: balance;
+}
+.fiche-quiz__titre::after { content: ""; position: absolute; inset: 0; }
+.fiche-quiz__meta, .fiche-quiz__signature {
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.fiche-quiz__pied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: auto;
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--line);
+  min-height: var(--tap-sm);
+}
+.fiche-quiz__pied > .pill, .fiche-quiz__pied > .btn { position: relative; z-index: 1; }
+.fiche-quiz__pied .section__spacer { flex: 1; }
+/* La carte vide qui crée : elle porte le geste, et sert d'état vide quand
+   il n'y a encore rien. */
+.fiche-quiz--nouveau {
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-1);
+  border-style: dashed;
+  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--ink-muted);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+}
+.fiche-quiz--nouveau::before { display: none; }
+.fiche-quiz--nouveau:hover { border-color: var(--accent); color: var(--accent-deep); background: var(--accent-soft); box-shadow: none; }
+.fiche-quiz__plus { font-size: var(--t-2xl); line-height: 1; font-family: var(--font-display); }
+
 /* --- Rail gauche ------------------------------------------------------------ */
 .rail {
   position: sticky;
@@ -1143,41 +1301,9 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   color: var(--ink);
   transition: background var(--dur-fast) var(--ease-out);
 }
-/* --- La ligne qui ouvre -------------------------------------------------------
-   Le titre est le bouton ; son pseudo-élément étend la surface de clic à la
-   ligne entière. On ne pose pas `role="button"` sur le conteneur : il porte
-   déjà des boutons, et un rôle interactif imbriqué donne deux arrêts de
-   tabulation sur la même chose.
-
-   La règle ne s'applique QU'aux lignes de questionnaire. Celles de l'équipe,
-   des files d'attente et de la corbeille gardent leurs boutons et rien
-   d'autre : un clic large y viserait « retirer », « accepter » ou
-   « supprimer définitivement ». Une ligne devient cliquable quand elle a un
-   geste principal évident et non destructeur — la corbeille en a deux, qui se
-   contredisent, et c'est pourquoi elle n'en a pas. */
-.sheet__row--ouvrable { position: relative; }
-.sheet__row__cible {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.sheet__row__cible::after { content: ''; position: absolute; inset: 0; }
-/* Au-dessus du voile, sinon l'export et les pastilles deviendraient
-   inatteignables — c'est la ligne qui les recouvrirait. */
-.sheet__row--ouvrable > .btn,
-.sheet__row--ouvrable > .pill { position: relative; z-index: 1; }
-.sheet__row--ouvrable:hover { background: var(--surface-2); }
-/* L'anneau se pose sur la LIGNE, pas sur les trois mots du titre : c'est la
-   ligne entière qui répondra à la touche Entrée. */
-.sheet__row--ouvrable:has(.sheet__row__cible:focus-visible) {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.sheet__row__cible:focus-visible { outline: none; }
+/* La ligne ouvrable a cédé la place aux cartes de l'accueil (`.fiche-quiz`),
+   qui reprennent son patron : le titre est le bouton, sa surface s'étend à
+   la carte entière. */
 
 /* Le survol est une promesse de clic, et il ne doit se poser que sur les
    lignes qui la tiennent. La règle valait pour toutes : les <div> inertes de

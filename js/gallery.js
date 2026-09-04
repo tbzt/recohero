@@ -72,6 +72,7 @@ async function boot() {
   const presentation = espace ? normaliserPresentation(await chargerPresentation(espace)) : null;
   renderQuizzes(await loadAll({ espace }), presentation);
   renderHistory();
+  incliner();
   /* Même règle que dans le backoffice : on agit, on laisse un retour.
      L'historique est reconstitué depuis la mémoire, pas depuis le disque. */
   dom.clear.addEventListener('click', () => {
@@ -88,6 +89,33 @@ async function boot() {
         },
       },
     });
+  });
+}
+
+/* --- L'inclinaison ----------------------------------------------------------------
+   Une vignette suit le pointeur qui la survole : trois degrés, pas plus,
+   comme une carte qu'on soulève par un coin. Deux variables posées sur la
+   vignette, le CSS fait le reste. Au doigt il n'y a pas de survol, et sous
+   mouvement réduit on ne penche rien. */
+function incliner() {
+  if (!window.matchMedia?.('(hover: hover)').matches) return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
+  const AMPLITUDE = 3;
+  dom.grid.addEventListener('pointermove', (event) => {
+    const carte = event.target.closest('.quiz-card');
+    if (!carte) return;
+    const boite = carte.getBoundingClientRect();
+    const x = (event.clientX - boite.left) / boite.width - 0.5;
+    const y = (event.clientY - boite.top) / boite.height - 0.5;
+    carte.style.setProperty('--ry', `${(x * AMPLITUDE * 2).toFixed(2)}deg`);
+    carte.style.setProperty('--rx', `${(-y * AMPLITUDE * 2).toFixed(2)}deg`);
+  });
+  dom.grid.addEventListener('pointerout', (event) => {
+    const carte = event.target.closest('.quiz-card');
+    if (!carte || carte.contains(event.relatedTarget)) return;
+    carte.style.removeProperty('--rx');
+    carte.style.removeProperty('--ry');
   });
 }
 

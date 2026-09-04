@@ -686,78 +686,91 @@ function panneauQuestionnaires() {
   const draftIds = new Set(drafts.map((q) => q.id));
   const partage = Boolean(state.espace && state.remoteSession);
 
-  /* La ligne entière ouvre. Elle le faisait DÉJÀ dans le rail et dans la
-     feuille des questionnaires — trois rendus de la même liste, et le panneau
-     était le seul à exiger qu'on vise un bouton de soixante pixels au bout
-     d'une ligne qui en fait neuf cents. Le survol le promettait pourtant :
-     `.sheet__row:hover` s'allumait sans que rien ne réponde.
-
-     C'est le TITRE qui devient le bouton, et non un `<div>` habillé en
-     bouton : la ligne porte déjà des boutons, et un rôle interactif imbriqué
-     donne un arbre d'accessibilité imprévisible et deux arrêts de tabulation
-     sur la même chose. Le pseudo-élément étend sa surface à la ligne entière.
-
-     Ce qu'on y gagne en plus du confort : le nom annoncé devient le titre du
-     questionnaire. Une liste de six brouillons présentait jusqu'ici six
-     boutons nommés « Ouvrir », indiscernables hors de leur contexte. */
-  const ligne = (quiz, primaire, actions) => el('div', { class: 'sheet__row sheet__row--ouvrable' }, [
-    el('span', { class: 'sheet__emoji', text: quiz.emoji || '✦', 'aria-hidden': 'true' }),
-    el('span', { class: 'sheet__label' }, [
+  /* La carte. Le titre est le bouton, et son pseudo-élément étend la
+     surface de clic à la carte entière : la carte porte déjà d'autres
+     boutons, et un rôle interactif imbriqué donnerait deux arrêts de
+     tabulation sur la même chose. Le nom annoncé est le titre du
+     questionnaire, pas « Ouvrir ». */
+  const carte = (quiz, primaire, { pastilles = [], actions = [], meta = null } = {}) => {
+    const n = quiz.questions?.length ?? 0;
+    const m = quiz.results?.length ?? 0;
+    return el('div', {
+      class: 'fiche-quiz' + (state.quiz?.id === quiz.id ? ' is-ouverte' : ''),
+      style: { '--card-accent': quiz.accent },
+    }, [
+      quiz.image && el('img', { class: 'fiche-quiz__cover', src: quiz.image, alt: '', loading: 'lazy' }),
+      el('span', { class: 'fiche-quiz__emoji', 'aria-hidden': 'true', text: quiz.emoji || '✦' }),
       el('button', {
-        class: 'sheet__row__cible', type: 'button',
-        'data-act': primaire, 'data-id': quiz.id, text: quiz.title,
+        class: 'fiche-quiz__titre', type: 'button',
+        'data-act': primaire, 'data-id': quiz.id, text: quiz.title || 'Questionnaire sans titre',
       }),
-      signature(quiz) && el('span', { class: 'field__hint', style: { display: 'block' }, text: signature(quiz) }),
-    ]),
-    ...actions,
+      el('span', { class: 'fiche-quiz__meta', text:
+        `${n} question${n > 1 ? 's' : ''} · ${m} profil${m > 1 ? 's' : ''}` + (meta ? ` · ${meta}` : '') }),
+      signature(quiz) && el('span', { class: 'fiche-quiz__signature', text: signature(quiz) }),
+      el('span', { class: 'fiche-quiz__pied' }, [
+        ...pastilles,
+        el('span', { class: 'section__spacer' }),
+        ...actions,
+      ]),
+    ]);
+  };
+
+  const exporter = (quiz) => el('button', {
+    class: 'btn btn--icon btn--quiet', type: 'button',
+    'data-act': 'export-one', 'data-id': quiz.id, title: 'Exporter en JSON', 'aria-label': 'Exporter en JSON', text: '↓',
+  });
+
+  /* La carte vide qui crée. Elle ferme la grille des brouillons, et quand il
+     n'y en a aucun, elle est la grille : l'état vide porte le geste. */
+  const nouveau = () => el('button', {
+    class: 'fiche-quiz fiche-quiz--nouveau', type: 'button', 'data-act': 'new-quiz',
+  }, [
+    el('span', { class: 'fiche-quiz__plus', 'aria-hidden': 'true', text: '+' }),
+    'Nouveau questionnaire',
   ]);
 
   const liste = (titre, aide, contenu) => el('section', { class: 'panel' }, [
     el('div', { class: 'section__head' }, [
       el('h2', { text: titre }),
       el('span', { class: 'section__spacer' }),
-      titre === 'Mes brouillons' && el('button', {
-        class: 'btn btn--primary btn--sm', type: 'button', 'data-act': 'new-quiz', text: '+ Nouveau',
-      }),
     ]),
     aide && el('p', { class: 'panel__hint', text: aide }),
     contenu,
   ]);
 
+  const enLigne = (id) => partage && state.remote.some((q) => q.id === id);
+  const parcours = (id) => {
+    const total = state.stats?.[id]?.total || 0;
+    return total ? `${total} parcours terminé${total > 1 ? 's' : ''}` : null;
+  };
+
   const blocs = [
     liste('Mes brouillons',
       'Gardés sur cet ordinateur. Rien n’en sort tant que tu ne diffuses pas.',
-      drafts.length
-        /* Plus de bouton « Ouvrir » : il faisait exactement ce que fait sa
-           ligne, et un raccourci qui double son conteneur n'est pas un
-           raccourci, c'est une question — « si je clique à côté, il se passe
-           autre chose ? ». Ce qu'il disait encore, en revanche, c'est LEQUEL
-           est ouvert : son fond plein le montrait. Une pastille le dit mieux,
-           puisqu'elle décrit un état au lieu d'annoncer une action. */
-        ? el('div', { class: 'sheet__list' }, drafts.map((quiz) => ligne(quiz, 'select', [
-            el('span', { class: 'pill', text: `${quiz.questions?.length ?? 0} q.` }),
-            state.quiz?.id === quiz.id && el('span', { class: 'pill pill--accent', text: 'ouvert' }),
-          ])))
-        : el('div', { class: 'empty' }, [
-            el('div', { class: 'empty__icon', text: '✦' }),
-            el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'new-quiz',
-              text: '+ Créer un questionnaire' }),
-          ])),
+      el('div', { class: 'grille-quiz' }, [
+        ...drafts.map((quiz) => carte(quiz, 'select', { pastilles: [
+          state.quiz?.id === quiz.id && el('span', { class: 'pill pill--accent', text: 'ouvert' }),
+          enLigne(quiz.id) && el('span', { class: 'pill', text: 'en ligne' }),
+        ] })),
+        nouveau(),
+      ])),
   ];
 
   if (partage && state.remote.length) {
     blocs.push(liste(`Publiés dans ${nomDeLEspace()}`,
       'Ce que vos usagers voient. Modifier en crée une copie locale ; la version diffusée ne bouge qu’à la prochaine diffusion.',
-      /* La ligne reprend EXACTEMENT l'action que portait son bouton, sans en
+      /* La carte reprend EXACTEMENT l'action que portait sa ligne, sans en
          inventer une : ouvrir la copie si elle existe, la fabriquer sinon. */
-      el('div', { class: 'sheet__list' }, state.remote.map((quiz) => ligne(quiz,
-        draftIds.has(quiz.id) ? 'select' : 'edit-remote', [
-          draftIds.has(quiz.id) && el('span', { class: 'pill', text: 'copie en cours' }),
-          el('button', {
-            class: 'btn btn--icon btn--quiet', type: 'button',
-            'data-act': 'export-one', 'data-id': quiz.id, title: 'Exporter en JSON', text: '↓',
-          }),
-        ])))));
+      el('div', { class: 'grille-quiz' }, state.remote.map((quiz) => carte(quiz,
+        draftIds.has(quiz.id) ? 'select' : 'edit-remote', {
+          meta: parcours(quiz.id),
+          pastilles: [
+            state.presentation.epingle === quiz.id && el('span', { class: 'pill pill--accent', text: 'à la une' }),
+            state.presentation.masques.has(quiz.id) && el('span', { class: 'pill pill--warn', text: 'masqué' }),
+            draftIds.has(quiz.id) && el('span', { class: 'pill', text: 'copie en cours' }),
+          ],
+          actions: [exporter(quiz)],
+        })))));
   }
 
   /* Les retraits, dans l'onglet où l'on cherche les questionnaires — et non
@@ -804,14 +817,11 @@ function panneauQuestionnaires() {
   if (!partage && state.published.length) {
     blocs.push(liste('Au kiosque de ce dépôt',
       'Les questionnaires livrés avec l’application. Modifier en crée une copie locale.',
-      el('div', { class: 'sheet__list' }, state.published.map((quiz) => ligne(quiz,
-        draftIds.has(quiz.id) ? 'select' : 'edit-published', [
-          draftIds.has(quiz.id) && el('span', { class: 'pill', text: 'copie en cours' }),
-          el('button', {
-            class: 'btn btn--icon btn--quiet', type: 'button',
-            'data-act': 'export-one', 'data-id': quiz.id, title: 'Exporter en JSON', text: '↓',
-          }),
-        ])))));
+      el('div', { class: 'grille-quiz' }, state.published.map((quiz) => carte(quiz,
+        draftIds.has(quiz.id) ? 'select' : 'edit-published', {
+          pastilles: [draftIds.has(quiz.id) && el('span', { class: 'pill', text: 'copie en cours' })],
+          actions: [exporter(quiz)],
+        })))));
   }
 
   return blocs;
