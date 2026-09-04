@@ -231,6 +231,14 @@ export function makeQuiz(partial = {}) {
     /* Ce que ce questionnaire recommande, en général. Purement éditorial :
        il ne sert qu'à préremplir le type d'une nouvelle recommandation. */
     typeParDefaut: 'livre',
+    /* Les axes se présentent-ils sur l'écran de départ ? Éteint par défaut.
+       « ✦ Évasion · ★ Frisson » ne dit rien à qui n'a pas encore vu un point
+       s'y poser : la liste occupe le haut de la couverture, repousse le
+       bouton « Commencer », et demande de comprendre le barème avant d'avoir
+       joué. Certains questionnaires y gagnent quand même — ceux dont les axes
+       SONT le sujet annoncé — d'où un réglage par questionnaire plutôt qu'une
+       suppression pure et simple. */
+    axesEnCouverture: false,
     axes,
     questions: [makeQuestion(axes)],
     results: [makeResult(axes)],
@@ -345,6 +353,9 @@ export function normalize(raw) {
     image: safeImage(raw.image),
     accent: /^#[0-9a-f]{3,8}$/i.test(raw.accent || '') ? raw.accent : ACCENTS[0],
     typeParDefaut: RECO_TYPES.some((t) => t.id === raw.typeParDefaut) ? raw.typeParDefaut : 'livre',
+    /* Absent vaut éteint : les questionnaires écrits avant ce réglage
+       cessent donc de présenter leurs axes, ce qui est l'effet voulu. */
+    axesEnCouverture: raw.axesEnCouverture === true,
     axes,
     questions,
     results,

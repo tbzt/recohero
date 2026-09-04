@@ -247,7 +247,22 @@ export function axes(quiz, ctx = {}) {
           el('div', { class: 'empty__icon', text: '★' }),
           el('p', { text: 'Aucun axe. Sans axe, il n’y a rien à compter.' }),
         ]),
-    el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-4)' } , text:
+    /* Le réglage se pose ICI et non dans « Identité », bien qu'il touche à
+       la couverture : la question « faut-il les montrer ? » se pose en
+       regardant les axes qu'on vient de nommer, pas en écrivant un titre.
+       Et l'aperçu à côté affiche justement la couverture sur ce panneau :
+       on coche, on voit. */
+    quiz.axes.length && el('label', {
+      class: 'sheet__row' + (quiz.axesEnCouverture ? ' is-active' : ''),
+      style: { marginTop: 'var(--s-4)' },
+    }, [
+      el('input', {
+        type: 'checkbox', 'data-act': 'axes-couverture',
+        ...(quiz.axesEnCouverture ? { checked: true } : {}),
+      }),
+      el('span', { class: 'sheet__label', text: 'Les présenter sur l’écran de départ' }),
+    ]),
+    el('p', { class: 'panel__hint', style: { marginTop: 'var(--s-3)' } , text:
       'Supprimer un axe efface aussi les points que les réponses lui donnaient.' }),
   ]);
 }

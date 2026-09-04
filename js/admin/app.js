@@ -1385,12 +1385,10 @@ const refreshDiag = debounce(() => { renderRail(); rafraichirDiagCartes(); sched
 
 function onClick(event) {
   const trigger = event.target.closest('[data-act]');
-  /* Les champs sont pilotés par data-bind, pas par data-act — sauf la case
-     à cocher des crédits, dont le clic EST l'action. */
   if (!trigger) return;
   /* Les champs sont pilotés par data-bind, pas par data-act — sauf les cases
      à cocher, dont le clic EST l'action. */
-  if (trigger.tagName === 'INPUT' && !['crediter', 'confiance'].includes(trigger.dataset.act)) return;
+  if (trigger.tagName === 'INPUT' && !['crediter', 'confiance', 'axes-couverture'].includes(trigger.dataset.act)) return;
   const { act, id } = trigger.dataset;
   const [ownerId, childId] = (id || '').split('|');
   const quiz = state.quiz;
@@ -1588,6 +1586,11 @@ function onClick(event) {
       if (!reco) return undefined;
       remember('Coup de cœur modifié');
       reco.confiance = !reco.confiance;
+      return structural();
+    }
+    case 'axes-couverture': {
+      remember('Présentation des axes modifiée');
+      quiz.axesEnCouverture = !quiz.axesEnCouverture;
       return structural();
     }
     case 'crediter': {

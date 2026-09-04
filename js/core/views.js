@@ -102,7 +102,12 @@ export function coverView(quiz, options = {}) {
     el(interactive ? 'h1' : 'p', { class: 'cover__title', text: quiz.title || 'Questionnaire sans titre' }),
     quiz.tagline && el('p', { class: 'cover__tagline', text: quiz.tagline }),
     quiz.intro && el('div', { class: 'cover__intro', html: paragraphs(quiz.intro) }),
-    el('div', { class: 'cover__axes' }, quiz.axes.map((axis, rang) => el(
+    /* Seulement si l'auteur l'a demandé — voir `axesEnCouverture` dans
+       schema.js. Sans eux, le compteur du bandeau n'a personne à qui
+       succéder au premier écran : la transition de vue ne trouve pas de
+       `axe-N` de départ et l'axe apparaît au lieu de voyager. C'est un
+       supplément qui manque, pas un parcours qui casse. */
+    quiz.axesEnCouverture && el('div', { class: 'cover__axes' }, quiz.axes.map((axis, rang) => el(
       'span', {
         class: 'cover__axis',
         /* Le nom de transition fait voyager l'axe vers le compteur du
