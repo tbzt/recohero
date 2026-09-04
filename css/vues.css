@@ -31,6 +31,15 @@
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-1);
 }
+/* Le signe de la question. Plus petit que celui de la couverture : là il
+   ouvre le questionnaire et tient l'écran seul, ici il accompagne un énoncé
+   qui doit rester le plus gros objet de la page. */
+.question__emoji {
+  font-size: var(--t-2xl);
+  line-height: 1;
+  margin: 0 0 var(--s-2);
+}
+
 /* Le titre porte la police d'affichage lui-même : dans l'aperçu du
    backoffice il est un <p>, pas un <h1>, et sans ceci il tombait en sans. */
 .question__text {

@@ -7,17 +7,51 @@
 export const SCHEMA_VERSION = 1;
 
 /* Les types d'œuvre proposés dans le backoffice. Purement éditorial :
-   une reco dont le type est inconnu s'affiche quand même.               */
+   une reco dont le type est inconnu s'affiche quand même.
+
+   La liste suit la typologie des collections d'une médiathèque, et non les
+   rayons d'une librairie : on y emprunte des revues, des mangas et des jeux
+   vidéo, et on y vient pour une exposition ou un atelier. Les neuf premiers
+   types couvraient le livre et l'audiovisuel ; il manquait tout le reste du
+   catalogue, et un bibliothécaire n'avait alors que « Autre » pour dire
+   « Spirou » ou « L'heure du conte de samedi ».
+
+   Trois voisinages méritent d'être dits, parce qu'ils se confondent :
+   — BD, manga et comics sont trois entrées et non une, parce qu'une
+     médiathèque les range en trois endroits et qu'un lecteur de l'un n'est
+     pas forcément lecteur des autres ;
+   — « Animation » nomme ce que l'établissement PROGRAMME — atelier, heure du
+     conte, rencontre, concert — et non le film d'animation, qui reste un
+     film. D'où le libellé en deux mots : « Animation » seul se lirait dans
+     l'autre sens ;
+   — « Jeu » devient « Jeu de société » du jour où « Jeu vidéo » existe à côté.
+
+   Les IDENTIFIANTS ne changent jamais : `normalize()` retombe sur « autre »
+   pour un type qu'il ne connaît pas, si bien que renommer une clé
+   déclasserait en silence toutes les recos déjà saisies. Les libellés et les
+   icônes, eux, sont de la présentation et se retouchent librement.       */
 export const RECO_TYPES = [
-  { id: 'livre',    label: 'Livre',       icon: '📕' },
-  { id: 'film',     label: 'Film',        icon: '🎬' },
-  { id: 'serie',    label: 'Série',       icon: '📺' },
-  { id: 'album',    label: 'Album',       icon: '🎧' },
-  { id: 'bd',       label: 'BD',          icon: '🗯️' },
-  { id: 'jeu',      label: 'Jeu',         icon: '🎲' },
-  { id: 'podcast',  label: 'Podcast',     icon: '🎙️' },
-  { id: 'expo',     label: 'Exposition',  icon: '🖼️' },
-  { id: 'autre',    label: 'Autre',       icon: '✦' },
+  { id: 'livre',      label: 'Livre',               icon: '📕' },
+  { id: 'bd',         label: 'BD',                  icon: '🗯️' },
+  /* La fleur de cerisier plutôt qu'un drapeau : c'est le signe que portent
+     déjà les signalétiques de rayon, et il se rend à l'identique partout —
+     un drapeau régional s'affiche « JP » en lettres sous Windows. */
+  { id: 'manga',      label: 'Manga',               icon: '🌸' },
+  { id: 'comics',     label: 'Comics',              icon: '💥' },
+  { id: 'revue',      label: 'Revue',               icon: '📰' },
+  /* Le casque passe au livre audio, et le disque revient à l'album : entre
+     les deux, c'est l'album qui a un objet à montrer. */
+  { id: 'livreaudio', label: 'Livre audio',         icon: '🎧' },
+  { id: 'film',       label: 'Film',                icon: '🎬' },
+  { id: 'serie',      label: 'Série',               icon: '📺' },
+  { id: 'album',      label: 'Album',               icon: '💿' },
+  { id: 'podcast',    label: 'Podcast',             icon: '🎙️' },
+  { id: 'jeu',        label: 'Jeu de société',      icon: '🎲' },
+  { id: 'jeuvideo',   label: 'Jeu vidéo',           icon: '🎮' },
+  { id: 'numerique',  label: 'Ressource numérique', icon: '💻' },
+  { id: 'expo',       label: 'Exposition',          icon: '🖼️' },
+  { id: 'animation',  label: 'Animation, atelier',  icon: '🎪' },
+  { id: 'autre',      label: 'Autre',               icon: '✦' },
 ];
 
 /* Les glyphes proposés pour les axes. Tous pris dans des blocs Unicode
@@ -151,6 +185,10 @@ export function makeQuestion(axes = []) {
     id: uid('q'),
     text: '',
     hint: '',
+    /* La couverture et les réponses avaient leur signe ; la question, non —
+       alors que c'est elle qui occupe l'écran seule. Facultatif, et sans
+       effet sur le calcul : c'est un repère, pas une donnée. */
+    emoji: '',
     image: '',
     type: 'single',
     options: [makeOption(axes), makeOption(axes)],
@@ -226,6 +264,7 @@ export function normalize(raw) {
       id: String(q.id || uid('q')),
       text: String(q.text || ''),
       hint: String(q.hint || ''),
+      emoji: String(q.emoji || '').slice(0, 8),
       image: safeImage(q.image),
       type: q.type === 'multiple' ? 'multiple' : 'single',
       options: (Array.isArray(q.options) ? q.options : [])
@@ -339,7 +378,7 @@ export function normalize(raw) {
    vaut notre marque qu'une page anonyme.                                */
 
 export const IDENTITE_VIDE = {
-  titre: '', accroche: '', accent: '', logo: '', intro: '',
+  titre: '', accroche: '', accent: '', emoji: '', logo: '', intro: '',
   retour: { libelle: '', url: '' }, pied: '',
 };
 
@@ -356,6 +395,14 @@ export function normaliserIdentite(raw) {
     /* Même validation que l'accent d'un questionnaire : tout le thème en
        découle par color-mix, une valeur folle déteindrait sur la page. */
     accent: /^#[0-9a-f]{3,8}$/i.test(raw.accent || '') ? raw.accent : '',
+    /* Le signe du bandeau, à défaut de logo. Toutes les structures n'ont pas
+       un fichier image à portée de main — ni le droit de le poser sur un
+       hébergeur — et le repli sur NOTRE ✦ leur faisait diffuser notre marque
+       en croyant diffuser la leur. Un emoji se choisit en trois secondes.
+
+       Il ne remplace pas le logo, il le précède : là où il y a un logo, le
+       logo gagne. Deux marques côte à côte n'en feraient aucune.        */
+    emoji: String(raw.emoji || '').slice(0, 8).trim(),
     logo: safeImage(raw.logo),
     intro: String(raw.intro || '').slice(0, 600),
     /* Un lien de retour sans adresse n'est pas un lien ; une adresse sans

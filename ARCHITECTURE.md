@@ -309,7 +309,7 @@ place dans un dépôt public.*
 
 ---
 
-## Sept pièges payés comptant
+## Huit pièges payés comptant
 
 **`Object.assign(node.style, …)` ne pose pas les propriétés
 personnalisées.** `style['--axis'] = couleur` crée une propriété
@@ -383,6 +383,21 @@ collage n'importait rien, en silence. `dismiss(dialog, then)` ferme, retire et
 exécute explicitement ; l'écouteur `close` ne garde que le ramassage des
 fermetures qu'on ne provoque pas soi-même — Échap, clic sur le fond.
 
+**Un canvas ne déborde pas : il peint dans le vide.** Le découpage de texte de
+la carte coupe aux espaces. Une adresse n'en a aucune : elle passait donc pour
+un seul mot, que la boucle acceptait tel quel — il faut bien poser quelque
+chose — et qui se dessinait à sa largeur entière. Mille vingt-quatre pixels
+pour six cent quatre-vingt-seize disponibles : l'adresse traversait le QR code
+et sortait de la carte par la droite, sur toutes les cartes produites depuis
+que le pied porte une adresse. Rien ne pouvait le dire — ni débordement, ni
+barre de défilement, ni avertissement : un canvas peint hors de lui-même sans
+se plaindre. Ce qu'un espace ne sait pas couper se coupe désormais au
+caractère, à la sortie de `wrap()`.
+
+La leçon vaut au-delà de ce défaut : sur un canvas, une mise en page ne se
+relit pas, elle se **mesure** — `measureText` pour les largeurs, un
+échantillonnage de pixels pour vérifier que rien n'est sorti du cadre.
+
 **Un import qui ne sait que dupliquer rend la sauvegarde inutile.** `adopt()`
 réattribuait un identifiant neuf dès qu'il en rencontrait un déjà présent.
 Tant que l'import ne servait qu'à recevoir le modèle d'un tiers, c'était le
@@ -444,12 +459,37 @@ centaines de kilo-octets pour un résultat qu'on ne contrôlerait pas.
 
 Deux contraintes structurent le fichier.
 
-**Le plancher.** La signature est ancrée en bas. Une constante `FLOOR` marque
-la limite au-dessus de laquelle tout doit tenir, et chaque bloc facultatif
+**Le plancher.** La signature est ancrée en bas. Un `plancher` marque la
+limite au-dessus de laquelle tout doit tenir, et chaque bloc facultatif
 (sous-titre, feuille de score, recommandations) vérifie qu'il a la place
 *avant* de se dessiner. Un profil au titre de trois lignes perd des
 recommandations ; il ne mord jamais sur la signature. Vérifié par
 échantillonnage de pixels, pas par estimation.
+
+Deux choses s'apprennent le jour où on mesure vraiment au lieu d'estimer.
+
+**La place se réserve à la mesure, jamais au forfait.** Le forfait valait 96 px
+là où une recommandation en prend 86 : la deuxième sautait pour six pixels, et
+laissait un trou de quatre-vingt-dix à sa place. La carte annonçait trois
+titres et en montrait un — et l'écart ne se voyait pas, puisqu'une carte à
+laquelle il manque quelque chose ressemble à une carte.
+
+**Et le plancher n'est pas une constante : il dépend de ce que le pied va
+porter.** Avec un QR le pied prend 224 px ; sans carré, 68 — sa hauteur
+d'origine, du temps où il ne portait qu'une signature. Réserver 224 dans les
+deux cas coûtait 162 px de blanc, soit deux recommandations, sur les cartes
+sans carré : celles d'un brouillon, dont le lien porte le questionnaire entier
+et dépasse de loin ce qu'un QR de ce format sait encoder. C'étaient précisément
+les cartes qui avaient le moins à montrer.
+
+**L'adresse ne s'imprime que s'il y a un carré à scanner**, et ce n'est pas une
+coquetterie : l'encodeur ne renonce que sur une adresse trop longue pour ce
+format, c'est-à-dire exactement sur un lien porteur. Quatre mille caractères de
+base64 que personne ne recopiera. Quand elle s'imprime, ce n'est pas pour être
+tapée au clavier — personne ne saisit `?q=quel-roman-pour-cet-ete` — c'est un
+repère qui dit chez qui l'on va : d'où l'hôte seul dès que le chemin ne tient
+pas sur la ligne, et une coupe par la GAUCHE s'il le faut, puisque ce qui
+identifie une adresse est à sa fin.
 
 **Le canvas teinté.** Dessiner une image d'un autre domaine rend le canvas
 « teinté » et fait échouer `toBlob()` — la carte deviendrait impossible à
@@ -607,6 +647,12 @@ n'est pas plus sûr que ce qui vient d'un lien.
 
 Le repli est **notre** marque, pas une page vide. Un champ laissé vide n'est pas
 un trou à combler : c'est la valeur par défaut qui reste, et elle est assumée.
+
+Assumée, mais pas imposée : une structure sans fichier de logo — et sans
+hébergeur où le poser — signait son kiosque et les cartes de son public de
+NOTRE étoile. L'identité porte donc un `emoji`, choisi dans le même
+dictionnaire que partout ailleurs. Il ne concurrence pas le logo, il le
+précède : là où il y a un logo, le logo gagne.
 
 **Retirer de l'espace déplace, et n'efface plus.** `deleteQuiz()` dépose dans
 `espaces/<nom>/corbeille` **avant** de retirer de `quizzes` — dans cet ordre,

@@ -141,10 +141,13 @@ function habiller(id) {
   pose('marqueAccroche', id.accroche);
 
   /* Le logo remplace le signe, il ne s'ajoute pas : deux marques côte à
-     côte ne feraient qu'une confusion. */
+     côte ne feraient qu'une confusion. À défaut de logo, l'emoji de la
+     structure ; à défaut des deux, notre ✦ posé dans le HTML. */
   const signe = document.getElementById('marqueSigne');
   if (signe && id.logo) {
     signe.replaceChildren(el('img', { class: 'brand__logo', src: id.logo, alt: '' }));
+  } else if (signe && id.emoji) {
+    signe.textContent = id.emoji;
   }
 
   /* La barre du haut appartient au visiteur : on y met la sortie vers le

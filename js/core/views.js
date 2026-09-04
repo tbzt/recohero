@@ -30,6 +30,16 @@ export function questionView(quiz, question, index, options = {}) {
 
     question.image && el('img', { class: 'question__image', src: question.image, alt: '' }),
 
+    /* Le signe de la question, quand elle en porte un. Décoratif, donc
+       masqué à la synthèse vocale : il ne dit rien que l'énoncé ne dise, et
+       il se lirait « emoji parapluie de plage » avant la question elle-même.
+       Au-dessus du texte plutôt qu'à côté : à 42 px, l'énoncé occupe deux
+       lignes sur un téléphone, et un signe posé devant lui volerait la
+       première. */
+    question.emoji && el('p', {
+      class: 'question__emoji', 'aria-hidden': 'true', text: question.emoji,
+    }),
+
     /* Le titre reste un <h1> dans le parcours : c'est là que va le focus au
        changement d'écran. Dans un aperçu, ce serait un second <h1> sur une
        page qui en a déjà un. */

@@ -1332,6 +1332,14 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
 }
 
 .signe { display: flex; align-items: center; gap: var(--s-1); min-width: 0; }
+/* Un signe accroché à un titre : une colonne juste assez large pour le champ
+   et sa porte vers le dictionnaire, le titre prend tout le reste. Sous
+   30 rem, les deux se remettent l'un sous l'autre plutôt que de comprimer le
+   champ du titre à trois caractères. */
+.champ-titre { display: flex; align-items: flex-end; gap: var(--s-2); }
+.champ-titre > .field:first-child { flex: 0 0 5.5rem; }
+.champ-titre > .field:last-child { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 30rem) { .champ-titre { flex-wrap: wrap; } }
 .signe__champ { flex: 1 1 auto; min-width: 0; }
 .signe__ouvrir { flex: none; }
 

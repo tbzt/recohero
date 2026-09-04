@@ -372,7 +372,8 @@ function questionCard(quiz, question, index, ctx = {}) {
       /* Le texte n'est dans l'en-tête que repliée : dépliée, il est le champ
          juste dessous, en corps de titre. Le lire deux fois n'aidait pas. */
       folded
-        ? el('span', { class: 'editor-card__label', text: question.text || 'Question sans texte' })
+        ? el('span', { class: 'editor-card__label', text:
+            `${question.emoji ? question.emoji + ' ' : ''}${question.text || 'Question sans texte'}` })
         : el('span', { class: 'editor-card__label' }),
       folded && summary([
         `${question.options.length} réponse${question.options.length > 1 ? 's' : ''}`,
@@ -400,8 +401,18 @@ function questionCard(quiz, question, index, ctx = {}) {
         'Image de la question', `question:${question.id}:image`, question.image, 'cover',
         'Affichée au-dessus de l’énoncé, pleine largeur.',
       ),
-      field('Question', input(`question:${question.id}:text`, question.text,
-        { class: 'input input--titre', placeholder: 'Il est 15 h, un dimanche d’août. Tu…' })),
+      /* Le signe est un accessoire de l'énoncé, pas un champ de plus : il
+         partage sa ligne. Lui donner une colonne de formulaire entière —
+         comme le fait le panneau Identité pour la couverture — le ferait
+         passer pour une décision du même poids que la question. */
+      el('div', { class: 'champ-titre' }, [
+        field('Signe', champSigne(`question:${question.id}:emoji`, question.emoji, 'emoji', {
+          class: 'input signe__champ', maxlength: '4', placeholder: '🙂',
+          style: 'text-align:center', 'aria-label': 'Signe de la question',
+        })),
+        field('Question', input(`question:${question.id}:text`, question.text,
+          { class: 'input input--titre', placeholder: 'Il est 15 h, un dimanche d’août. Tu…' })),
+      ]),
       el('div', { class: 'grid-2' }, [
         field('Précision (facultatif)', input(`question:${question.id}:hint`, question.hint,
           { placeholder: 'Une consigne courte.' })),

@@ -1703,9 +1703,28 @@ async function attachImage(bind, kind, file) {
    comme avant.                                                           */
 function ouvrirSymboles(cible) {
   const [bind, mode] = String(cible).split('|');
+  choisirSigne({
+    mode,
+    actuel: valeurLiee(bind),
+    poser: (signe) => {
+      apply(bind, signe);
+      flush();
+      renderRail();
+      renderPanel();
+    },
+  });
+}
+
+/* Le dictionnaire lui-même, séparé de la liaison au questionnaire. Le
+   sélecteur ne servait qu'à des champs `data-bind`, c'est-à-dire au modèle du
+   document ouvert ; l'identité de l'espace, elle, vit dans un formulaire à
+   part, avec ses propres nœuds et son propre enregistrement. Sans cette
+   coupure, lui donner un signe demandait soit de recopier le dictionnaire,
+   soit de faire passer l'identité par `apply()` — c'est-à-dire de la ranger
+   dans le questionnaire, où elle n'a rien à faire. */
+function choisirSigne({ mode, actuel = '', poser: retenir }) {
   const emoji = mode === 'emoji';
   const dictionnaire = emoji ? EMOJIS : GLYPHES;
-  const actuel = valeurLiee(bind);
 
   const recherche = el('input', {
     class: 'input', type: 'search',
@@ -1716,10 +1735,7 @@ function ouvrirSymboles(cible) {
   const vide = el('p', { class: 'field__hint', hidden: true, text: 'Aucun signe pour cette recherche.' });
 
   const poser = (signe) => {
-    apply(bind, signe);
-    flush();
-    renderRail();
-    renderPanel();
+    retenir(signe);
     dismiss(dialog);
   };
 
@@ -2767,6 +2783,24 @@ function sectionApparence() {
   const accroche = el('input', { class: 'input', value: actuelle.accroche || '', placeholder: 'Trois minutes, et vous repartez avec une idée', maxlength: '160' });
   const intro = el('textarea', { class: 'textarea', rows: '3', placeholder: 'Deux phrases d’accueil, facultatives.', maxlength: '600' });
   intro.value = actuelle.intro || '';
+  /* Le signe du bandeau, à défaut de logo. Toutes les structures n'ont pas
+     un fichier image sous la main, et le repli était NOTRE ✦ : elles
+     diffusaient notre marque en croyant diffuser la leur. Le même
+     dictionnaire que partout ailleurs — on ne demande à personne de savoir
+     taper un emoji sur un poste de travail. */
+  const signe = el('input', {
+    class: 'input signe__champ', value: actuelle.emoji || '', maxlength: '4',
+    placeholder: '🏛', style: 'text-align:center', 'aria-label': 'Signe du bandeau',
+  });
+  const signeOuvrir = el('button', {
+    class: 'btn btn--icon btn--quiet signe__ouvrir', type: 'button', text: '⊞',
+    title: 'Choisir un emoji', 'aria-label': 'Choisir un emoji',
+    onClick: () => choisirSigne({
+      mode: 'emoji',
+      actuel: signe.value.trim(),
+      poser: (valeur) => { signe.value = valeur; },
+    }),
+  });
   const logo = el('input', { class: 'input input--mono', value: actuelle.logo || '', placeholder: 'https://… (facultatif)' });
   const accent = el('input', { class: 'swatch-input', type: 'color', value: actuelle.accent || '#2E6BA8' });
   const retourUrl = el('input', { class: 'input input--mono', value: actuelle.retour?.url || '', placeholder: 'https://mediatheque.fr' });
@@ -2783,7 +2817,7 @@ function sectionApparence() {
      aperçu qui prétend montrer le résultat. */
   const lireLeFormulaire = () => normaliserIdentite({
     titre: titre.value, accroche: accroche.value, intro: intro.value,
-    logo: logo.value, accent: accent.value, pied: pied.value,
+    emoji: signe.value, logo: logo.value, accent: accent.value, pied: pied.value,
     retour: { url: retourUrl.value.trim(), libelle: retourLib.value },
   });
 
@@ -2797,10 +2831,16 @@ function sectionApparence() {
       el('span', { class: 'field__hint', text: 'Le grand titre de la page.' }),
     ]),
     el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Mot d’accueil' }), intro]),
+    el('div', { class: 'field' }, [
+      el('span', { class: 'field__label', text: 'Signe' }),
+      el('span', { class: 'signe', style: { maxWidth: '7rem' } }, [signe, signeOuvrir]),
+      el('span', { class: 'field__hint', text:
+        'Remplace le ✦ de RecoHero dans le bandeau, quand il n’y a pas de logo.' }),
+    ]),
     el('label', { class: 'field' }, [
       el('span', { class: 'field__label', text: 'Logo' }), logo,
       el('span', { class: 'field__hint', text:
-        'Remplace le signe ✦ dans le bandeau. Un SVG en ligne (data:) est refusé : donnez une adresse https, ou un PNG.' }),
+        'Prend la place du signe. Un SVG en ligne (data:) est refusé : donnez une adresse https, ou un PNG.' }),
     ]),
     el('div', { class: 'field' }, [
       el('span', { class: 'field__label', text: 'Couleur' }),
