@@ -8,12 +8,12 @@
 import { resolveQuiz, loadAll } from './core/catalog.js';
 import { vitrines as chargerVitrines, compterParcours, compterDebut, identite as chargerIdentite } from './core/remote.js';
 import { tally, resolve, proximite, indices } from './core/scoring.js';
-import { RECO_TYPES, slugify, dureeEstimee, normaliserIdentite } from './core/schema.js';
-import { questionView } from './core/views.js';
+import { slugify, normaliserIdentite } from './core/schema.js';
+import { questionView, coverView, bannerView, recoView } from './core/views.js';
 import * as store from './core/store.js';
 import { linkFor } from './core/share.js';
 import { renderResultCard, toBlob } from './core/card.js';
-import { el, paragraphs, escapeHtml, applyAccent, toast, copy, downloadBlob, avecEspace, garderEspace } from './core/ui.js';
+import { el, applyAccent, toast, copy, downloadBlob, avecEspace, garderEspace } from './core/ui.js';
 
 const params = new URLSearchParams(location.search);
 const isTest = params.has('test');
@@ -404,50 +404,13 @@ function bump(axisIds) {
 function renderCover() {
   const { quiz } = state;
   const resumable = Object.keys(state.answers).length > 0;
-
-  return el('section', { class: 'cover' }, [
-    /* La lumière de fin de journée : une lueur chaude et quelques grains
-       qui dérivent, derrière le titre. Purement décoratif — masqué aux
-       lecteurs d'écran, éteint sous `--ambient`, et rien du parcours n'en
-       dépend. */
-    el('div', { class: 'cover__lueur', 'aria-hidden': 'true' },
-      [0, 1, 2, 3].map(() => el('span', { class: 'cover__mote' }))),
-    quiz.image
-      ? el('img', { class: 'cover__image', src: quiz.image, alt: '' })
-      : el('div', { class: 'cover__emoji', text: quiz.emoji || '✦' }),
-    el('h1', { class: 'cover__title', text: quiz.title }),
-    quiz.tagline && el('p', { class: 'cover__tagline', text: quiz.tagline }),
-    quiz.intro && el('div', { class: 'cover__intro', html: paragraphs(quiz.intro) }),
-    el('div', { class: 'cover__axes' }, quiz.axes.map((axis, rang) => el(
-      'span', {
-        class: 'cover__axis',
-        style: { '--axis': axis.color, animationDelay: `${120 + rang * 60}ms` },
-      },
-      [el('span', { class: 'glyph', text: axis.glyph }), axis.label],
-    ))),
-    el('div', { class: 'cover__actions' }, [
-      el('button', {
-        class: 'btn btn--primary', type: 'button',
-        'data-act': resumable ? 'resume' : 'start',
-        text: resumable ? 'Reprendre où j’en étais' : 'Commencer',
-      }),
-      resumable && el('button', {
-        class: 'btn btn--ghost', type: 'button', 'data-act': 'restart', text: 'Repartir de zéro',
-      }),
-    ]),
-    signature(quiz),
-    /* La durée d'abord : « huit questions » ne dit pas si on a le temps, et
-       c'est la seule chose que se demande quelqu'un qui hésite devant une
-       tablette — ou devant une affiche, qui annonce la même estimation. */
-    el('p', {
-      class: 'cover__meta',
-      text: `environ ${dureeEstimee(quiz)} minute${dureeEstimee(quiz) > 1 ? 's' : ''} · `
-          + `${quiz.questions.length} question${quiz.questions.length > 1 ? 's' : ''} · `
-          + `${quiz.results.length} profil${quiz.results.length > 1 ? 's' : ''} possible`
-          + `${quiz.results.length > 1 ? 's' : ''}`,
-    }),
-    isTest && el('p', { class: 'cover__meta' }, [el('span', { class: 'pill pill--warn', text: 'Mode test — rien n’est enregistré' })]),
-  ]);
+  const vue = coverView(quiz, { resumable, signature: signature(quiz) });
+  if (isTest) {
+    vue.append(el('p', { class: 'cover__meta' }, [
+      el('span', { class: 'pill pill--warn', text: 'Mode test — rien n’est enregistré' }),
+    ]));
+  }
+  return vue;
 }
 
 /* Les auteurs crédités, et seulement ceux qui ont choisi d'être nommés.
@@ -593,14 +556,14 @@ function renderResult() {
        dans l'ordre où il a été établi — voilà ce que vous avez récolté,
        voilà donc ce qu'on vous propose. */
     el('div', { class: 'recos__list' },
-      calculees.map((reco, i) => renderReco(reco, i, retard))),
+      calculees.map((reco, i) => recoView(reco, i, retard))),
 
     coeur.length && el('div', { class: 'recos__coeur' }, [
       el('p', { class: 'recos__coeur__intro', text: coeur.length > 1
         ? 'Et parce qu’on y tient, quoi qu’en dise le compteur :'
         : 'Et parce qu’on y tient, quoi qu’en dise le compteur :' }),
       el('div', { class: 'recos__list' },
-        coeur.map((reco, i) => renderReco(reco, calculees.length + i, retard))),
+        coeur.map((reco, i) => recoView(reco, calculees.length + i, retard))),
     ]),
   ]);
 
@@ -640,19 +603,7 @@ function renderResult() {
   const node = el('section', { class: 'result', style: { '--apres': `${apres}ms` } }, [
     depouillement,
 
-    el('div', { class: 'result__banner' }, [
-      /* Le halo qui s'allume derrière le profil, et trois étincelles.
-         Décoratif : le résultat se lit exactement pareil sans eux. */
-      el('div', { class: 'result__halo', 'aria-hidden': 'true' }),
-      el('span', { class: 'result__spark', 'aria-hidden': 'true' }),
-      el('span', { class: 'result__spark', 'aria-hidden': 'true' }),
-      el('span', { class: 'result__spark', 'aria-hidden': 'true' }),
-      el('p', { class: 'result__kicker', text: quiz.title }),
-      profile.image && el('img', { class: 'result__image', src: profile.image, alt: '' }),
-      el('h1', { class: 'result__title', text: profile.title }),
-      profile.subtitle && el('p', { class: 'result__subtitle', text: profile.subtitle }),
-      profile.text && el('div', { class: 'result__text', html: paragraphs(profile.text) }),
-    ]),
+    bannerView(quiz, profile),
 
     /* La jauge se lit d'un axe à l'autre, pas contre un plafond que le
        questionnaire rend inatteignable (voir `sommet`, plus haut) : l'axe
@@ -856,31 +807,6 @@ function presqueNode(quiz, scores, profile) {
       r.creator && el('span', { class: 'presque__auteur', text: ` — ${r.creator}` }),
       r.location && el('span', { class: 'presque__cote', text: ` · 📍 ${r.location}` }),
     ]))),
-  ]);
-}
-
-function renderReco(reco, index, retard = 0) {
-  const type = RECO_TYPES.find((t) => t.id === reco.type) || RECO_TYPES.at(-1);
-  const meta = [reco.creator, reco.year].filter(Boolean).join(' · ');
-  const title = reco.link
-    ? `<a href="${escapeHtml(reco.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(reco.title)} ↗</a>`
-    : escapeHtml(reco.title);
-
-  return el('article', { class: 'reco', style: { animationDelay: `${retard + index * 70}ms` } }, [
-    reco.image
-      ? el('img', { class: 'reco__cover', src: reco.image, alt: '', loading: 'lazy' })
-      : el('div', { class: 'reco__icon', text: type.icon, title: type.label, 'aria-hidden': 'true' }),
-    el('div', {}, [
-      el('h3', { class: 'reco__title', html: title }),
-      meta && el('p', { class: 'reco__creator', text: meta }),
-      reco.note && el('p', { class: 'reco__note', text: reco.note }),
-      /* Le seul élément de la reco qui serve une fois debout, dans le
-         bâtiment. Il se détache pour ça. */
-      reco.location && el('p', { class: 'reco__location' }, [
-        el('span', { 'aria-hidden': 'true', text: '📍' }),
-        el('span', { text: reco.location }),
-      ]),
-    ]),
   ]);
 }
 

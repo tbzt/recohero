@@ -41,7 +41,7 @@ placés sous lui.
 | `core/scoring.js` | Le comptage, la résolution du profil, la joignabilité. Fonctions **pures**. | lire le DOM, écrire du stockage |
 | `core/share.js` | Encodage / décodage d'un questionnaire dans une URL. | valider le contenu |
 | `core/catalog.js` | D'où viennent les questionnaires : lien, dépôt, brouillons. | modifier un questionnaire |
-| `core/views.js` | La vue d'une question, **partagée** par le parcours et l'aperçu du backoffice. | connaître l'état de l'un ou de l'autre |
+| `core/views.js` | Les vues du parcours — question, couverture, bandeau de profil, recommandation — **partagées** par le parcours et l'aperçu du backoffice. | connaître l'état de l'un ou de l'autre |
 | `core/sortable.js` | Réordonner une liste au pointeur. | connaître ce qu'elle contient |
 | `core/card.js` | Dessiner la carte de résultat sur un canvas. | lire le DOM de la page |
 | `core/qr.js` | Encoder un texte en matrice de QR code. Fonctions **pures**. | savoir ce qu'il encode, ni où ça se dessine |
@@ -143,7 +143,7 @@ Cinq fichiers dans un ordre qui ne change pas.
 | `foundation.css` | les tokens : couleur, typo, espace, mouvement, z-index | `:root` uniquement |
 | `base.css` | la remise à zéro, les éléments nus, les primitives de page | éléments, `.page`, `.stack` |
 | `components.css` | ce qui sert à **au moins deux** pages | classes de composant |
-| `vues.css` | la vue d'une question, rendue par `views.js` — chargée par le parcours **et** le backoffice, sans quoi l'aperçu de l'éditeur ne ressemble pas au parcours | `.question*`, `.option*` |
+| `vues.css` | les vues du parcours rendues par `views.js` — question, couverture, bandeau de profil, recommandation — chargées par le parcours **et** le backoffice, sans quoi l'aperçu de l'éditeur ne ressemble pas au parcours | `.question*`, `.option*`, `.cover*`, `.result__*`, `.reco*` |
 | `gallery` / `quiz` / `admin.css` | ce qui ne sert qu'à cette page | classes de page |
 
 Un composant qui n'apparaît que sur une page n'a rien à faire dans

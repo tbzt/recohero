@@ -9,6 +9,31 @@ import { RECO_TYPES, ACCENTS, NOMS_ACCENTS, RULE_MODES, slugify, imageWeight } f
 import { ceilings } from '../core/scoring.js';
 import { el, formatBytes, contrasteSurBlanc } from '../core/ui.js';
 
+/* Les constats du diagnostic qui visent cet objet, posés sur sa carte. Le
+   rail garde la vue d'ensemble ; ici, la remarque est là où l'on corrige.
+   Repliée, la carte propose de se déplier — c'est là qu'est le champ. */
+export function diagCarte(ctx, id, folded = false) {
+  const soucis = (ctx.issues || []).filter((i) => i.id === id);
+  if (!soucis.length) return null;
+  const erreur = soucis.some((i) => i.level === 'error');
+  return el('div', { class: 'diag-carte' + (erreur ? ' diag-carte--erreur' : '') }, [
+    ...soucis.map((issue) => el('p', { class: `diag-carte__ligne diag-carte__ligne--${issue.level === 'error' ? 'error' : 'warn'}` }, [
+      el('span', { class: 'diag-carte__marque', 'aria-hidden': 'true', text: issue.level === 'error' ? '●' : '▲' }),
+      el('span', { text: issue.msg }),
+    ])),
+    folded && el('button', {
+      class: 'diag-carte__ouvrir', type: 'button', 'data-act': 'card-fold', 'data-id': id, text: 'Déplier',
+    }),
+  ]);
+}
+
+/* La classe d'état d'une carte, d'après ses constats. */
+const etatCarte = (ctx, id) => {
+  const soucis = (ctx.issues || []).filter((i) => i.id === id);
+  if (!soucis.length) return '';
+  return soucis.some((i) => i.level === 'error') ? ' a-corriger' : ' a-verifier';
+};
+
 /* En dessous de tant de parcours terminés, on montre le compte plutôt que
    la part : un pourcentage sur sept parcours désigne des personnes. */
 export const PETIT_ECHANTILLON = 30;
@@ -190,7 +215,7 @@ export function identite(quiz, ctx = {}) {
 
 /* --- 2. Axes ---------------------------------------------------------------- */
 
-export function axes(quiz) {
+export function axes(quiz, ctx = {}) {
   const caps = ceilings(quiz);
 
   return el('section', { class: 'panel' }, [
@@ -199,7 +224,7 @@ export function axes(quiz) {
     ]),
     quiz.axes.length
       ? el('div', { class: 'editor-list', 'data-sortable': 'axes' }, quiz.axes.map((axis, i) => el('div', {
-          class: 'axis-row', style: { '--axis': axis.color },
+          class: 'axis-row' + etatCarte(ctx, axis.id), style: { '--axis': axis.color }, 'data-carte': axis.id,
         }, [
           grip(axis.label || `axe ${i + 1}`),
           champSigne(`axis:${axis.id}:glyph`, axis.glyph, 'glyphe', {
@@ -216,6 +241,7 @@ export function axes(quiz) {
             tool('axis-down', axis.id, 'Descendre', '↓', { disabled: i === quiz.axes.length - 1 }),
             tool('axis-del', axis.id, 'Supprimer cet axe', '✕'),
           ]),
+          diagCarte(ctx, axis.id),
         ])))
       : el('div', { class: 'empty' }, [
           el('div', { class: 'empty__icon', text: '★' }),
@@ -244,12 +270,8 @@ export function axes(quiz) {
    change. Un questionnaire écrit avant ceci s'ouvre sans conversion, et un
    auteur qui veut du point près récupère son champ numérique d'un clic.    */
 
-const INTENSITES = [
-  { value: '0', label: '—' },
-  { value: '1', label: 'un peu' },
-  { value: '2', label: 'beaucoup' },
-  { value: '3', label: 'à fond' },
-];
+/* Les quatre niveaux, dits à la synthèse vocale et dans l'infobulle. */
+export const NIVEAUX = ['rien', 'un peu', 'beaucoup', 'à fond'];
 
 export function poidsHorsEchelle(quiz) {
   return quiz.questions.some((q) => q.options.some((o) =>
@@ -264,25 +286,40 @@ function pesee(question, option, axis, rang, ctx) {
   /* Le mot « points » n'apparaît que dans le mode qui en montre. Ailleurs on
      parle de ce que la réponse révèle, parce que c'est ce que l'auteur pense
      en la posant. */
-  const controle = ctx.poidsFins || ctx.poidsHorsEchelle
-    ? el('input', {
+  if (ctx.poidsFins || ctx.poidsHorsEchelle) {
+    return el('span', {
+      class: 'scorechip' + (valeur !== 0 ? ' is-set' : ''),
+      style: { '--axis': axis.color }, title: axis.label,
+    }, [
+      el('span', { class: 'scorechip__glyph', text: axis.glyph }),
+      el('input', {
         class: 'scorechip__input', type: 'number', min: '-9', max: '9', step: '1',
         'data-bind': bind, value: String(valeur),
         'aria-label': `Points ${nom}`,
-      })
-    : el('select', {
-        class: 'scorechip__select', 'data-bind': bind,
-        'aria-label': `Ce que cette réponse révèle — ${nom}`,
-      }, INTENSITES.map((n) => el('option', {
-        value: n.value, selected: n.value === String(valeur) ? '' : null, text: n.label,
-      })));
+      }),
+    ]);
+  }
 
-  return el('span', {
-    class: 'scorechip' + (valeur !== 0 ? ' is-set' : ''),
-    style: { '--axis': axis.color }, title: axis.label,
+  /* Un clic par niveau. La pastille était un menu déroulant : deux clics et
+     une liste système par-dessus, pour le geste le plus répété de
+     l'éditeur. Elle se règle maintenant en la touchant — chaque clic monte
+     d'un cran, le quatrième revient à rien — et au clavier par ← →.
+     C'est un curseur pour la synthèse vocale, qui en lit le niveau en mots.
+     app.js applique la valeur et met le bouton à jour sur place, sans
+     redessiner : le focus reste où il est. */
+  const niveau = Math.max(0, Math.min(3, valeur));
+  return el('button', {
+    class: 'pesee' + (niveau ? ' is-set' : ''), type: 'button',
+    'data-act': 'pesee', 'data-id': `${question.id}|${option.id}|${axis.id}`,
+    'data-niveau': String(niveau),
+    style: { '--axis': axis.color },
+    role: 'slider', 'aria-valuemin': '0', 'aria-valuemax': '3',
+    'aria-valuenow': String(niveau), 'aria-valuetext': NIVEAUX[niveau],
+    'aria-label': `Ce que cette réponse révèle — ${nom}`,
+    title: `${axis.label} : ${NIVEAUX[niveau]}`,
   }, [
-    el('span', { class: 'scorechip__glyph', text: axis.glyph }),
-    controle,
+    el('span', { class: 'pesee__glyph', text: axis.glyph }),
+    el('span', { class: 'pesee__niveaux', 'aria-hidden': 'true' }, [el('i'), el('i'), el('i')]),
   ]);
 }
 
@@ -307,20 +344,6 @@ export function questions(quiz, ctx = {}) {
       'au-delà de trois, ou négatives. Elles restent réglables au point près.',
     ]),
 
-    /* L'aperçu se remplit depuis app.js et se met à jour à la frappe, sans
-       redessiner le panneau — sans quoi le curseur sauterait du champ. */
-    el('div', { class: 'preview' + (ctx.previewOpen === false ? ' is-closed' : ''), id: 'questionPreview' }, [
-      el('div', { class: 'preview__bar' }, [
-        el('span', { class: 'preview__title', text: 'Aperçu' }),
-        el('span', { class: 'preview__hint', id: 'previewHint', text: 'Placez le curseur dans une question' }),
-        el('span', { class: 'panel__spacer' }),
-        el('button', {
-          class: 'btn btn--quiet btn--sm', type: 'button', 'data-act': 'preview-toggle',
-          text: ctx.previewOpen === false ? 'Afficher' : 'Masquer',
-        }),
-      ]),
-      el('div', { class: 'preview__stage', id: 'previewStage' }),
-    ]),
     quiz.questions.length
       ? el('div', { class: 'editor-list', 'data-sortable': 'questions' },
           quiz.questions.map((q, i) => questionCard(quiz, q, i, ctx)))
@@ -338,12 +361,19 @@ function questionCard(quiz, question, index, ctx = {}) {
   const fed = quiz.axes.filter((axis) =>
     question.options.some((o) => (o.scores[axis.id] || 0) > 0));
 
-  return el('article', { class: 'editor-card' + (folded ? ' is-folded' : '') }, [
+  return el('article', {
+    class: 'editor-card' + (folded ? ' is-folded' : '') + etatCarte(ctx, question.id),
+    'data-carte': question.id,
+  }, [
     el('header', { class: 'editor-card__head' }, [
       grip(`question ${index + 1}`),
       fold(question.id, folded, 'la question'),
       el('span', { class: 'editor-card__index', text: String(index + 1) }),
-      el('span', { class: 'editor-card__label', text: question.text || 'Question sans texte' }),
+      /* Le texte n'est dans l'en-tête que repliée : dépliée, il est le champ
+         juste dessous, en corps de titre. Le lire deux fois n'aidait pas. */
+      folded
+        ? el('span', { class: 'editor-card__label', text: question.text || 'Question sans texte' })
+        : el('span', { class: 'editor-card__label' }),
       folded && summary([
         `${question.options.length} réponse${question.options.length > 1 ? 's' : ''}`,
         question.type === 'multiple' ? 'choix multiple' : null,
@@ -364,13 +394,14 @@ function questionCard(quiz, question, index, ctx = {}) {
         tool('q-del', question.id, 'Supprimer la question', '✕'),
       ]),
     ]),
+    diagCarte(ctx, question.id, folded),
     !folded && el('div', { class: 'editor-card__body stack' }, [
       (ctx.expanded?.has(question.id) || question.image) && imageField(
         'Image de la question', `question:${question.id}:image`, question.image, 'cover',
         'Affichée au-dessus de l’énoncé, pleine largeur.',
       ),
       field('Question', input(`question:${question.id}:text`, question.text,
-        { placeholder: 'Il est 15 h, un dimanche d’août. Tu…' })),
+        { class: 'input input--titre', placeholder: 'Il est 15 h, un dimanche d’août. Tu…' })),
       el('div', { class: 'grid-2' }, [
         field('Précision (facultatif)', input(`question:${question.id}:hint`, question.hint,
           { placeholder: 'Une consigne courte.' })),
@@ -470,12 +501,17 @@ function resultCard(quiz, result, index, ctx) {
     result.rule.mode === 'total' ? `total ${result.rule.min}–${result.rule.max}` :
     'par défaut';
 
-  return el('article', { class: 'editor-card' + (folded ? ' is-folded' : '') }, [
+  return el('article', {
+    class: 'editor-card' + (folded ? ' is-folded' : '') + etatCarte(ctx, result.id),
+    'data-carte': result.id,
+  }, [
     el('header', { class: 'editor-card__head' }, [
       grip(`profil ${index + 1}`),
       fold(result.id, folded, 'le profil'),
       el('span', { class: 'editor-card__index', text: String(index + 1) }),
-      el('span', { class: 'editor-card__label', text: result.title || 'Profil sans titre' }),
+      folded
+        ? el('span', { class: 'editor-card__label', text: result.title || 'Profil sans titre' })
+        : el('span', { class: 'editor-card__label' }),
       folded && summary([
         condition,
         `${result.recos.length} reco${result.recos.length > 1 ? 's' : ''}`,
@@ -513,9 +549,10 @@ function resultCard(quiz, result, index, ctx) {
         tool('res-del', result.id, 'Supprimer le profil', '✕'),
       ]),
     ]),
+    diagCarte(ctx, result.id, folded),
     !folded && el('div', { class: 'editor-card__body stack' }, [
       field('Titre du profil', input(`result:${result.id}:title`, result.title,
-        { placeholder: '🌊 Le solaire mélancolique' }),
+        { class: 'input input--titre', placeholder: '🌊 Le solaire mélancolique' }),
         'Un emoji en tête du titre s’affiche avec lui — pas besoin d’un champ à part.'),
       field('Sous-titre', input(`result:${result.id}:subtitle`, result.subtitle,
         { placeholder: 'Vous aimez que ça finisse mal, mais au soleil.' })),

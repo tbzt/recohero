@@ -478,9 +478,13 @@ function clampScore(value) {
    « pas encore prêt », et on dit précisément pourquoi.                   */
 
 export function diagnose(quiz) {
+  /* `where` désigne la section, `id` l'objet fautif quand il y en a un :
+     l'éditeur pose alors la remarque sur la carte même, et le rail sait
+     y conduire. Les constats sans objet — pas de filet, doublon entre
+     profils — restent au niveau de la section. */
   const issues = [];
-  const err = (msg, where) => issues.push({ level: 'error', msg, where });
-  const warn = (msg, where) => issues.push({ level: 'warn', msg, where });
+  const err = (msg, where, id = null) => issues.push({ level: 'error', msg, where, id });
+  const warn = (msg, where, id = null) => issues.push({ level: 'warn', msg, where, id });
 
   if (!quiz.title.trim()) err('Le questionnaire n’a pas de titre.', 'identite');
   if (!quiz.axes.length) err('Aucun axe : il n’y a rien à compter.', 'axes');
@@ -489,41 +493,41 @@ export function diagnose(quiz) {
 
   const labels = new Set();
   quiz.axes.forEach((a) => {
-    if (!a.label.trim()) warn('Un axe n’a pas de nom.', 'axes');
+    if (!a.label.trim()) warn('Un axe n’a pas de nom.', 'axes', a.id);
     if (labels.has(a.label.trim().toLowerCase())) {
-      warn(`Deux axes s’appellent « ${a.label} ».`, 'axes');
+      warn(`Deux axes s’appellent « ${a.label} ».`, 'axes', a.id);
     }
     labels.add(a.label.trim().toLowerCase());
   });
 
   quiz.questions.forEach((q, i) => {
     const n = i + 1;
-    if (!q.text.trim()) err(`Question ${n} : le texte est vide.`, 'questions');
-    if (q.options.length < 2) err(`Question ${n} : il faut au moins deux réponses.`, 'questions');
+    if (!q.text.trim()) err(`Question ${n} : le texte est vide.`, 'questions', q.id);
+    if (q.options.length < 2) err(`Question ${n} : il faut au moins deux réponses.`, 'questions', q.id);
     q.options.forEach((o, j) => {
-      if (!o.text.trim()) err(`Question ${n}, réponse ${j + 1} : texte vide.`, 'questions');
+      if (!o.text.trim()) err(`Question ${n}, réponse ${j + 1} : texte vide.`, 'questions', q.id);
     });
     const anyPoint = q.options.some((o) => Object.values(o.scores).some((v) => v !== 0));
     if (!anyPoint && q.options.length) {
-      warn(`Question ${n} : aucune réponse ne rapporte de point, elle n’influence rien.`, 'questions');
+      warn(`Question ${n} : aucune réponse ne rapporte de point, elle n’influence rien.`, 'questions', q.id);
     }
   });
 
   /* Un axe qui ne reçoit jamais de point ne peut pas être dominant. */
   quiz.axes.forEach((a) => {
     const reachable = quiz.questions.some((q) => q.options.some((o) => (o.scores[a.id] || 0) > 0));
-    if (!reachable) warn(`L’axe « ${a.label} » ne reçoit de point nulle part.`, 'axes');
+    if (!reachable) warn(`L’axe « ${a.label} » ne reçoit de point nulle part.`, 'axes', a.id);
   });
 
   quiz.results.forEach((r, i) => {
     const n = i + 1;
-    if (!r.title.trim()) err(`Profil ${n} : pas de titre.`, 'resultats');
-    if (!r.recos.length) warn(`Profil ${n} : aucune recommandation.`, 'resultats');
+    if (!r.title.trim()) err(`Profil ${n} : pas de titre.`, 'resultats', r.id);
+    if (!r.recos.length) warn(`Profil ${n} : aucune recommandation.`, 'resultats', r.id);
     r.recos.forEach((c, j) => {
-      if (!c.title.trim()) warn(`Profil ${n}, reco ${j + 1} : pas de titre.`, 'resultats');
+      if (!c.title.trim()) warn(`Profil ${n}, reco ${j + 1} : pas de titre.`, 'resultats', r.id);
     });
     if (r.rule.mode === 'range' && r.rule.min > r.rule.max) {
-      err(`Profil ${n} : intervalle inversé (min > max).`, 'resultats');
+      err(`Profil ${n} : intervalle inversé (min > max).`, 'resultats', r.id);
     }
   });
 

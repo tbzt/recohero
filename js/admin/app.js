@@ -5,7 +5,7 @@
    par un data-bind : aucun gestionnaire en ligne dans le HTML.
    ========================================================================== */
 
-import { PANELS, poidsHorsEchelle, PETIT_ECHANTILLON } from './panels.js';
+import { PANELS, NIVEAUX, diagCarte, poidsHorsEchelle, PETIT_ECHANTILLON } from './panels.js';
 import {
   makeQuiz, makeAxis, makeQuestion, makeOption, makeResult, makeReco,
   normalize, diagnose, uid, slugify, safeImage, imageWeight, RECO_TYPES,
@@ -14,7 +14,7 @@ import {
 import { GLYPHES, EMOJIS, chercher } from '../core/symboles.js';
 import { reachability } from '../core/scoring.js';
 import { bindSortables } from '../core/sortable.js';
-import { questionView } from '../core/views.js';
+import { questionView, coverView, bannerView, recoView } from '../core/views.js';
 import { loadPublished, loadEspace, forgetEspace } from '../core/catalog.js';
 import * as remote from '../core/remote.js';
 import * as store from '../core/store.js';
@@ -95,7 +95,8 @@ boot();
 
 async function boot() {
   for (const id of ['gate', 'gateForm', 'gatePass', 'shell', 'rail', 'panel',
-                    'quizName', 'saveStatus', 'topActions', 'tabbar']) {
+                    'quizName', 'saveStatus', 'topActions', 'tabbar',
+                    'apercu', 'apercuScene', 'apercuLegende', 'apercuBascule']) {
     dom[id] = document.getElementById(id);
   }
   state.espace = espaceCourant();
@@ -235,14 +236,27 @@ async function open() {
   dom.quizName.parentElement?.addEventListener('click', onClick);
   window.addEventListener('beforeunload', flush);
   dom.shell.addEventListener('focusin', (event) => {
-    const bind = event.target.closest('[data-bind]')?.dataset.bind || '';
+    const bind = event.target.closest('[data-bind]')?.dataset.bind
+      || (event.target.closest('[data-act="pesee"]') && `score:${event.target.closest('[data-act="pesee"]').dataset.id.replaceAll('|', ':')}`)
+      || '';
     /* Que le curseur soit dans l'énoncé, dans une réponse ou dans une
-       pesée, l'identifiant retenu est celui de la question qui les porte :
-       c'est elle qu'on veut à l'aperçu. */
-    const id = /^(?:question|option|score):([^:]+)/.exec(bind)?.[1];
+       pesée, l'identifiant retenu est celui de la question qui les porte ;
+       dans un titre, une règle ou une reco, celui du profil. C'est lui
+       qu'on veut au téléphone. */
+    const id = /^(?:question|option|score|result|rule|reco):([^:|]+)/.exec(bind)?.[1];
     if (!id || id === state.focused) return;
     state.focused = id;
     paintPreview();
+  });
+  /* La pesée au clavier : ← → et ↑ ↓ montent et descendent d'un cran. */
+  dom.shell.addEventListener('keydown', (event) => {
+    const bouton = event.target.closest?.('[data-act="pesee"]');
+    if (!bouton) return;
+    const delta = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    const [qId, oId, aId] = bouton.dataset.id.split('|');
+    reglerPesee(bouton, qId, oId, aId, Number(bouton.dataset.niveau) + delta);
   });
   window.addEventListener('keydown', (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
@@ -586,7 +600,7 @@ function renderRail() {
       issues.length
         ? el('div', { class: 'diag' }, issues.slice(0, 12).map((issue) => el('button', {
             class: `diag__item diag__item--${issue.level === 'error' ? 'error' : 'warn'}`,
-            type: 'button', 'data-act': 'panel', 'data-id': issue.where,
+            type: 'button', 'data-act': 'panel', 'data-id': issue.where, 'data-cible': issue.id,
           }, [
             el('span', { class: 'diag__mark', text: issue.level === 'error' ? '●' : '▲' }),
             el('span', { text: issue.msg }),
@@ -851,9 +865,10 @@ function renderEspace() {
 
 async function renderPanel() {
   dom.shell?.classList.toggle('est-espace', state.vue === 'espace');
-  if (state.vue === 'espace') return renderEspace();
+  if (state.vue === 'espace') { paintPreview(); return renderEspace(); }
 
   if (!state.quiz) {
+    paintPreview();
     dom.panel.replaceChildren(el('section', { class: 'panel' }, [
       el('div', { class: 'empty' }, [
         el('div', { class: 'empty__icon', text: '✦' }),
@@ -886,6 +901,8 @@ async function renderPanel() {
     reach: state.reach, expanded: state.expanded,
     previewOpen: state.previewOpen, folded: state.folded,
     poidsFins: state.poidsFins, poidsHorsEchelle: poidsHorsEchelle(state.quiz),
+    /* Les constats, pour que chaque carte porte les siens. */
+    issues: diagnose(state.quiz),
   };
   if (panel.id === 'publier') {
     ctx.linkSize = (await encode(state.quiz)).length + 40;
@@ -911,14 +928,14 @@ async function renderPanel() {
   dom.panel.replaceChildren(bandeauEtat(ctx), panel.render(state.quiz, ctx));
   applyAccent(state.quiz.accent);
   bindSortables(dom.panel, dropped);
-  if (panel.id === 'questions') paintPreview();
+  paintPreview();
 
   if (panel.id === 'resultats') scheduleReach();
 }
 
 function bandeauEtat(ctx) {
   const quiz = state.quiz;
-  const soucis = diagnose(quiz);
+  const soucis = ctx.issues || diagnose(quiz);
   const erreurs = soucis.filter((i) => i.level === 'error').length;
   const enLigne = state.remote.some((q) => q.id === quiz.id);
   const stats = ctx.stats;
@@ -939,6 +956,7 @@ function bandeauEtat(ctx) {
       ? el('button', {
           class: 'etat__item etat__item--erreur', type: 'button',
           'data-act': 'panel', 'data-id': soucis.find((i) => i.level === 'error').where,
+          'data-cible': soucis.find((i) => i.level === 'error').id,
           title: 'Aller au premier problème',
         }, [
           el('strong', { class: 'etat__valeur', text: String(erreurs) }),
@@ -1082,21 +1100,78 @@ function undoable(label, mutate) {
    (views.js). Il se repeint tout seul à la frappe et ne redessine jamais
    le panneau : un redessin déplacerait le curseur du champ en cours.   */
 
+/* --- Le téléphone -------------------------------------------------------------
+   Le vrai rendu du parcours, dans un cadre de 375 px à l'échelle, qui suit
+   l'onglet et le curseur : la couverture depuis Identité, Axes et Diffuser ;
+   la question sous le curseur depuis Questions ; le profil sous le curseur
+   depuis Profils, avec ses recommandations. Ce sont les vues de views.js,
+   celles-là mêmes que joue quiz.js — pas une imitation. */
 function paintPreview() {
-  const stage = document.getElementById('previewStage');
-  const hint = document.getElementById('previewHint');
-  if (!stage || !state.quiz) return;
+  if (!dom.apercu) return;
+  const quiz = state.quiz;
+  if (!quiz || state.vue !== 'quiz') { dom.apercu.hidden = true; return; }
+  dom.apercu.hidden = false;
+  dom.apercu.classList.toggle('is-closed', !state.previewOpen);
+  dom.apercuBascule.textContent = state.previewOpen ? 'Masquer' : 'Afficher';
 
-  const index = state.quiz.questions.findIndex((q) => q.id === state.focused);
-  if (index < 0) {
-    stage.replaceChildren(el('p', { class: 'preview__empty', text: 'Placez le curseur dans une question.' }));
-    if (hint) hint.textContent = '';
-    return;
+  let vue;
+  let legende;
+  let compteur = false;
+  if (state.panel === 'questions' && quiz.questions.length) {
+    const index = Math.max(0, quiz.questions.findIndex((q) => q.id === state.focused));
+    vue = questionView(quiz, quiz.questions[index], index, { interactive: false });
+    legende = `question ${index + 1} sur ${quiz.questions.length}`;
+    compteur = true;
+  } else if (state.panel === 'resultats' && quiz.results.length) {
+    const index = Math.max(0, quiz.results.findIndex((r) => r.id === state.focused));
+    const profil = quiz.results[index];
+    vue = el('section', { class: 'result result--static' }, [
+      bannerView(quiz, profil, { interactive: false }),
+      profil.recos.length
+        ? el('div', { class: 'recos__list' }, profil.recos.map((reco, i) => recoView(reco, i)))
+        : null,
+    ]);
+    legende = `profil ${index + 1} sur ${quiz.results.length}`;
+  } else {
+    vue = coverView(quiz, { interactive: false });
+    legende = 'la couverture';
   }
 
-  const question = state.quiz.questions[index];
-  if (hint) hint.textContent = `question ${index + 1} sur ${state.quiz.questions.length}`;
-  stage.replaceChildren(questionView(state.quiz, question, index, { interactive: false }));
+  dom.apercuLegende.textContent = legende;
+  dom.apercuScene.replaceChildren(
+    el('div', { class: 'tel__bandeau', 'aria-hidden': 'true' }, [
+      el('span', { class: 'tel__bandeau__titre', text: quiz.title || 'Questionnaire sans titre' }),
+      compteur && el('span', { class: 'tally tel__bandeau__tally' }, quiz.axes.slice(0, 10).map((a) => el(
+        'span', { class: 'tally__axis', style: { '--axis': a.color } },
+        [el('span', { class: 'tally__glyph', text: a.glyph }), el('span', { class: 'tally__count', text: '0' })],
+      ))),
+    ]),
+    el('div', { class: 'tel__scene' }, [vue]),
+  );
+}
+
+/* Régler une pesée et mettre le bouton à jour sur place : un redessin du
+   panneau ferait perdre le focus au bouton qu'on vient de presser. */
+function reglerPesee(bouton, qId, oId, aId, niveau) {
+  const n = ((niveau % 4) + 4) % 4;
+  apply(`score:${qId}:${oId}:${aId}`, n);
+  touch();
+  bouton.dataset.niveau = String(n);
+  bouton.classList.toggle('is-set', n !== 0);
+  bouton.setAttribute('aria-valuenow', String(n));
+  bouton.setAttribute('aria-valuetext', NIVEAUX[n]);
+  const axe = state.quiz?.axes.find((a) => a.id === aId);
+  if (axe) bouton.title = `${axe.label} : ${NIVEAUX[n]}`;
+  refreshDiag();
+}
+
+/* Conduire à une carte depuis le rail : la déplier, l'amener à l'écran,
+   poser le curseur dans son premier champ. */
+function allerALaCarte(id) {
+  const carte = dom.panel.querySelector(`[data-carte="${CSS.escape(id)}"]`);
+  if (!carte) return;
+  carte.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  carte.querySelector('input, textarea, select, [data-act="pesee"]')?.focus({ preventScroll: true });
 }
 
 const repaintPreview = debounce(paintPreview, 140);
@@ -1238,7 +1313,7 @@ function onInput(event) {
   touch();
   live(target);
   refreshDiag();
-  if (state.panel === 'questions') repaintPreview();
+  repaintPreview();
 }
 
 function onChange(event) {
@@ -1273,21 +1348,35 @@ function live(target) {
   }
   if (bind === 'q:accent') applyAccent(target.value);
 
-  if (bind?.startsWith('question:') || bind?.startsWith('result:')) {
-    const label = target.closest('.editor-card')?.querySelector('.editor-card__label');
-    if (label && /:(text|title)$/.test(bind) && !bind.includes(':subtitle')) {
-      const isResult = bind.startsWith('result:');
-      if (isResult === bind.endsWith(':title')) {
-        label.textContent = target.value || (isResult ? 'Profil sans titre' : 'Question sans texte');
-      }
-    }
-  }
+  /* L'en-tête d'une carte dépliée ne porte plus le texte : le champ est le
+     titre. Repliée, elle n'a pas de champ. Il n'y a donc plus rien à
+     recopier à la frappe. */
   if (bind?.startsWith('score:')) {
     target.closest('.scorechip')?.classList.toggle('is-set', Number(target.value) !== 0);
   }
 }
 
-const refreshDiag = debounce(() => { renderRail(); scheduleReach(); }, 600);
+/* Les remarques posées sur les cartes suivent le diagnostic à la frappe,
+   sans redessiner le panneau — un redessin ferait sauter le curseur. On
+   remplace le bloc de chaque carte, et rien d'autre. */
+function rafraichirDiagCartes() {
+  if (!state.quiz) return;
+  const ctx = { issues: diagnose(state.quiz) };
+  for (const carte of dom.panel.querySelectorAll('[data-carte]')) {
+    const id = carte.dataset.carte;
+    const soucis = ctx.issues.filter((i) => i.id === id);
+    carte.classList.toggle('a-corriger', soucis.some((i) => i.level === 'error'));
+    carte.classList.toggle('a-verifier', soucis.length > 0 && !soucis.some((i) => i.level === 'error'));
+    carte.querySelector(':scope > .diag-carte')?.remove();
+    const bloc = diagCarte(ctx, id, carte.classList.contains('is-folded'));
+    if (!bloc) continue;
+    const tete = carte.querySelector(':scope > .editor-card__head');
+    if (tete) tete.after(bloc);
+    else carte.append(bloc);
+  }
+}
+
+const refreshDiag = debounce(() => { renderRail(); rafraichirDiagCartes(); scheduleReach(); }, 600);
 
 /* --- Actions --------------------------------------------------------------------- */
 
@@ -1346,7 +1435,16 @@ function onClick(event) {
     }
     case 'panel': {
       state.panel = PANELS.some((p) => p.id === id) ? id : 'identite';
-      return (renderRail(), renderPanel());
+      /* Un constat du rail vise un objet : on ouvre sa carte et on y va. */
+      const cible = trigger.dataset.cible;
+      if (cible) state.folded.delete(cible);
+      renderRail();
+      return renderPanel().then(() => { if (cible) allerALaCarte(cible); });
+    }
+    case 'pesee': {
+      const [qId, oId, aId] = (id || '').split('|');
+      reglerPesee(trigger, qId, oId, aId, Number(trigger.dataset.niveau) + 1);
+      return undefined;
     }
     /* Reprendre une copie. Une seule mécanique, deux étagères : le
        kiosque et l'espace. Garder l'identifiant, c'est pouvoir réécraser
@@ -1533,7 +1631,7 @@ function onClick(event) {
     case 'export-one':    return exportOne(id);
     case 'preview-toggle': {
       state.previewOpen = !state.previewOpen;
-      return renderPanel();
+      return paintPreview();
     }
     case 'poids-mode': {
       state.poidsFins = !state.poidsFins;

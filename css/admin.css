@@ -818,7 +818,9 @@
 /* Au-delà de quatre axes la rangée de pesées ne tient plus sur la ligne :
    elle passe dessous, sur toute la largeur. Le seuil est en em pour
    suivre la taille de texte, pas la taille d'écran. */
-@media (max-width: 62rem) {
+/* Sous 90 rem : la colonne du téléphone rogne l'éditeur, et la rangée de
+   pesées passe sous la réponse plutôt que de l'écraser. */
+@media (max-width: 90rem) {
   .opt { grid-template-columns: 20px 3.2rem 1fr auto; }
   .opt .scoreset { grid-column: 1 / -1; justify-content: flex-start; }
 }
@@ -892,26 +894,6 @@
 }
 .vitrine__entete .input:focus { box-shadow: none; }
 
-/* La pesée en mots. Elle porte le nom de ce qu'elle règle, donc elle est
-   plus large qu'un champ de deux chiffres — et c'est le prix assumé :
-   `scoreset` sait déjà passer à la ligne, et sous 48 rem la rangée occupe
-   déjà toute la largeur de la réponse. */
-.scorechip__select {
-  min-height: 28px;
-  padding: 0 var(--s-1);
-  border: none;
-  background: transparent;
-  font-size: var(--t-xs);
-  color: var(--ink);
-  cursor: pointer;
-  /* La flèche native mange dix pixels pour rien sur une pastille : le
-     survol et le focus disent déjà que c'est actionnable. */
-  appearance: none;
-  text-align: center;
-  text-align-last: center;
-}
-.scoreset--dense .scorechip__select { font-size: var(--t-xs); padding: 0 2px; }
-
 .scorechip:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
@@ -976,60 +958,238 @@ button.etat__item:hover .etat__libelle { color: var(--ink); text-decoration: und
   .etat__sep { display: none; }
 }
 
-/* --- Aperçu vivant -----------------------------------------------------------
-   Collant en haut du panneau : il suit l'auteur pendant qu'il descend
-   dans sa liste de questions. Plafonné en hauteur, parce qu'il ne doit
-   jamais coûter plus de place que l'édition elle-même.               */
-.preview {
-  position: sticky;
-  top: 68px;
-  z-index: var(--z-raised);
-  margin-bottom: var(--s-4);
-  border: 1px solid var(--accent-line);
-  border-radius: var(--r-md);
-  background: var(--bg);
-  box-shadow: var(--shadow-2);
-  overflow: hidden;
+/* --- Le téléphone --------------------------------------------------------------
+   Le vrai rendu du parcours, dans un cadre de 375 px réduit à 72 %, qui
+   suit le curseur. Au-delà de 78 rem il tient une colonne à droite de
+   l'éditeur, collante ; en dessous il se replie en bandeau au-dessus du
+   panneau, à plat et plafonné en hauteur. Un seul nœud, deux formes.
+
+   La page s'élargit pour lui : à 68 rem, une colonne de plus laissait
+   488 px à l'éditeur, trop peu pour une ligne de réponse et ses pesées. */
+@media (min-width: 78rem) {
+  .topbar .page, body > .page { max-width: 86rem; }
 }
-.preview__bar {
+.admin-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: start;
+  min-width: 0;
+}
+.apercu { --echelle: 0.72; min-width: 0; }
+/* La barre tient dans la largeur du téléphone : le titre prend sa ligne,
+   la légende et la bascule la suivante. Sur une seule ligne, elle était
+   plus large que la colonne et la faisait déborder de la page. */
+.apercu__barre {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-2);
-  padding: var(--s-2) var(--s-3);
-  background: var(--accent-soft);
-  border-bottom: 1px solid var(--accent-line);
+  gap: var(--s-1) var(--s-2);
+  margin-bottom: var(--s-3);
 }
-.preview__title {
+.apercu__barre .apercu__titre { flex: 1 1 100%; }
+.apercu__titre {
   font-size: var(--t-xs);
   font-weight: var(--fw-bold);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent-deep);
+  white-space: nowrap;
 }
-.preview__hint { font-size: var(--t-xs); color: var(--ink-muted); }
-.preview__stage {
-  padding: var(--s-5);
-  max-height: 42vh;
+.apercu__legende { flex: 1; min-width: 0; font-size: var(--t-xs); color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tel {
+  width: calc(375px * var(--echelle));
+  height: calc(812px * var(--echelle));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-xl);
+  background: var(--bg);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+}
+/* L'écran : 375 px, réduit par transformation. Il défile en lui-même quand
+   un profil et ses recommandations dépassent. Les jetons de mouvement y
+   tombent à 1 ms : chaque frappe le redessine, et un halo qui se rallume
+   à chaque lettre serait une gêne, pas une aide. `--apres` aussi, sinon
+   le bandeau de profil attendrait sa révélation. */
+.tel__ecran {
+  --dur-fast: 1ms; --dur-base: 1ms; --dur-slow: 1ms; --dur-reveal: 1ms; --apres: 0ms;
+  width: 375px;
+  height: 812px;
+  transform: scale(var(--echelle));
+  transform-origin: top left;
   overflow-y: auto;
   overscroll-behavior: contain;
+  background: var(--bg);
+  color: var(--ink);
 }
-.preview__empty {
-  margin: 0;
+/* Inerte au pointeur : on regarde, on ne joue pas. Le conteneur, lui,
+   garde le défilement. */
+.tel__ecran > * { pointer-events: none; }
+.tel__bandeau {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: 56px;
+  padding: var(--s-2) var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+.tel__bandeau__titre {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
   font-size: var(--t-sm);
-  color: var(--ink-faint);
-  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.preview.is-closed .preview__stage { display: none; }
+.tel__bandeau__tally { flex: none; flex-wrap: nowrap; gap: var(--s-2); }
+.tel__bandeau__tally .tally__axis { flex-direction: column; align-items: center; gap: 0; }
+.tel__bandeau__tally .tally__glyph { font-size: var(--t-base); line-height: 1; }
+.tel__bandeau__tally .tally__count { font-size: var(--t-xs); line-height: 1; min-width: 0; }
+.tel__scene { padding: var(--s-7) var(--s-4) var(--s-6); }
+.tel__scene .question { max-width: none; }
+.tel__scene .result { max-width: none; }
+.tel__scene .result__banner { margin-bottom: var(--s-5); }
+.apercu.is-closed .tel { display: none; }
 
-/* Dans l'aperçu, la question n'est pas jouable : rien ne doit suggérer
-   qu'on peut cliquer. Les tailles, elles, restent celles du parcours —
-   c'est tout l'intérêt. */
-.question--static { pointer-events: none; }
-.question--static .question__text { font-size: var(--t-xl); }
-.question--static .option { cursor: default; }
+@media (min-width: 78rem) {
+  .admin-main { grid-template-columns: minmax(0, 1fr) calc(375px * 0.72); }
+  .apercu {
+    order: 2;
+    position: sticky;
+    top: 76px;
+  }
+}
+/* En dessous : à plat, collant, plafonné — la forme qu'avait l'aperçu. */
+@media (max-width: 77.9375rem) {
+  .apercu {
+    position: sticky;
+    top: 68px;
+    z-index: var(--z-raised);
+    padding: var(--s-2) var(--s-3) var(--s-3);
+    border: 1px solid var(--accent-line);
+    border-radius: var(--r-md);
+    background: var(--bg);
+    box-shadow: var(--shadow-2);
+  }
+  .apercu__barre { margin-bottom: var(--s-2); }
+  .tel { width: auto; height: auto; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+  .tel__ecran { width: auto; height: auto; max-height: 42vh; transform: none; }
+  .tel__bandeau { display: none; }
+  .tel__scene { padding: var(--s-3); }
+}
 @media (max-width: 62rem) {
-  .preview { position: static; }
-  .preview__stage { max-height: 32vh; }
+  .apercu { position: static; }
+  .tel__ecran { max-height: 32vh; }
+}
+
+/* --- Un seul titre ---------------------------------------------------------------
+   Dépliée, la carte ne répète plus son texte dans l'en-tête : le champ est
+   le titre, en corps de titre, sans cadre. Le trait d'accent dit où l'on
+   écrit. */
+.input--titre {
+  padding: var(--s-1) 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--t-xl);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.015em;
+}
+.input--titre:hover { border-bottom-color: var(--line-strong); }
+.input--titre:focus { outline: none; box-shadow: none; border-bottom-color: var(--accent); }
+
+/* --- La pesée à niveaux ------------------------------------------------------------
+   Le glyphe de l'axe et trois points. Chaque clic monte d'un cran ; les
+   points se remplissent dans la couleur de l'axe et la pastille prend sa
+   teinte. Le mode Points garde la pastille à champ numérique (.scorechip). */
+.pesee {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 var(--s-2) 0 var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out),
+              transform var(--dur-press) var(--spring);
+}
+.pesee:hover { border-color: var(--line-strong); }
+.pesee:active { transform: scale(0.94); }
+.pesee:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pesee__glyph {
+  font-family: var(--font-display);
+  font-size: var(--t-sm);
+  line-height: 1;
+  color: color-mix(in oklab, var(--axis, var(--accent)) 68%, var(--ink));
+}
+.pesee__niveaux { display: inline-flex; gap: 3px; }
+.pesee__niveaux i {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
+  background: var(--line-strong);
+  transition: background var(--dur-fast) var(--ease-out),
+              transform var(--dur-press) var(--spring);
+}
+.pesee[data-niveau="1"] i:nth-child(-n+1),
+.pesee[data-niveau="2"] i:nth-child(-n+2),
+.pesee[data-niveau="3"] i:nth-child(-n+3) { background: var(--axis, var(--accent)); transform: scale(1.15); }
+.pesee.is-set { border-color: var(--axis); background: color-mix(in oklab, var(--axis) 10%, var(--surface)); }
+.scoreset--dense .pesee { padding-inline: 5px; gap: 4px; }
+
+/* --- Le diagnostic, sur la carte ----------------------------------------------------
+   La remarque est là où l'on corrige. La carte prend un liseré de la
+   couleur du constat ; le rail garde la liste et sait y conduire. */
+.editor-card { scroll-margin-top: 80px; }
+.editor-card.a-verifier { border-color: color-mix(in oklab, var(--warning) 55%, var(--line)); }
+.editor-card.a-corriger { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
+.axis-row.a-verifier { border-color: color-mix(in oklab, var(--warning) 55%, var(--line)); }
+.diag-carte {
+  display: grid;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-3) var(--s-2) 52px;
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  color: var(--ink);
+  background: color-mix(in oklab, var(--warning) 8%, var(--surface));
+  border-bottom: 1px solid color-mix(in oklab, var(--warning) 35%, var(--line));
+}
+.diag-carte--erreur {
+  background: color-mix(in oklab, var(--danger) 8%, var(--surface));
+  border-bottom-color: color-mix(in oklab, var(--danger) 35%, var(--line));
+}
+.editor-card__head:has(+ .diag-carte) { border-bottom: none; }
+.editor-card.is-folded .diag-carte { border-bottom: none; }
+.diag-carte__ligne { display: flex; align-items: baseline; gap: var(--s-2); margin: 0; }
+.diag-carte__marque { flex: none; color: var(--warning); }
+.diag-carte__ligne--error .diag-carte__marque { color: var(--danger); }
+.diag-carte__ouvrir {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-deep);
+  font-size: var(--t-sm);
+  font-weight: var(--fw-medium);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.axis-row .diag-carte {
+  grid-column: 1 / -1;
+  margin-top: var(--s-1);
+  padding-left: var(--s-2);
+  border: 0;
+  border-radius: var(--r-sm);
 }
 
 /* --- Alerte ------------------------------------------------------------------

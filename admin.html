@@ -96,7 +96,22 @@
   <div class="page">
     <div class="admin-shell" id="shell" hidden>
       <aside class="rail" id="rail" aria-label="Navigation du backoffice"></aside>
-      <div id="panel"></div>
+      <div class="admin-main">
+        <!-- Le téléphone : le vrai rendu du parcours, à l'échelle, qui suit
+             le curseur. Au large il tient la colonne de droite ; sous 78rem
+             il se replie en bandeau collant au-dessus du panneau. Un seul
+             emplacement, le CSS décide de la forme. -->
+        <aside class="apercu" id="apercu" aria-label="Aperçu du parcours" hidden>
+          <div class="apercu__barre">
+            <span class="apercu__titre">Ce que voit l’usager</span>
+            <span class="apercu__legende" id="apercuLegende"></span>
+            <span class="panel__spacer"></span>
+            <button class="btn btn--quiet btn--sm" type="button" data-act="preview-toggle" id="apercuBascule">Masquer</button>
+          </div>
+          <div class="tel"><div class="tel__ecran" id="apercuScene"></div></div>
+        </aside>
+        <div id="panel"></div>
+      </div>
     </div>
   </div>
 
