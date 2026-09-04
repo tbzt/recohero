@@ -68,12 +68,28 @@
    le titre hors du bandeau. */
 .quizbar__tally.is-dense .tally__glyph { font-size: var(--t-base); }
 .quizbar__tally.is-dense { gap: var(--s-2); }
+/* Un trait par question. La piste est découpée par un masque répété d'après
+   `--n`, que quiz.js pose : trois pixels de vide entre deux segments, et la
+   largeur de remplissage tombe exactement sur un segment puisqu'elle vaut
+   « répondues sur total ». Sans `--n`, le masque est invalide et la barre
+   reste continue. */
 .quizbar .progress {
   position: absolute;
   left: 0; right: 0; bottom: -1px;
-  height: 3px;
+  height: 4px;
   border-radius: 0;
   background: transparent;
+  -webkit-mask-image: repeating-linear-gradient(to right,
+    black 0, black calc(100% / var(--n) - 3px),
+    transparent calc(100% / var(--n) - 3px), transparent calc(100% / var(--n)));
+  mask-image: repeating-linear-gradient(to right,
+    black 0, black calc(100% / var(--n) - 3px),
+    transparent calc(100% / var(--n) - 3px), transparent calc(100% / var(--n)));
+}
+/* À la dernière question, la barre respire deux fois : le résultat s'annonce. */
+.quizbar.est-derniere .progress__fill { animation: derniere 1.4s var(--ease-in-out) 2; }
+@keyframes derniere {
+  50% { opacity: 0.45; }
 }
 .quizbar { position: sticky; }
 /* --- Le compteur sur téléphone ---------------------------------------------
@@ -172,16 +188,32 @@
    Une seule vue à la fois, centrée verticalement quand la place le permet. */
 .stage {
   position: relative;   /* ancre l'astuce posée, qui ne doit rien décaler */
+  isolation: isolate;   /* le fond flouté passe en z-index négatif */
   flex: 1;
   display: flex;
   align-items: center;
   padding-block: var(--s-6) var(--s-8);
   /* L'animation d'entrée translate la vue de 22px : sans clip, la page
      devient scrollable horizontalement pendant la transition sur mobile.
-     `clip` plutôt que `hidden` : il ne crée pas de conteneur de scroll. */
-  overflow-x: hidden;
-  overflow-x: clip;
+     `clip` plutôt que `hidden` : il ne crée pas de conteneur de scroll.
+     Sur les deux axes depuis que le fond flouté déborde de 40 px. */
+  overflow: hidden;
+  overflow: clip;
 }
+/* L'ambiance d'une question illustrée : son image, floutée et presque
+   éteinte, derrière la scène. Décorative — `--ambient` la coupe. */
+.stage__fond {
+  position: absolute;
+  inset: -40px;
+  z-index: -1;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  filter: blur(40px) saturate(1.2);
+  opacity: calc(0.18 * var(--ambient));
+  animation: fond-in var(--dur-slow) var(--ease-out) both;
+}
+@keyframes fond-in { from { opacity: 0; } }
 .stage__inner { width: 100%; }
 
 /* UNE QUESTION NE SE CENTRE PAS, ELLE S'ANCRE.
@@ -647,15 +679,25 @@ html.a-la-transition .view-enter { animation: none; }
   gap: var(--s-3);
   margin-bottom: var(--s-7);
 }
+/* --- Le dépouillement ------------------------------------------------------------
+   Le premier temps du résultat. Chaque ligne porte `--retard` (posé par
+   quiz.js, 140 ms par rang) : la ligne se dépose, sa jauge se remplit, son
+   nombre monte, et si elle mène, son glyphe se couronne. Tout se lit depuis
+   cette seule variable. */
+.scores__kicker {
+  font-size: var(--t-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: var(--s-1);
+  animation: score-in var(--dur-base) var(--ease-out) both;
+}
 .score {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--s-3);
-  /* La feuille de score se dépose ligne à ligne, puis les recommandations
-     suivent : le résultat se lit dans l'ordre où il a été calculé, au lieu
-     d'apparaître d'un bloc. Le délai est posé en style inline par quiz.js. */
-  animation: score-in var(--dur-base) var(--ease-out) both;
+  animation: score-in var(--dur-base) var(--ease-out) var(--retard, 0ms) both;
 }
 @keyframes score-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -681,7 +723,7 @@ html.a-la-transition .view-enter { animation: none; }
   border-radius: inherit;
   background: var(--axis, var(--accent));
   transform-origin: left center;
-  animation: score-grow var(--dur-slow) var(--ease-out) both;
+  animation: score-grow var(--dur-reveal) var(--ease-out) calc(var(--retard, 0ms) + 80ms) both;
 }
 /* La largeur finale est posée en style inline ; le dépouillement se joue
    sur scaleX, ce qui ne dépend d'aucun réglage JS après coup. */
@@ -696,9 +738,98 @@ html.a-la-transition .view-enter { animation: none; }
   color: var(--ink-faint);
 }
 .score.is-lead .score__label { color: var(--ink); font-weight: var(--fw-medium); }
+.score.is-lead .score__value { color: var(--ink); font-weight: var(--fw-bold); }
+/* La couronne : le glyphe qui mène grossit d'un ressort et garde un halo,
+   une fois sa jauge remplie. */
+.score.is-lead .score__label .glyph {
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--axis, var(--accent)) 60%, transparent));
+  animation: couronne var(--dur-slow) var(--spring) calc(var(--retard, 0ms) + 520ms) both;
+}
+@keyframes couronne {
+  from { scale: 1; }
+  to   { scale: 1.3; }
+}
+
+/* Le nombre qui monte. `--n` est une propriété enregistrée (quiz.js), donc
+   interpolable en entiers ; le compteur CSS l'écrit. Le chiffre réel reste
+   dans le document et prend le relais quand l'enregistrement a échoué. */
+.score__value { position: relative; }
+.est-compte .score__chiffre { display: none; }
+.est-compte .score__value {
+  animation: compte var(--dur-reveal) var(--ease-out) calc(var(--retard, 0ms) + 80ms) both;
+}
+.est-compte .score__value::after {
+  counter-reset: n var(--n);
+  content: counter(n);
+}
+@keyframes compte { from { --n: 0; } }
+
+/* Le second temps : le profil s'allume une fois la récolte déposée. Chaque
+   geste du bandeau recule de `--apres`, posé par quiz.js sur `.result`. */
+.result__banner {
+  animation: banner-in var(--dur-base) var(--ease-out) var(--apres, 0ms) both;
+}
+@keyframes banner-in { from { opacity: 0; } }
+.result__halo { animation-delay: var(--apres, 0ms); }
+.result__image, .result__emoji { animation-delay: var(--apres, 0ms); }
+.result__title { animation-delay: calc(var(--apres, 0ms) + 120ms); }
+.result__banner::after { animation-delay: calc(var(--apres, 0ms) + 340ms); }
+.result__spark:nth-of-type(1) { animation-delay: calc(var(--apres, 0ms) + 90ms); }
+.result__spark:nth-of-type(2) { animation-delay: calc(var(--apres, 0ms) + 240ms); }
+.result__spark:nth-of-type(3) { animation-delay: calc(var(--apres, 0ms) + 390ms); }
+
+/* --- La carte, en vignette ---------------------------------------------------
+   Sous le profil, ce qu'on va emporter : la vraie carte, réduite et un peu
+   penchée, comme posée sur la table. Le bloc n'existe pas tant que le
+   canvas n'a pas répondu. */
+.carte:empty { display: none; }
+.carte {
+  margin-bottom: var(--s-6);
+  animation: reco-in var(--dur-slow) var(--spring) calc(var(--apres, 0ms) + 700ms) both;
+}
+.carte__bouton {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  width: 100%;
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-lg);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--spring),
+              box-shadow var(--dur-base) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+.carte__bouton:hover { border-color: var(--accent); box-shadow: var(--shadow-2); transform: translateY(-2px); }
+.carte__bouton:active { transform: scale(0.98); }
+.carte__apercu {
+  flex: none;
+  width: 72px;
+  height: auto;
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-2);
+  rotate: -4deg;
+  transition: rotate var(--dur-base) var(--spring);
+}
+.carte__bouton:hover .carte__apercu { rotate: -1deg; }
+.carte__corps { flex: 1; min-width: 0; }
+.carte__titre {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--t-md);
+}
+.carte__sous { display: block; font-size: var(--t-sm); color: var(--ink-muted); }
+.carte__fleche { flex: none; color: var(--accent-deep); font-size: var(--t-lg); }
 @media (max-width: 34rem) {
   .score { grid-template-columns: 1fr auto; }
   .score__track { grid-column: 1 / -1; }
+  /* Le nombre reste sur la ligne du nom, à droite : placé d'office, il
+     tombait sous la piste, seul sur sa ligne. */
+  .score__value { grid-row: 1; grid-column: 2; justify-self: end; }
 }
 
 /* --- Les recommandations ------------------------------------------------------ */
@@ -727,6 +858,19 @@ html.a-la-transition .view-enter { animation: none; }
 @keyframes reco-in {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: none; }
+}
+/* Les recommandations entrent quand on descend jusqu'à elles, pas au
+   chargement : on les découvre. Le navigateur qui ne connaît pas les
+   chronologies de défilement garde l'entrée cadencée ; la personne qui a
+   demandé moins de mouvement aussi, puisque celle-ci se joue au doigt. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .reco {
+      animation: reco-in var(--dur-slow) var(--ease-out) both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
 }
 .reco__icon {
   display: grid;

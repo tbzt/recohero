@@ -37,6 +37,20 @@ const kiosque = avecEspace('index.html', espace);
    l'adresse, elle, menait au kiosque. */
 const sortie = isTest ? avecEspace('admin.html', espace) : kiosque;
 
+/* --- Le compte qui monte ---------------------------------------------------------
+   Les jauges du résultat affichent leur nombre en le comptant depuis zéro.
+   C'est une animation CSS sur une propriété personnalisée typée : il faut
+   l'enregistrer une fois, et le CSS n'a pas de moyen de savoir si c'est
+   fait. D'où ce drapeau, posé en classe sur la feuille de score : sans lui,
+   le nombre est simplement écrit, et il est juste. */
+let compteAnime = false;
+try {
+  if (window.CSS?.registerProperty) {
+    CSS.registerProperty({ name: '--n', syntax: '<integer>', inherits: true, initialValue: 0 });
+    compteAnime = true;
+  }
+} catch { /* non pris en charge : le nombre est là, sans le compte */ }
+
 const dom = {
   bar: document.getElementById('quizbar'),
   title: document.getElementById('quizTitle'),
@@ -202,6 +216,16 @@ function dessiner() {
   if (state.direction === 'back') view.classList.add('view-enter--back');
 
   dom.stage.replaceChildren(el('div', { class: 'stage__inner page' }, [view]));
+
+  /* L'ambiance d'une question illustrée : la même image, floutée, en fond
+     de scène. Décorative, éteinte sous `--ambient`. */
+  const courante = step >= 0 && step < quiz.questions.length ? quiz.questions[step] : null;
+  if (courante?.image) {
+    dom.stage.prepend(el('div', {
+      class: 'stage__fond', 'aria-hidden': 'true',
+      style: { backgroundImage: `url("${courante.image.replace(/["\\]/g, '')}")` },
+    }));
+  }
   updateBar();
 
   const heading = dom.stage.querySelector('h1');
@@ -222,7 +246,7 @@ function dessiner() {
 
   /* Après le rendu, jamais pendant : le catalogue arrive quand il arrive, et
      le résultat n'a pas à l'attendre. */
-  if (step >= quiz.questions.length) suite(quiz);
+  if (step >= quiz.questions.length) { suite(quiz); apercuCarte(quiz); }
 }
 
 let derniersScores = null;
@@ -234,6 +258,10 @@ function updateBar() {
     ? 1
     : Math.min(answered, quiz.questions.length) / quiz.questions.length;
   dom.progress.style.width = `${Math.round(ratio * 100)}%`;
+  /* Un trait par question : la barre se lit comme les pastilles d'une
+     story, et le CSS découpe la piste d'après ce nombre. */
+  dom.progress.parentElement?.style.setProperty('--n', String(quiz.questions.length));
+  dom.bar.classList.toggle('est-derniere', step === quiz.questions.length - 1);
 
   const scores = tally(quiz, state.answers);
   /* Dix au plus, comme la carte de résultat — et resserrés au-delà de six.
@@ -256,12 +284,18 @@ function updateBar() {
   const empreinte = montres.map((a) => scores.counts[a.id]).join('·') + '|' + scores.leaders.join(',');
   if (empreinte !== derniersScores) {
     derniersScores = empreinte;
-    dom.tally.replaceChildren(...montres.map((axis) => el(
+    dom.tally.replaceChildren(...montres.map((axis, rang) => el(
     'span',
     { /* Qui mène, pendant qu'on joue. La course est le sujet du
          questionnaire ; jusqu'ici elle ne se lisait qu'à l'arrivée. */
       class: 'tally__axis' + (scores.leaders.includes(axis.id) && scores.best > 0 ? ' is-lead' : ''),
-      style: { '--axis': axis.color }, title: axis.label, 'data-axis': axis.id },
+      /* Le même nom que la pastille de la couverture et que la jauge du
+         résultat : la transition de vue fait VOYAGER l'axe d'un écran à
+         l'autre au lieu de le faire réapparaître. Le rang, pas
+         l'identifiant : un nom de transition doit être un identifiant CSS
+         valide, et un identifiant d'axe peut être n'importe quoi. */
+      style: { '--axis': axis.color, viewTransitionName: `axe-${rang}` },
+      title: axis.label, 'data-axis': axis.id },
     [
       /* Le glyphe est un signe, pas un mot : lu à voix haute, « puce » ne dit
          rien de l'axe, et le compteur — qui est une région vivante — annonçait
@@ -276,7 +310,10 @@ function updateBar() {
     ],
     )));
   }
-  dom.tally.hidden = step < 0;
+  /* Caché sur la couverture, et caché sur le résultat : les jauges y
+     prennent le relais, et un même axe ne peut pas porter son nom de
+     transition à deux endroits de la même page. */
+  dom.tally.hidden = step < 0 || step >= quiz.questions.length;
 }
 
 /* --- Les points qui volent ---------------------------------------------------
@@ -532,7 +569,20 @@ function renderResult() {
      pour une conséquence, et abîmerait la confiance dans les deux. */
   const calculees = profile.recos.filter((r) => !r.confiance);
   const coeur = profile.recos.filter((r) => r.confiance);
-  const retard = quiz.axes.length * 55 + 90;
+
+  /* --- Le dépouillement ------------------------------------------------------
+     Le résultat arrivait d'un bloc, le nom du profil en premier : tout était
+     dit avant qu'on ait regardé. Il se lit maintenant dans l'ordre où il
+     s'est établi. D'abord la récolte : les jauges se déposent une à une, le
+     nombre monte, le glyphe qui mène grossit. Puis le profil, avec son halo.
+     Puis, en descendant, ce qui l'a fait pencher et ce qu'on propose.
+
+     `--apres` est le temps du premier temps : c'est lui que le CSS attend
+     avant d'allumer le profil. Il dépend du nombre d'axes, que seul le JS
+     connaît. Sous mouvement réduit, tous les jetons tombent à 1 ms et
+     l'ordre au repos reste le bon. */
+  const apres = Math.min(quiz.axes.length, 10) * 140 + 520;
+  const retard = apres + 300;
 
   const recosNode = el('section', { class: 'recos' }, [
     el('div', { class: 'recos__head' }, [
@@ -554,7 +604,42 @@ function renderResult() {
     ]),
   ]);
 
-  const node = el('section', { class: 'result' }, [
+  const sommet = Math.max(1, ...quiz.axes.map((a) => scores.counts[a.id] || 0));
+  const depouillement = el('div', { class: 'scores' + (compteAnime ? ' est-compte' : '') }, [
+    el('p', { class: 'scores__kicker', text: 'Votre récolte' }),
+    ...quiz.axes.map((axis, rang) => {
+      const value = scores.counts[axis.id];
+      return el('div', {
+        class: 'score' + (scores.leaders.includes(axis.id) ? ' is-lead' : ''),
+        /* `--retard` cadence la ligne, sa jauge, son compte et sa couronne ;
+           le nom de transition reprend celui du compteur du bandeau, qui
+           vient de disparaître : l'axe descend à sa place. */
+        style: { '--axis': axis.color, '--retard': `${rang * 140}ms`, viewTransitionName: `axe-${rang}` },
+      }, [
+        el('span', { class: 'score__label' }, [
+          el('span', { class: 'glyph', text: axis.glyph, 'aria-hidden': 'true' }),
+          axis.label,
+          /* Le nombre, lu une fois avec son axe. Le compteur visible est
+             décoratif : il compte depuis zéro, et une synthèse vocale n'a
+             pas à suivre un chiffre qui change. */
+          el('span', { class: 'visually-hidden', text: ` : ${value}` }),
+        ]),
+        el('div', { class: 'score__track' }, [
+          el('div', {
+            class: 'score__fill',
+            style: { width: `${Math.round(Math.min(1, Math.max(0, value) / sommet) * 100)}%` },
+          }),
+        ]),
+        el('span', { class: 'score__value', 'aria-hidden': 'true', style: { '--n': String(value) } }, [
+          el('span', { class: 'score__chiffre', text: String(value) }),
+        ]),
+      ]);
+    }),
+  ]);
+
+  const node = el('section', { class: 'result', style: { '--apres': `${apres}ms` } }, [
+    depouillement,
+
     el('div', { class: 'result__banner' }, [
       /* Le halo qui s'allume derrière le profil, et trois étincelles.
          Décoratif : le résultat se lit exactement pareil sans eux. */
@@ -570,36 +655,16 @@ function renderResult() {
     ]),
 
     /* La jauge se lit d'un axe à l'autre, pas contre un plafond que le
-       questionnaire rend inatteignable. Le plafond théorique d'un axe
-       suppose qu'on ait répondu dans sa direction à chaque question —
-       ce que personne ne fait : sur le questionnaire d'exemple, l'axe
-       GAGNANT se remplissait à 54 % en moyenne, et aucun parcours sur
-       34 992 n'atteignait 100 %. Le résultat, moment de récompense,
-       montrait donc des barres à moitié vides et un « /16 » qui annonçait
-       un objectif hors d'atteinte. On rapporte désormais au plus haut
-       score obtenu : l'axe qui mène remplit sa barre, les autres se
-       situent par rapport à lui. */
-    el('div', { class: 'scores' }, (() => {
-      const sommet = Math.max(1, ...quiz.axes.map((a) => scores.counts[a.id] || 0));
-      return quiz.axes.map((axis, rang) => {
-        const value = scores.counts[axis.id];
-        return el('div', {
-          class: 'score' + (scores.leaders.includes(axis.id) ? ' is-lead' : ''),
-          style: { '--axis': axis.color, animationDelay: `${rang * 55}ms` },
-        }, [
-          el('span', { class: 'score__label' }, [
-            el('span', { class: 'glyph', text: axis.glyph }), axis.label,
-          ]),
-          el('div', { class: 'score__track' }, [
-            el('div', {
-              class: 'score__fill',
-              style: { width: `${Math.round(Math.min(1, Math.max(0, value) / sommet) * 100)}%` },
-            }),
-          ]),
-          el('span', { class: 'score__value', text: String(value) }),
-        ]);
-      });
-    })()),
+       questionnaire rend inatteignable (voir `sommet`, plus haut) : l'axe
+       qui mène remplit sa barre, les autres se situent par rapport à lui.
+       Sur le questionnaire d'exemple, l'axe gagnant ne remplissait qu'à
+       54 % en moyenne un plafond théorique qu'aucun des 34 992 parcours
+       n'atteignait. */
+
+    /* La carte à emporter, montrée à l'instant de la révélation et non au
+       bout de trois écrans. Vide tant que le canvas n'a pas répondu, et
+       `apercuCarte()` la remplit après le rendu. */
+    el('section', { class: 'carte' }),
 
     /* Ce qui a pesé, entre la récolte et la prescription : le résultat se
        lit alors dans l'ordre où il s'est établi — voilà ce que vous avez
@@ -637,6 +702,40 @@ function renderResult() {
      après coup : la largeur au repos est donc toujours juste, même si
      l'onglet est en arrière-plan quand le résultat est calculé.        */
   return node;
+}
+
+/* --- La carte, en vignette ---------------------------------------------------
+   Le bouton « Ma carte de résultat » était le geste principal de l'écran et
+   il vivait tout en bas. La carte se dessine maintenant après le rendu,
+   sans faire attendre le résultat, et se pose en vignette sous le profil :
+   on voit ce qu'on va emporter. Un tap ouvre la grande. Jamais sur une
+   borne, où la carte n'a pas de sens. Si le canvas échoue, le bloc reste
+   vide et le bouton du bas fait le travail comme avant. */
+async function apercuCarte(quiz) {
+  if (isKiosque) return;
+  const cible = dom.stage.querySelector('.carte');
+  if (!cible) return;
+  const scores = tally(quiz, state.answers);
+  const profile = resolve(quiz, scores);
+  if (!profile) return;
+
+  const url = await adresseDuParcours().catch(() => '');
+  let canvas;
+  try {
+    canvas = await renderResultCard(quiz, profile, scores, { identite: identiteEspace, url });
+  } catch { return; }
+  if (!cible.isConnected) return;
+
+  canvas.className = 'carte__apercu';
+  canvas.setAttribute('aria-hidden', 'true');
+  cible.replaceChildren(el('button', { class: 'carte__bouton', type: 'button', 'data-act': 'card' }, [
+    canvas,
+    el('span', { class: 'carte__corps' }, [
+      el('span', { class: 'carte__titre', text: 'Votre carte de résultat' }),
+      el('span', { class: 'carte__sous', text: 'À enregistrer, ou à partager.' }),
+    ]),
+    el('span', { class: 'carte__fleche', 'aria-hidden': 'true', text: '→' }),
+  ]));
 }
 
 /* --- Et après ? -----------------------------------------------------------------
@@ -833,6 +932,8 @@ function pick(button) {
     .map((axe) => ({ axe, points: option.scores[axe.id] || 0 }))
     .filter((g) => g.points > 0);
 
+  vibrer();
+
   if (question.type === 'multiple') {
     const current = new Set(state.answers[question.id] || []);
     const ajoute = !current.has(optionId);
@@ -868,7 +969,8 @@ function pick(button) {
     updateBar();
 
     /* Décocher ne fait rien voler : on ne met pas en scène un retrait. */
-    if (ajoute) envoler(button, gains);
+    if (ajoute) { marquerLeGain(button, gains); envoler(button, gains); }
+    else marquerLeGain(button, []);
     return undefined;
   }
 
@@ -885,6 +987,7 @@ function pick(button) {
     node.setAttribute('aria-pressed', String(node === button));
   }
   button.classList.add('is-confirmed');
+  for (const node of dom.stage.querySelectorAll('.option')) marquerLeGain(node, node === button ? gains : []);
   updateBar();
   envoler(button, gains);
 
@@ -898,6 +1001,28 @@ function pick(button) {
      n'avoir pas répondu — alors qu'il avait répondu deux fois. */
   clearTimeout(attenteAvance);
   attenteAvance = setTimeout(() => advance(), 340);
+}
+
+/* Ce que la réponse vient de rapporter, écrit sur elle : « +2 ● ». Les
+   points qui volent le montrent en mouvement ; ceci le laisse lisible
+   pendant le temps de respiration, et sur un écran qui n'anime pas. */
+function marquerLeGain(button, gains) {
+  for (const vieux of button.querySelectorAll('.option__gain')) vieux.remove();
+  for (const { axe, points } of gains) {
+    button.append(el('span', {
+      class: 'option__gain', 'aria-hidden': 'true',
+      style: { '--axis': axe.color }, text: `+${points} ${axe.glyph}`,
+    }));
+  }
+}
+
+/* Un retour dans la main, là où il existe. Huit millisecondes : un tic,
+   pas un bourdonnement. Sans moteur, l'appel ne fait rien. Sans geste de
+   la personne — une réponse au clavier synthétisée, un test — le navigateur
+   refuse et le dit en erreur dans la console : on ne demande pas. */
+function vibrer() {
+  if (!navigator.userActivation?.hasBeenActive) return;
+  try { navigator.vibrate?.(8); } catch { /* rien à signaler */ }
 }
 
 function advance() {
