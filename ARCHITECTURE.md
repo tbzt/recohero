@@ -475,9 +475,9 @@ titres et en montrait un — et l'écart ne se voyait pas, puisqu'une carte à
 laquelle il manque quelque chose ressemble à une carte.
 
 **Et le plancher n'est pas une constante : il dépend de ce que le pied va
-porter.** Avec un QR le pied prend 224 px ; sans carré, 68 — sa hauteur
-d'origine, du temps où il ne portait qu'une signature. Réserver 224 dans les
-deux cas coûtait 162 px de blanc, soit deux recommandations, sur les cartes
+porter.** Avec un QR le pied prend 268 px ; sans carré, 68 — sa hauteur
+d'origine, du temps où il ne portait qu'une signature. Réserver 268 dans les
+deux cas coûterait 200 px de blanc, soit deux recommandations, sur les cartes
 sans carré : celles d'un brouillon, dont le lien porte le questionnaire entier
 et dépasse de loin ce qu'un QR de ce format sait encoder. C'étaient précisément
 les cartes qui avaient le moins à montrer.
@@ -535,6 +535,27 @@ lecteur y serait tombé, puisque c'est dans le format qu'il prend le masque.
 
 **Un aller-retour ne prouve rien à lui seul quand le test partage le code du
 codeur.** C'est la leçon à garder si ce fichier doit évoluer.
+
+**Et un QR juste n'est pas un QR lisible.** Les quatre contrôles prouvent que
+la matrice est conforme ; ils ne disent rien de ce qui tranche sur le terrain,
+qui est le nombre de pixels par module. Un « ça ne marche que sur certains
+téléphones » vient de là presque à tous les coups, et ré-auditer trois cents
+lignes de Reed-Solomon n'y trouve rien. La mesure à faire est
+`cote / (taille + 8)`.
+
+| | côté | pixels par module | sur le terrain |
+|---|---|---|---|
+| Carte de résultat | 240 px sur 1080 | 4,5 à 6,5 | 96 px à l'écran, la carte étant réduite à 432 px par `.cardview` |
+| Affiche | 754 à 900 px sur A4 à 150 ppp | 14 à 24 | 2,4 mm par module au pire, 4 mm au mieux |
+
+Deux pièges de géométrie, payés comptant. **La zone de silence est dessinée
+DANS `cote`** — `dessinerQR` s'en charge, puisque lui seul sait sur quel fond
+le carré atterrit — donc toute marge de mise en page autour du carré la paie
+une seconde fois. Sur la carte, ramener l'air du pied de 28 px à 14 a financé
+la moitié de l'agrandissement sans rien prendre aux recommandations. Et
+**`espace=` dans l'adresse fait passer le symbole de la version 5 à la
+version 7** : huit modules de plus, donc 18 % de module en moins à carré
+constant. Ce qu'on ajoute à l'URL se paie en lisibilité.
 
 ## Le mode embarqué
 

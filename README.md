@@ -37,6 +37,15 @@ Au-delà de quatre axes, l'éditeur fait passer la rangée de pesées sous la
 ligne de réponse plutôt que de la comprimer ; la carte de résultat rétrécit
 ses glyphes au-delà de six et en affiche huit au maximum.
 
+**Les axes ne se présentent pas sur l'écran de départ**, sauf si vous le
+demandez : la case *Les présenter sur l'écran de départ*, sous la liste dans
+le panneau **Axes**. Éteinte par défaut, parce que « ✦ Évasion · ★ Frisson »
+ne dit rien à qui n'a pas encore vu un point s'y poser, et que la liste
+repoussait le bouton « Commencer » sous le pli sur un téléphone. Les axes
+apparaissent de toute façon dans le bandeau dès la première question, et sur
+la carte de résultat. Cochez la case quand les axes *sont* le sujet annoncé du
+questionnaire.
+
 Créer un questionnaire passe par trois questions — ce qu'on recommande, le
 titre, et les tempéraments à distinguer. L'assistant ne règle que la
 charpente : il ne rédige ni accroche, ni question, ni profil. Le nombre d'axes
@@ -133,6 +142,12 @@ sont silencieusement effacés à la lecture du questionnaire.
 affiche 1080 × 1350 (format portrait 4:5, celui des stories) : le titre du
 questionnaire, l'illustration ou l'emoji du profil, son nom, sa devise, la
 feuille de score avec les glyphes, et jusqu'à trois recommandations.
+
+Le pied porte le nom du lieu et un QR code vers le questionnaire : une carte
+qui donne envie sans dire où aller est une affiche sans adresse. Il n'y figure
+que si le questionnaire est publié quelque part — le lien d'un brouillon
+transporte le questionnaire entier et ne rentre pas dans un QR ; la carte
+garde alors la marque et se tait.
 
 Ce n'est pas une capture d'écran : c'est un visuel dessiné pour être partagé,
 sans aucune bibliothèque — le canvas du navigateur suffit. Sur mobile, le
