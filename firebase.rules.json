@@ -124,7 +124,13 @@
         ".validate": "$espace.matches(/^[a-z0-9][a-z0-9-]{1,30}$/) && newData.hasChildren(['par', 'courriel', 'structure', 'le']) && (root.child('proprietaires').child(auth.uid).exists() || (newData.child('par').val() === auth.uid && auth.token.email_verified === true && newData.child('courriel').val() === auth.token.email && newData.child('le').val() <= now))",
 
         "structure": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
-        "mot": { ".validate": "newData.isString() && newData.val().length <= 500" }
+        "mot": { ".validate": "newData.isString() && newData.val().length <= 500" },
+
+        "verdict": {
+          ".validate": "newData.hasChildren(['etat', 'le']) && newData.child('le').val() <= now && root.child('proprietaires').child(auth.uid).exists()",
+          "etat": { ".validate": "newData.val() === 'ouvert' || newData.val() === 'refuse'" },
+          "motif": { ".validate": "newData.isString() && newData.val().length <= 500" }
+        }
       }
     }
   }

@@ -342,12 +342,20 @@ installer, et personne n'a plus besoin de la console Firebase pour elle :
    veut.
 4. Le propriétaire de l'installation voit la demande dans son onglet
    **Ouvertures**, avec le nom réclamé, la structure, l'adresse et la date.
-   Un clic sur **Ouvrir** crée l'espace et en fait la personne **gérante**.
+   **Examiner** ouvre la fiche complète — le mot laissé, l'adresse du futur
+   kiosque, et un bouton ✉ qui prépare un courriel à la personne. De là,
+   **Ouvrir l'espace** le crée et en fait la personne **gérante**.
+5. La réponse attend la personne là où elle a déposé sa demande. Ouverte,
+   elle entre chez elle et reçoit son mot de bienvenue. Refusée, elle lit le
+   **motif** — obligatoire, c'est le seul message qu'elle recevra jamais — et
+   peut retirer sa demande pour libérer le nom et en essayer un autre.
 
-Rien n'avertit personne : la base n'envoie pas de courriel et il n'y a pas de
-serveur pour le faire. Le propriétaire voit une pastille en ouvrant son
-backoffice, et c'est lui qui renvoie le lien — le message « Espace ouvert »
-propose de le copier.
+Aucun courriel ne part de RecoHero, ni vers le propriétaire, ni vers la
+personne : la base n'en envoie pas, et il n'y a pas de serveur pour le faire.
+Le propriétaire voit une **pastille** en ouvrant son backoffice ; la personne
+voit la réponse **en revenant à son adresse**. Le reste — prévenir, relancer,
+expliquer de vive voix — se fait par les moyens ordinaires, et le bouton ✉
+prépare le brouillon pour épargner le plus pénible.
 
 **Devenir propriétaire se fait une fois, à la console**, et c'est la dernière
 chose qui s'y passe : créer `proprietaires/<UID>` à `true`, à la racine, à

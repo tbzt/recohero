@@ -814,6 +814,30 @@ export async function demanderOuverture(nom, corps) {
   });
 }
 
+/* Trancher n'efface pas la demande : cela lui ajoute un verdict.
+
+   C'est tout le mécanisme de la notification, et il n'y en a pas d'autre
+   possible ici — aucun serveur à nous n'enverra jamais de courriel. La
+   personne relit SA demande, à l'adresse où elle l'a déposée, et y trouve la
+   réponse. La règle lui accorde déjà cette lecture ; elle ne s'accorde pas
+   l'écriture du verdict, que seul un propriétaire peut poser.
+
+   Effacer aurait été plus simple et strictement pire : un refus sans trace
+   rend le nom libre, et l'écran se remet alors à proposer « demande
+   l'ouverture » à quelqu'un dont on vient justement de refuser la demande.
+   Il recommencerait, sans savoir qu'il recommence.
+
+   Un PATCH, pas un PUT : le corps de la demande — qui, quoi, quand — ne
+   nous appartient pas, et le réécrire au moment de répondre reviendrait à
+   signer son texte de notre nom. */
+export async function trancherOuverture(nom, verdict) {
+  return call(racine('ouvertures', `/${encodeURIComponent(nom)}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ verdict: { ...verdict, le: Date.now() } }),
+  });
+}
+
 export async function retirerOuverture(nom) {
   return call(racine('ouvertures', `/${encodeURIComponent(nom)}`), { method: 'DELETE' });
 }

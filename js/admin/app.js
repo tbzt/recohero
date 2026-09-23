@@ -572,6 +572,28 @@ function entrerDansLEspace() {
     return [item('⏳', 'Demande envoyée', 'l’équipe doit encore l’accepter', null)];
   }
   if (e.ouverture) {
+    const verdict = e.ouverture.verdict;
+
+    /* Le refus DOIT se dire, et c'est la seule raison pour laquelle la
+       demande n'est pas effacée en même temps qu'elle est refusée. Sans
+       cette trace, le nom redeviendrait libre et l'écran proposerait de
+       nouveau « demander l'ouverture » — à quelqu'un dont on vient de
+       refuser la demande, et qui recommencerait sans savoir qu'il
+       recommence. */
+    if (verdict?.etat === 'refuse') {
+      return [
+        item('✕', 'Ouverture refusée', Number.isFinite(verdict.le) ? formatDate(verdict.le) : 'sans date', null),
+        el('p', { class: 'rail__secours', text: verdict.motif
+          ? `Motif : ${verdict.motif}`
+          : 'Aucun motif n’a été donné.' }),
+        item('⌫', 'Retirer ma demande', 'et libérer ce nom pour en essayer un autre', 'entrer-oublier'),
+      ];
+    }
+    /* Ouvert, et pourtant ici : c'est que la lecture de l'appartenance n'a
+       pas abouti. On ne renvoie pas vers une porte, on dit de recharger. */
+    if (verdict?.etat === 'ouvert') {
+      return [item('✦', 'Ton espace est ouvert', 'recharge la page pour y entrer', 'entrer-recharger')];
+    }
     return [item('⏳', 'Ouverture demandée', 'elle attend un avis', null)];
   }
 
@@ -823,8 +845,10 @@ function renderTabbar(bySection) {
       o.id === 'equipe' && Object.keys(state.demandes || {}).length
         ? el('span', { class: 'rail__item__badge', text: String(Object.keys(state.demandes).length) })
         : null,
-      o.id === 'ouvertures' && Object.keys(state.ouvertures || {}).length
-        ? el('span', { class: 'rail__item__badge', text: String(Object.keys(state.ouvertures).length) })
+      /* Une réponse déjà écrite n'attend rien de moi : la compter ici ferait
+         d'une pastille — qui veut dire « viens décider » — un simple total. */
+      o.id === 'ouvertures' && ouverturesEnAttente().length
+        ? el('span', { class: 'rail__item__badge', text: String(ouverturesEnAttente().length) })
         : null,
     ])));
     return;
@@ -1016,14 +1040,40 @@ function panneauQuestionnaires() {
    pour le niveau de l'espace. Les deux appellent la même fonction : il n'y a
    qu'une porte, elle est rendue à deux endroits. */
 function panneauEntree() {
-  const vierge = espaceVierge();
+  const e = state.monEntree || {};
+  const verdict = e.ouverture?.verdict;
+
+  /* Le titre ne peut pas se contenter de « ce nom est-il pris ? ». Un nom
+     refusé est techniquement libre — la branche `espaces/<nom>` n'existe
+     toujours pas — et l'écran annonçait donc « un nom libre, demande son
+     ouverture » juste au-dessus du refus qu'on venait de recevoir. Deux
+     phrases vraies séparément, et qui se contredisent à la lecture. */
+  const [titre, propos] = (() => {
+    if (verdict?.etat === 'refuse') return [
+      `« ${state.espace} » — demande refusée`,
+      'Ta demande a reçu une réponse, la voici. Tu peux la retirer pour libérer ce nom et en essayer un autre.',
+    ];
+    if (verdict?.etat === 'ouvert') return [
+      `« ${state.espace} » — ton espace est ouvert`,
+      'La demande a été acceptée. Recharge la page pour entrer chez toi.',
+    ];
+    if (e.ouverture) return [
+      `« ${state.espace} » — demande déposée`,
+      'Elle attend un avis. Rien ne t’avertira : c’est en revenant à cette adresse que tu liras la réponse.',
+    ];
+    if (espaceVierge()) return [
+      `« ${state.espace} » — un nom libre`,
+      'Personne ne travaille encore sous ce nom. Demande son ouverture, et il sera le tien.',
+    ];
+    return [
+      `Espace « ${state.espace} »`,
+      'Tu es connecté, mais tu n’es pas de cette équipe : rien de ce qui est publié ici ne t’appartient encore.',
+    ];
+  })();
+
   return el('section', { class: 'panel' }, [
-    el('div', { class: 'section__head' }, [
-      el('h2', { text: vierge ? `« ${state.espace} » — un nom libre` : `Espace « ${state.espace} »` }),
-    ]),
-    el('p', { class: 'panel__hint', text: vierge
-      ? 'Personne ne travaille encore sous ce nom. Demande son ouverture, et il sera le tien.'
-      : 'Tu es connecté, mais tu n’es pas de cette équipe : rien de ce qui est publié ici ne t’appartient encore.' }),
+    el('div', { class: 'section__head' }, [el('h2', { text: titre })]),
+    el('p', { class: 'panel__hint', text: propos }),
     el('div', { class: 'rail__list entree__portes' }, entrerDansLEspace()),
   ]);
 }
@@ -1810,8 +1860,11 @@ function onClick(event) {
     case 'entrer-rejoindre': return rejoindreLEspace();
     case 'entrer-demander':  return demanderLAcces();
     case 'entrer-ouvrir':    return demanderLOuverture();
-    case 'ouverture-valider': return validerOuverture(id);
+    case 'ouverture-valider': return examinerOuverture(id);
     case 'ouverture-refuser': return refuserOuverture(id);
+    case 'ouverture-purger':  return purgerOuverture(id);
+    case 'entrer-oublier':    return oublierMaDemande();
+    case 'entrer-recharger':  return location.reload();
     case 'entrer-verifier':  return verifierMonCourriel();
     case 'entrer-revalider': return revaliderMonAdresse();
     case 'copier-uid':       return copierUid();
@@ -2413,25 +2466,71 @@ function contenuEquipe() {
    protège : c'est la règle, qui refuse la lecture de cette branche à tout
    autre et lui refuserait l'écriture même s'il trouvait le chemin. L'onglet
    ne fait que ne pas mentir sur ce qui est atteignable. */
-function contenuOuvertures() {
-  const demandes = Object.entries(state.ouvertures || {})
-    .sort(([, a], [, b]) => (a?.le || 0) - (b?.le || 0));
+function ouverturesEnAttente() {
+  return Object.entries(state.ouvertures || {}).filter(([, d]) => !d?.verdict);
+}
 
-  const ligne = ([nom, d]) => el('div', { class: 'sheet__row' }, [
+/* L'adresse que prendra — ou qu'a prise — l'espace. Une seule fabrique, pour
+   que le lien montré à l'écran et celui qu'on copie ne divergent jamais. */
+function lienEspace(nom) {
+  const lien = new URL('admin.html', location.href);
+  lien.searchParams.set('espace', nom);
+  return lien.toString();
+}
+
+/* Rien ne part d'ici : `mailto:` ouvre le logiciel de courrier de la
+   personne, avec le texte déjà écrit, et c'est elle qui envoie. C'est la
+   seule façon honnête de tenir la promesse « je peux lui écrire » sans
+   serveur — et le brouillon épargne la partie pénible, retrouver l'adresse
+   et réexpliquer de quoi il s'agit. */
+function lienCourriel(nom, d, sujet, corps) {
+  const url = new URL(`mailto:${d?.courriel || ''}`);
+  url.searchParams.set('subject', sujet);
+  url.searchParams.set('body', corps);
+  /* Un espace dans un mailto s'encode `%20`, pas `+` : les clients de
+     messagerie ne défont pas la convention des formulaires web, et le
+     brouillon s'ouvrirait truffé de croix. */
+  return url.toString().replace(/\+/g, '%20');
+}
+
+function boutonEcrire(nom, d, sujet, corps) {
+  if (!d?.courriel) return null;
+  return el('a', {
+    class: 'btn btn--quiet btn--sm', href: lienCourriel(nom, d, sujet, corps),
+    title: `Écrire à ${d.courriel}`, text: '✉ Écrire',
+  });
+}
+
+/* Deux files, et elles ne demandent pas la même chose. Celle du haut attend
+   une décision. Celle du bas ne porte plus qu'un message déjà écrit, qui
+   attend d'être lu par quelqu'un d'autre — on ne la retire donc pas à la
+   légère, et surtout pas automatiquement. */
+function contenuOuvertures() {
+  const toutes = Object.entries(state.ouvertures || {})
+    .sort(([, a], [, b]) => (a?.le || 0) - (b?.le || 0));
+  const attente = toutes.filter(([, d]) => !d?.verdict);
+  const reglees = toutes.filter(([, d]) => d?.verdict);
+
+  const titre = (texte) => el('h3', {
+    style: 'font-size:var(--t-base);margin-top:var(--s-5);margin-bottom:var(--s-2)', text: texte,
+  });
+
+  const signature = (nom, d) => `?espace=${nom} · ${d?.courriel || 'adresse inconnue'}`
+    /* `le` n'est formaté que s'il est vraiment une date : sur une valeur
+       inattendue, Intl lève et emporterait le panneau entier. */
+    + (Number.isFinite(d?.le) ? ` · ${formatDate(d.le)}` : '');
+
+  const ligneAttente = ([nom, d]) => el('div', { class: 'sheet__row' }, [
     el('span', { class: 'sheet__emoji', text: '🔑' }),
     el('span', { class: 'sheet__label' }, [
       el('span', { text: d?.structure || nom }),
-      el('span', { class: 'field__hint', style: { display: 'block' },
-        /* `le` n'est formaté que s'il est vraiment une date : sur une valeur
-           inattendue, Intl lève et emporterait le panneau entier. */
-        text: `?espace=${nom} · ${d?.courriel || 'adresse inconnue'}`
-          + (Number.isFinite(d?.le) ? ` · ${formatDate(d.le)}` : '') }),
+      el('span', { class: 'field__hint', style: { display: 'block' }, text: signature(nom, d) }),
       d?.mot && el('span', { class: 'field__hint', style: { display: 'block' }, text: `« ${d.mot} »` }),
     ]),
     el('button', {
       class: 'btn btn--sm btn--primary', type: 'button',
-      'data-act': 'ouverture-valider', 'data-id': nom, text: 'Ouvrir',
-      'aria-label': `Ouvrir l’espace « ${nom} » pour ${d?.structure || 'cette structure'}`,
+      'data-act': 'ouverture-valider', 'data-id': nom, text: 'Examiner',
+      'aria-label': `Examiner la demande de ${d?.structure || nom}`,
     }),
     el('button', {
       class: 'btn btn--icon btn--quiet', type: 'button',
@@ -2439,27 +2538,52 @@ function contenuOuvertures() {
       /* Le nom accessible se calcule sur le contenu visible : sans
          `aria-label`, il ne resterait que « ✕ », et deux lignes de suite
          offriraient deux boutons qui s'annoncent pareil. */
-      title: 'Écarter cette demande', 'aria-label': `Écarter la demande de ${d?.structure || nom}`, text: '✕',
+      title: 'Refuser cette demande', 'aria-label': `Refuser la demande de ${d?.structure || nom}`, text: '✕',
     }),
   ]);
 
-  return [
-    el('section', { class: 'panel' }, [
-      el('div', { class: 'section__head' }, [
-        el('h2', { text: demandes.length
-          ? `Espaces réclamés — ${demandes.length}`
-          : 'Espaces réclamés' }),
+  const ligneReglee = ([nom, d]) => {
+    const ouvert = d.verdict?.etat === 'ouvert';
+    return el('div', { class: 'sheet__row' }, [
+      el('span', { class: 'sheet__emoji', text: ouvert ? '✦' : '✕' }),
+      el('span', { class: 'sheet__label' }, [
+        el('span', { text: d?.structure || nom }),
+        el('span', { class: 'field__hint', style: { display: 'block' }, text: signature(nom, d) }),
+        !ouvert && d.verdict?.motif && el('span', { class: 'field__hint', style: { display: 'block' }, text: `Motif : ${d.verdict.motif}` }),
       ]),
+      el('span', { class: ouvert ? 'pill pill--accent' : 'pill', text: ouvert ? 'ouvert' : 'refusé' }),
+      boutonEcrire(nom, d,
+        ouvert ? `Votre espace RecoHero « ${nom} »` : `Votre demande d’espace RecoHero « ${nom} »`,
+        ouvert
+          ? `Bonjour,\n\nVotre espace est ouvert : ${lienEspace(nom)}\n\nVous en avez la gérance et pouvez y inviter votre équipe depuis l’onglet Équipe.\n\n`
+          : `Bonjour,\n\n${d.verdict?.motif || ''}\n\n`),
+      el('button', {
+        class: 'btn btn--icon btn--quiet', type: 'button',
+        'data-act': 'ouverture-purger', 'data-id': nom,
+        title: 'Retirer cette trace', 'aria-label': `Retirer la trace de ${d?.structure || nom}`, text: '⌫',
+      }),
+    ]);
+  };
 
-      demandes.length
-        ? el('div', { class: 'sheet__list' }, demandes.map(ligne))
-        : el('p', { class: 'panel__hint', text:
-            'Rien en attente. Une demande arrive ici quand quelqu’un ouvre le backoffice sur un nom d’espace libre et le réclame.' }),
+  const bloc = [];
 
-      el('p', { class: 'field__hint', style: { marginTop: 'var(--s-4)' }, text:
-        'Ouvrir crée l’espace et en fait la personne gérante — donc irretirable, sauf depuis la console. C’est le seul geste de ce backoffice qui ne se défait pas d’ici.' }),
-    ]),
-  ];
+  bloc.push(el('div', { class: 'section__head' }, [
+    el('h2', { text: attente.length ? `Espaces réclamés — ${attente.length}` : 'Espaces réclamés' }),
+  ]));
+
+  bloc.push(attente.length
+    ? el('div', { class: 'sheet__list' }, attente.map(ligneAttente))
+    : el('p', { class: 'panel__hint', text:
+        'Rien en attente. Une demande arrive ici quand quelqu’un ouvre le backoffice sur un nom d’espace libre et le réclame.' }));
+
+  if (reglees.length) {
+    bloc.push(titre(`Déjà répondu — ${reglees.length}`));
+    bloc.push(el('div', { class: 'sheet__list' }, reglees.map(ligneReglee)));
+    bloc.push(el('p', { class: 'field__hint', text:
+      'C’est ici que vit la réponse : la personne la lit en revenant sur l’adresse où elle a fait sa demande. Retirer la trace efface ce message — un refus retiré rend aussi le nom libre.' }));
+  }
+
+  return [el('section', { class: 'panel' }, bloc)];
 }
 
 /* L'espace n'a plus de panneau « Réglages ». Il ne contenait que deux boutons
@@ -3077,56 +3201,183 @@ function demanderLOuverture() {
   structure.focus();
 }
 
-/* Ouvrir, c'est deux écritures, et l'ordre est le même que pour valider une
-   demande d'accès : la naissance d'abord, la file ensuite. Si la seconde
-   échoue, l'espace existe et la demande traîne — ce qui se répare d'un clic.
-   L'ordre inverse effacerait la demande sans rien créer, et il ne resterait
-   plus trace de rien à quoi se raccrocher. */
-async function validerOuverture(nom) {
-  const d = state.ouvertures?.[nom];
-  if (!d?.par) return toast('Cette demande ne dit pas qui l’a déposée : rien à qui donner l’espace.', 'danger');
-
-  try {
-    await remote.ouvrirEspace(nom, d.par, d.structure || nom);
-    await remote.retirerOuverture(nom).catch(() => {});
-    await refreshEspace();
-    repaint();
-
-    const lien = new URL('admin.html', location.href);
-    lien.searchParams.set('espace', nom);
-    /* Le courriel d'ouverture n'existe pas — pas de serveur pour l'envoyer.
-       Ce qu'on peut faire, c'est mettre le lien à un geste de la main : il
-       reste à l'écrire soi-même, et autant que ce soit dit. */
-    toast(`Espace « ${nom} » ouvert. ${d.courriel || 'La personne'} en est gérante — à prévenir par tes propres moyens.`, {
-      duration: 9000,
-      action: {
-        label: 'Copier le lien',
-        onClick: () => navigator.clipboard?.writeText(lien.toString())
-          .then(() => toast('Lien copié.'))
-          .catch(() => toast(lien.toString())),
-      },
-    });
-  } catch (err) {
-    toast(err.message, 'danger');
-  }
+/* Une ligne de la fiche : l'étiquette, la valeur, et rien de décoratif. */
+function ligneFiche(label, valeur, mono = false) {
+  if (!valeur) return null;
+  return el('div', { class: 'field' }, [
+    el('span', { class: 'field__label', text: label }),
+    el('span', { style: mono ? 'font-family:var(--font-mono);font-size:var(--t-sm);word-break:break-all' : '', text: valeur }),
+  ]);
 }
 
-async function refuserOuverture(nom) {
-  const garde = state.ouvertures?.[nom];
+/* Ouvrir ne se fait plus d'un clic dans une liste. Le geste est le seul de
+   ce backoffice qui ne se défait pas depuis le web — il crée une branche
+   qu'on ne peut plus supprimer d'ici, et donne à quelqu'un une gérance dont
+   on ne peut plus le retirer. Un bouton au bout d'une ligne, entre deux
+   autres lignes, ne dit pas ça.
+
+   L'écran sert aussi à ce qu'on ne peut pas automatiser : lire le mot,
+   reconnaître la structure, et écrire à la personne si quelque chose
+   cloche. L'adresse est là, avec un brouillon déjà prêt. */
+function examinerOuverture(nom) {
+  const d = state.ouvertures?.[nom];
+  if (!d) return toast('Cette demande n’est plus là.', 'danger');
+  if (!d.par) return toast('Cette demande ne dit pas qui l’a déposée : il n’y a personne à qui donner l’espace.', 'danger');
+
+  const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
+  const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Ouvrir l’espace' });
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: `Ouvrir « ${nom} » ?` }),
+
+      ligneFiche('Structure', d.structure || '—'),
+      ligneFiche('Demandé par', d.courriel || 'adresse inconnue'),
+      ligneFiche('Le', Number.isFinite(d.le) ? formatDate(d.le) : null),
+      d.mot && el('div', { class: 'field' }, [
+        el('span', { class: 'field__label', text: 'Son mot' }),
+        el('p', { class: 'panel__hint', style: { margin: 0 }, text: `« ${d.mot} »` }),
+      ]),
+      ligneFiche('Adresse du kiosque', lienEspace(nom).replace('admin.html', ''), true),
+
+      el('p', { class: 'field__hint', text:
+        'Ouvrir crée l’espace et donne la gérance à cette personne : elle ne pourra plus en être retirée depuis le web, seulement depuis la console. La réponse l’attendra à l’adresse où elle a déposé sa demande.' }),
+      erreur,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      boutonEcrire(nom, d, `Votre demande d’espace RecoHero « ${nom} »`,
+        `Bonjour,\n\nÀ propos de votre demande d’espace « ${nom} » :\n\n`),
+      el('span', { class: 'section__spacer' }),
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
+      valider,
+    ]),
+  ]);
+
+  valider.addEventListener('click', async () => {
+    valider.disabled = true;
+    erreur.hidden = true;
+    try {
+      /* La naissance d'abord, le verdict ensuite. Si le second échoue,
+         l'espace existe et la demande reste en attente — ce qui se voit et
+         se répare. L'ordre inverse annoncerait une ouverture qui n'a pas eu
+         lieu, et personne ne saurait que le nom est encore à prendre. */
+      await remote.ouvrirEspace(nom, d.par, d.structure || nom);
+      await remote.trancherOuverture(nom, { etat: 'ouvert' }).catch(() => {});
+      await refreshEspace();
+      dismiss(dialog, () => {
+        repaint();
+        toast(`« ${nom} » est ouvert. ${d.courriel || 'La personne'} en a la gérance et lira la réponse en revenant.`, {
+          duration: 9000,
+          action: {
+            label: 'Copier le lien',
+            onClick: () => navigator.clipboard?.writeText(lienEspace(nom))
+              .then(() => toast('Lien copié.'))
+              .catch(() => toast(lienEspace(nom))),
+          },
+        });
+      });
+    } catch (err) {
+      erreur.textContent = err.message;
+      erreur.hidden = false;
+      valider.disabled = false;
+    }
+  });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+/* Refuser demande un motif, et ce n'est pas de la politesse : c'est le seul
+   texte que la personne recevra jamais. « Demande écartée » sans un mot la
+   laisse deviner si le nom était pris, si elle s'est trompée d'adresse, ou
+   s'il faut réessayer autrement. */
+function refuserOuverture(nom) {
+  const d = state.ouvertures?.[nom];
+  if (!d) return toast('Cette demande n’est plus là.', 'danger');
+
+  const motif = el('textarea', { class: 'textarea', rows: '3', maxlength: '500',
+    placeholder: 'Ce nom est déjà réservé pour un autre réseau — reprenez avec « mediatheque-untel ».' });
+  const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
+  const valider = el('button', { class: 'btn btn--danger', type: 'button', text: 'Refuser' });
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: `Refuser « ${nom} »` }),
+      el('p', { class: 'panel__hint', text:
+        'Ce motif est le seul message que la personne recevra : elle le lira en revenant sur l’adresse où elle a fait sa demande. Rien ne part par courriel.' }),
+      ligneFiche('Structure', d.structure || '—'),
+      ligneFiche('Demandé par', d.courriel || 'adresse inconnue'),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'field__label', text: 'Motif' }),
+        motif,
+      ]),
+      erreur,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      boutonEcrire(nom, d, `Votre demande d’espace RecoHero « ${nom} »`,
+        `Bonjour,\n\nÀ propos de votre demande d’espace « ${nom} » :\n\n`),
+      el('span', { class: 'section__spacer' }),
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
+      valider,
+    ]),
+  ]);
+
+  valider.addEventListener('click', async () => {
+    const texte = motif.value.trim();
+    if (!texte) {
+      erreur.textContent = 'Sans motif, la personne ne saura pas quoi faire de ce refus.';
+      erreur.hidden = false;
+      return motif.focus();
+    }
+    valider.disabled = true;
+    erreur.hidden = true;
+    try {
+      await remote.trancherOuverture(nom, { etat: 'refuse', motif: texte });
+      await refreshEspace();
+      dismiss(dialog, () => {
+        repaint();
+        toast('Refus enregistré. La personne le lira en revenant.');
+      });
+    } catch (err) {
+      erreur.textContent = err.message;
+      erreur.hidden = false;
+      valider.disabled = false;
+    }
+  });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  motif.focus();
+}
+
+/* Retirer la trace efface le message qui attend d'être lu. On le demande,
+   parce que rien ne le rattrape : ni l'historique, ni la personne. */
+async function purgerOuverture(nom) {
+  const d = state.ouvertures?.[nom];
+  const ouvert = d?.verdict?.etat === 'ouvert';
+  const partir = window.confirm(ouvert
+    ? `Retirer la trace de « ${nom} » ? L’espace reste ouvert, mais le mot de bienvenue ne s’affichera plus.`
+    : `Retirer la trace de « ${nom} » ? Le motif du refus disparaît, et le nom redevient libre.`);
+  if (!partir) return undefined;
+
   try {
     await remote.retirerOuverture(nom);
     await refreshEspace();
+    return repaint();
+  } catch (err) {
+    return toast(err.message, 'danger');
+  }
+}
+
+/* Côté demandeur : renoncer à un nom pour en essayer un autre. */
+async function oublierMaDemande() {
+  try {
+    await remote.retirerOuverture(state.espace);
+    await refreshEspace();
     repaint();
-    toast('Demande écartée. Elle n’en sera pas avertie.', {
-      action: garde && {
-        label: 'Annuler',
-        onClick: async () => {
-          await remote.demanderOuverture(nom, garde).catch(() => {});
-          await refreshEspace();
-          repaint();
-        },
-      },
-    });
+    toast('Demande retirée. Ce nom est de nouveau libre.');
   } catch (err) {
     toast(err.message, 'danger');
   }
@@ -4035,6 +4286,7 @@ async function refreshEspace() {
      seul endroit qui relit tout, et une file d'attente qu'on ne relit jamais
      est une file qu'on découvre trop tard. */
   ({ proprietaire: state.proprietaire, liste: state.ouvertures } = await remote.fileDOuvertures());
+  await saluerLOuverture();
   await verifierGardeFou();
 }
 
@@ -4082,6 +4334,32 @@ async function releverLAppartenance() {
     remote.courrielVerifie().catch(() => false),
   ]);
   state.monEntree = { invitation, demande, ouverture, verifie };
+}
+
+/* Le mot de bienvenue, une fois et jamais plus.
+
+   Qui vient d'obtenir son espace y arrive en membre : la porte s'ouvre, le
+   backoffice s'affiche, et rien ne dit que c'est le sien ni d'où ça vient.
+   La réponse existe pourtant — c'est le verdict posé sur sa demande — mais
+   elle est rangée là où seuls les non-membres regardent.
+
+   La lecture supplémentaire est bornée par `membres.length === 1` : c'est
+   l'état d'un espace qui vient de naître, et il cesse d'être vrai à la
+   première invitation. Un espace vivant ne paie donc rien, et celui qui
+   paie s'en acquitte pendant les quelques minutes où la question se pose.
+
+   On efface la trace en la montrant. Ce message est une nouvelle, pas un
+   écriteau : le relire à chaque ouverture ferait de l'accueil une alarme. */
+async function saluerLOuverture() {
+  if (state.membre !== true || state.membres.length !== 1) return;
+  const demande = await remote.maDemandeOuverture(state.espace).catch(() => null);
+  if (demande?.verdict?.etat !== 'ouvert') return;
+
+  await remote.retirerOuverture(state.espace).catch(() => {});
+  toast(
+    `Bienvenue. « ${state.espace} » est à toi : tu en as la gérance, et l’onglet Équipe sert à y faire venir tes collègues.`,
+    { duration: 10000 },
+  );
 }
 
 /* Poser une règle de base de données et croire qu'elle est là sont deux
