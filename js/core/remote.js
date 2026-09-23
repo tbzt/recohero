@@ -113,11 +113,19 @@ export async function signIn(email, password) {
 
 /* Un jeton valide, ou null si personne n'est connecté. Le renouvellement
    est silencieux : c'est la seule façon qu'une session de travail d'une
-   après-midi ne se coupe pas au milieu d'une phrase.                   */
-async function token() {
+   après-midi ne se coupe pas au milieu d'une phrase.
+
+   `forcer` saute le cache. Un jeton d'identité n'est pas seulement une
+   autorisation, c'est un CONSTAT daté : il porte `email_verified` tel qu'il
+   était à l'émission. Confirmer son adresse chez Firebase ne réécrit pas le
+   jeton qu'on a déjà en poche — rien ne le peut à distance — et celui-ci
+   vit près d'une heure. Qui revient de sa boîte aux lettres se fait donc
+   redire qu'il n'a pas confirmé, par un jeton qui a raison sur le passé et
+   tort sur le présent. Il n'y a qu'une issue : en demander un neuf.     */
+async function token(forcer = false) {
   const saved = store.getRemote();
   if (!saved?.refreshToken) return null;
-  if (saved.idToken && Date.now() < saved.expiresAt - MARGIN) return saved.idToken;
+  if (!forcer && saved.idToken && Date.now() < saved.expiresAt - MARGIN) return saved.idToken;
 
   const response = await fetch(REFRESH, {
     method: 'POST',
@@ -680,10 +688,19 @@ function charge(jeton) {
   }
 }
 
+/* Les deux réponses n'ont pas la même valeur, et c'est ce qui décide du
+   surcoût. Une adresse confirmée ne se déconfirme jamais : un jeton qui dit
+   OUI dit vrai, même vieux d'une heure. Un jeton qui dit NON, lui, ne dit
+   rien de plus que « pas encore à l'émission » — et c'est exactement la
+   réponse qu'on obtenait en boucle après avoir cliqué le lien reçu.
+
+   D'où l'asymétrie : on croit le oui sur parole, et on ne croit le non
+   qu'après avoir demandé un jeton neuf. Le renouvellement supplémentaire ne
+   coûte donc rien à qui a confirmé, et une requête à qui ne l'a pas fait —
+   c'est-à-dire précisément à qui est en train d'attendre que ça change. */
 export async function courrielVerifie() {
-  const jeton = await token();
-  if (!jeton) return false;
-  return charge(jeton)?.email_verified === true;
+  if (charge(await token())?.email_verified === true) return true;
+  return charge(await token(true))?.email_verified === true;
 }
 
 export async function envoyerCourrielVerification() {

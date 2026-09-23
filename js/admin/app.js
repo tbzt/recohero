@@ -536,6 +536,15 @@ function entrerDansLEspace() {
      d'entrée qui ne dépend de rien, et il doit donc être lisible là où les
      autres échouent — pas derrière le bouton de compte, que personne ne
      pense à ouvrir quand on vient de lui dire d'aller voir ses courriels. */
+  /* Le renvoi du courriel ne sert à rien à qui vient de cliquer le lien : ce
+     qu'il lui faut, c'est un jeton neuf. `courrielVerifie()` en demande un
+     dès que le jeton dit non, donc recharger la page suffirait — encore
+     faut-il savoir qu'il faut recharger, et rien ne le disait. Ce bouton
+     est ce « recharge » nommé par ce qu'il fait. */
+  const jeRevienDeMaBoite = () => item(
+    '↻', 'C’est fait, revérifier', 'après avoir cliqué le lien reçu', 'entrer-revalider',
+  );
+
   const secours = () => [
     el('p', { class: 'rail__secours', text:
       'Le courriel peut atterrir dans les indésirables. S’il ne vient pas, donne ton identifiant à quelqu’un de l’équipe : il peut t’ajouter sans courriel.' }),
@@ -556,7 +565,8 @@ function entrerDansLEspace() {
      conviée entrerait. On ne peut donc pas passer outre — mais on peut dire
      exactement ce qui manque, plutôt que de refuser sans expliquer. */
   if (e.invitation) {
-    return [item('📮', 'Vérifie ton adresse', 'l’invitation t’attend derrière', 'entrer-verifier'), ...secours()];
+    return [item('📮', 'Vérifie ton adresse', 'l’invitation t’attend derrière', 'entrer-verifier'),
+      jeRevienDeMaBoite(), ...secours()];
   }
   if (e.demande) {
     return [item('⏳', 'Demande envoyée', 'l’équipe doit encore l’accepter', null)];
@@ -579,6 +589,7 @@ function entrerDansLEspace() {
     if (!e.verifie) {
       return [
         item('📮', 'Vérifie ton adresse', 'il en faut une confirmée pour réclamer un espace', 'entrer-verifier'),
+        jeRevienDeMaBoite(),
         el('p', { class: 'rail__secours', text:
           'Le courriel peut atterrir dans les indésirables. Rien n’est perdu : reviens sur cette page une fois ton adresse confirmée.' }),
       ];
@@ -592,7 +603,8 @@ function entrerDansLEspace() {
      avait été vérifiée — c'est ce que l'écran affirmait. Ici comme au-dessus,
      on nomme ce qui manque plutôt que de laisser la base refuser sans dire. */
   if (!e.verifie) {
-    return [item('📮', 'Vérifie ton adresse', 'il en faut une confirmée pour demander l’accès', 'entrer-verifier'), ...secours()];
+    return [item('📮', 'Vérifie ton adresse', 'il en faut une confirmée pour demander l’accès', 'entrer-verifier'),
+      jeRevienDeMaBoite(), ...secours()];
   }
   return [item('🔔', 'Demander l’accès', 'un membre de l’équipe décidera', 'entrer-demander')];
 }
@@ -1801,6 +1813,7 @@ function onClick(event) {
     case 'ouverture-valider': return validerOuverture(id);
     case 'ouverture-refuser': return refuserOuverture(id);
     case 'entrer-verifier':  return verifierMonCourriel();
+    case 'entrer-revalider': return revaliderMonAdresse();
     case 'copier-uid':       return copierUid();
     case 'mon-mot-de-passe': return changerMonMotDePasse();
     case 'corbeille-restaurer': return restaurerDeLaCorbeille(id);
@@ -3117,6 +3130,19 @@ async function refuserOuverture(nom) {
   } catch (err) {
     toast(err.message, 'danger');
   }
+}
+
+/* Rien à envoyer, rien à écrire : on redemande un jeton et on relit ce qu'il
+   dit. `refreshEspace()` passe par `courrielVerifie()`, qui force déjà le
+   renouvellement quand le jeton en cache répond non. */
+async function revaliderMonAdresse() {
+  await refreshEspace();
+  repaint();
+  if (state.monEntree?.verifie) return toast('Adresse confirmée. Tu peux continuer.');
+  return toast(
+    'Toujours pas confirmée chez Firebase. Ouvre le lien du courriel, puis reprends ici.',
+    'danger',
+  );
 }
 
 async function verifierMonCourriel() {
