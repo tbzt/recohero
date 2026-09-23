@@ -292,9 +292,17 @@ tranche. Un refus de droits n'est jamais pris pour un conflit.
 **Le rang de gérant.** Les membres d'un espace s'invitent et se retirent entre
 eux, sans quoi chaque arrivée passerait par le propriétaire. Mais un seul
 membre suffirait alors à verrouiller tout le monde dehors. Un compte inscrit
-dans `espaces/<nom>/gerants` ne peut être retiré par personne, et cette branche
-n'est modifiable que depuis la console : il reste donc toujours quelqu'un pour
-rouvrir.
+dans `espaces/<nom>/gerants` ne peut être retiré par personne : il reste donc
+toujours quelqu'un pour rouvrir.
+
+La branche porte `".write": false` à tous ses niveaux, et il n'y a qu'un
+moment où elle s'écrit quand même : la NAISSANCE de l'espace. La règle posée
+sur `espaces/$espace` accorde l'écriture à un propriétaire tant que
+`!data.exists()` — donc une fois, sur une branche vide — et l'ouverture y
+place `membres`, `gerants` et `identite` d'un même corps. Dès que l'espace
+existe, la clause est fausse pour toujours et les règles profondes
+reprennent. Un espace né de cette façon a donc toujours son gérant, et le
+rang reste ensuite hors d'atteinte du web.
 
 **Et la règle vérifie qu'elle est là.** Une règle qu'on croit posée et qui ne
 l'est pas ne se voit nulle part : l'espace a la même apparence, protégé ou non.
@@ -629,9 +637,18 @@ coûteux : il laisserait croire à une protection.
 **La protection est ailleurs, et elle est vérifiable.** Les règles
 (`firebase.rules.json`) accordent la lecture à tous — c'est ce qui permet de
 répondre sans compte — et l'écriture aux seuls comptes inscrits dans
-`espaces/$espace/membres`. Cette liste n'est ni lisible ni modifiable depuis
-le web : elle ne se touche que depuis la console. Conséquence voulue :
-personne ne peut se fabriquer un espace.
+`espaces/$espace/membres`. Cette liste ne se lit qu'entre membres, et ne
+s'écrit que par eux : une invitation réclamée ou une demande acceptée y
+ajoute une ligne, jamais un inconnu.
+
+Conséquence voulue, et elle tient toujours : **personne ne se fabrique un
+espace de sa propre autorité.** La branche `espaces/<nom>` ne s'écrit, tant
+qu'elle n'existe pas, que par un compte inscrit dans `proprietaires` — liste
+racine en `".write": false`, qui ne se touche donc que depuis la console.
+Qui veut un espace le RÉCLAME dans `ouvertures/<nom>`, une salle d'attente
+qui n'accorde rien ; le propriétaire lit cette file et tranche. Ouvrir la
+demande à tout le monde n'ouvre pas la base : c'est la même séparation que
+`attente` contre `membres`, d'un cran au-dessus.
 
 Ces règles ont été éprouvées avant qu'une ligne de câblage soit écrite : huit
 requêtes anonymes, une seule acceptée (la lecture des questionnaires), sept

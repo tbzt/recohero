@@ -3,6 +3,8 @@
     "espaces": {
       "$espace": {
 
+        ".write": "auth != null && !data.exists() && root.child('proprietaires').child(auth.uid).exists()",
+
         "quizzes": {
           ".read": true,
           ".write": "auth != null && root.child('espaces').child($espace).child('membres').child(auth.uid).exists()",
@@ -105,6 +107,24 @@
           ".write": false
         }
 
+      }
+    },
+
+    "proprietaires": {
+      ".read": "auth != null && root.child('proprietaires').child(auth.uid).exists()",
+      ".write": false
+    },
+
+    "ouvertures": {
+      ".read": "auth != null && root.child('proprietaires').child(auth.uid).exists()",
+
+      "$espace": {
+        ".read": "auth != null && (data.child('par').val() === auth.uid || root.child('proprietaires').child(auth.uid).exists())",
+        ".write": "auth != null && (root.child('proprietaires').child(auth.uid).exists() || (data.child('par').val() === auth.uid && !newData.exists()) || (!data.exists() && !root.child('espaces').child($espace).exists()))",
+        ".validate": "$espace.matches(/^[a-z0-9][a-z0-9-]{1,30}$/) && newData.hasChildren(['par', 'courriel', 'structure', 'le']) && (root.child('proprietaires').child(auth.uid).exists() || (newData.child('par').val() === auth.uid && auth.token.email_verified === true && newData.child('courriel').val() === auth.token.email && newData.child('le').val() <= now))",
+
+        "structure": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
+        "mot": { ".validate": "newData.isString() && newData.val().length <= 500" }
       }
     }
   }

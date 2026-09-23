@@ -608,6 +608,20 @@
   color: var(--accent-deep);
   font-weight: var(--fw-medium);
 }
+/* La porte d'entrée est rendue avec les MÊMES boutons à deux endroits : dans
+   le rail, où le fond creusé les détache déjà, et dans le panneau, où ils
+   flottaient sans contour — un titre, une ligne grise, et rien qui se donne
+   à cliquer. On ne leur invente pas une seconde classe, c'est la même porte :
+   on leur rend ici le relief que le rail leur prêtait là-bas. */
+.entree__portes .rail__item {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  min-height: var(--tap);
+}
+.entree__portes .rail__item:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-2); }
+.entree__portes .rail__item:disabled { color: var(--ink-muted); background: var(--bg-sunk); }
+
 .rail__item__emoji { flex: none; }
 .rail__item__label {
   flex: 1;

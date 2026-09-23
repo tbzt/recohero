@@ -201,6 +201,7 @@ Un **espace** est une équipe et son catalogue. Il se nomme dans l'adresse :
 |---|---|---|
 | `…/?espace=maupassant` | tout le monde | Le kiosque de cette équipe, et lui seul. On répond **sans compte**. |
 | `…/admin.html?espace=maupassant` | l'équipe | Le backoffice. Demande une adresse et un mot de passe, une fois. |
+| `…/admin.html?espace=<nom libre>` | qui veut | Ce nom n'est celui de personne : le backoffice propose d'en **demander l'ouverture**. |
 
 **Une fois dans un espace, on y reste.** Le nom de l'espace voyage avec
 chaque lien interne — la marque du bandeau, « Backoffice », le pied de page,
@@ -324,9 +325,46 @@ de l'espace. Le mot de passe, lui, n'est nulle part dans le dépôt : il est tap
 par la personne, et seul le jeton qui en résulte est conservé — il expire, et
 se renouvelle tout seul tant que la session dure.
 
+#### Demander un espace — depuis le web, sans console
+
+Une médiathèque qui veut publier sur cette installation n'a plus rien à
+installer, et personne n'a plus besoin de la console Firebase pour elle :
+
+1. Elle ouvre `admin.html?espace=<un nom libre>` et clique **Créer un
+   compte**. Un compte ne donne aucun droit par lui-même — c'est une
+   identité, rien d'autre.
+2. Elle confirme son adresse par le courriel qui vient de partir. Les règles
+   l'exigent : sans adresse vérifiée, réclamer un nom d'espace ne coûterait
+   rien et se scripterait.
+3. De retour sur la même adresse, le backoffice lui propose **Demander
+   l'ouverture de cet espace** — car ce nom n'est celui de personne. Elle
+   choisit le nom définitif, celui de sa structure, et deux lignes si elle
+   veut.
+4. Le propriétaire de l'installation voit la demande dans son onglet
+   **Ouvertures**, avec le nom réclamé, la structure, l'adresse et la date.
+   Un clic sur **Ouvrir** crée l'espace et en fait la personne **gérante**.
+
+Rien n'avertit personne : la base n'envoie pas de courriel et il n'y a pas de
+serveur pour le faire. Le propriétaire voit une pastille en ouvrant son
+backoffice, et c'est lui qui renvoie le lien — le message « Espace ouvert »
+propose de le copier.
+
+**Devenir propriétaire se fait une fois, à la console**, et c'est la dernière
+chose qui s'y passe : créer `proprietaires/<UID>` à `true`, à la racine, à
+côté de `espaces`. La branche est en `".write": false` — une file d'attente
+dont on peut se nommer juge ne filtre rien.
+
+Les règles refusent toujours d'écrire sous `espaces/<nom>` à qui n'est pas
+propriétaire, tant que la branche n'existe pas — et elles le refusent à tout
+le monde dès qu'elle existe. La naissance d'un espace tient donc en une seule
+écriture, qui pose `membres`, `gerants` et `identite` d'un coup : l'étape 6
+ci-dessous, celle qui « n'est pas facultative », n'est plus une étape qu'on
+peut sauter.
+
 #### Monter son propre espace
 
-Pour une structure qui veut son autonomie complète, sans dépendre de personne :
+Pour une structure qui veut son autonomie complète, sans dépendre de personne
+— sa base, son projet, sa facture :
 
 1. Créer un projet sur `console.firebase.google.com` (Analytics : non).
 2. **Realtime Database** — pas Firestore : c'est celle qui a une API REST
@@ -348,8 +386,11 @@ ne rouvre la porte, sauf la console. Le nombre de personnes qui savent
 retourner dans la console est la vraie mesure de ce qu'un espace peut
 encaisser.
 
-Créer un espace passe toujours par la console : les règles interdisent d'en
-fabriquer un depuis le web. C'est voulu.
+Créer un espace ne se fait jamais **de sa propre autorité** depuis le web :
+les règles interdisent d'écrire sous `espaces/<nom>` à qui n'est pas
+propriétaire. C'est voulu, et c'est ce qui permet d'ouvrir la demande à tout
+le monde sans ouvrir la base — voir « Demander un espace » plus haut. Ce qui
+reste à la console, c'est la liste des propriétaires, et elle seule.
 
 ---
 

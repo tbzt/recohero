@@ -249,6 +249,33 @@ export async function creerCompte(email) {
   return data.localId;
 }
 
+/* S'inscrire soi-même. La fonction au-dessus crée le compte d'un AUTRE et
+   jette son secret ; celle-ci crée le sien, avec le mot de passe qu'on vient
+   de taper, et ouvre la session dans la foulée.
+
+   La différence n'est pas cosmétique : `returnSecureToken` vaut true ici, et
+   c'est ce qui distingue « quelqu'un a inscrit cette adresse » de « cette
+   personne est là, maintenant ». Sans session, il faudrait se reconnecter
+   dans l'instant avec ce qu'on vient de saisir — une deuxième porte qui ne
+   garde rien.
+
+   Ce que ce compte donne : rien. Ni espace, ni droit d'écrire nulle part.
+   C'est une identité, et il faut encore qu'une liste quelque part la
+   reconnaisse — c'est tout le propos des règles.                        */
+export async function creerMonCompte(email, motDePasse) {
+  const data = await appelIdentityToolkit(SIGN_UP, {
+    email, password: motDePasse, returnSecureToken: true,
+  });
+  store.setRemote({
+    email: data.email,
+    uid: data.localId,
+    idToken: data.idToken,
+    refreshToken: data.refreshToken,
+    expiresAt: Date.now() + Number(data.expiresIn || 3600) * 1000,
+  });
+  return session();
+}
+
 /* Le modèle de courriel de Firebase n'accepte aucune variable de notre
    cru : seulement %LINK%, %EMAIL%, %APP_NAME% et %DISPLAY_NAME%. Le nom
    de l'espace ne peut donc pas figurer dans le texte.
@@ -708,6 +735,92 @@ export async function maDemande(espace, uid) {
 
 export async function retirerDemande(espace, uid) {
   return call(branche(espace, 'attente', `/${encodeURIComponent(uid)}`), { method: 'DELETE' });
+}
+
+/* --- Ouvrir un espace ------------------------------------------------------
+   La troisième porte, et la seule qui ne mène pas DANS un espace mais en
+   fabrique un.
+
+   Les règles interdisent à quiconque d'écrire sous `espaces/<nom>` tant que
+   la branche n'existe pas — sauf à un propriétaire. Une médiathèque ne crée
+   donc pas son espace : elle le DEMANDE, dans `ouvertures/<nom>`, une branche
+   en salle d'attente qui ne donne aucun droit et n'en a jamais donné. Le
+   propriétaire lit cette file, et c'est son clic qui fait naître l'espace.
+
+   C'est exactement la mécanique de `attente`, d'un cran au-dessus : là, une
+   personne demande à entrer dans un espace et l'équipe décide ; ici, une
+   équipe demande un espace et le propriétaire décide. Le même geste, le même
+   écran, la même absence de courriel à l'arrivée.
+
+   La liste `proprietaires` est en `.write: false`, comme `gerants` : elle ne
+   s'écrit que depuis la console, une fois. C'est la seule chose qui reste
+   là-bas, et il faut qu'elle y reste — une file d'attente dont on peut se
+   nommer juge ne filtre rien.                                            */
+
+function racine(nom, rest = '') {
+  return `${DB}/${nom}${rest}.json`;
+}
+
+/* Une seule requête répond aux deux questions, et ce n'est pas une économie
+   de bout de ficelle : la règle n'accorde la lecture de `ouvertures` qu'aux
+   propriétaires, donc « ai-je pu lire ? » EST « suis-je propriétaire ? ».
+   Demander la liste `proprietaires` en plus serait poser deux fois la même
+   question à la même règle.
+
+   Une file vide et un refus se ressemblent pourtant — `{}` dans les deux
+   cas — et c'est ce que la réponse sépare : sans quoi l'onglet resterait
+   caché à un propriétaire qui n'a simplement aucune demande en attente. */
+export async function fileDOuvertures() {
+  try {
+    return { proprietaire: true, liste: (await call(racine('ouvertures'))) || {} };
+  } catch {
+    return { proprietaire: false, liste: {} };
+  }
+}
+
+/* Ma propre demande. Comme `monInvitation`, un refus vaut « rien pour toi » :
+   la règle n'ouvre cette lecture qu'à qui a déposé la demande. */
+export async function maDemandeOuverture(nom) {
+  if (!nom) return null;
+  return call(racine('ouvertures', `/${encodeURIComponent(nom)}`)).catch(() => null);
+}
+
+export async function demanderOuverture(nom, corps) {
+  return call(racine('ouvertures', `/${encodeURIComponent(nom)}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    /* `le` d'abord, et le corps ensuite : une demande qu'on REMET après
+       l'avoir écartée porte déjà sa date, et la réécrire à maintenant ferait
+       remonter en tête de file quelque chose qui attend depuis trois
+       semaines. Une date de dépôt décrit le dépôt, pas le dernier geste. */
+    body: JSON.stringify({ le: Date.now(), ...corps }),
+  });
+}
+
+export async function retirerOuverture(nom) {
+  return call(racine('ouvertures', `/${encodeURIComponent(nom)}`), { method: 'DELETE' });
+}
+
+/* La naissance, en UNE écriture — et elle est atomique par construction.
+
+   L'étape 6 du README — « créer gerants/<UID> pour au moins une personne »,
+   celle dont il est écrit qu'elle n'est pas facultative — n'est plus une
+   étape qu'on peut sauter : elle voyage dans le même corps que `membres`.
+   Un espace né ici a toujours son gérant.
+
+   Deux écritures successives auraient ouvert une fenêtre où l'espace existe
+   sans gérant, donc où la clause de naissance ne s'applique plus et où
+   personne ne peut plus réparer sans la console. Il n'y en a qu'une.    */
+export async function ouvrirEspace(nom, uid, titre) {
+  return call(`${DB}/espaces/${encodeURIComponent(nom)}.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      gerants: { [uid]: true },
+      membres: { [uid]: true },
+      identite: { titre },
+    }),
+  });
 }
 
 function path(espace, rest = '') {

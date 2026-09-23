@@ -50,7 +50,9 @@ const state = {
   membre: null,         /* suis-je de l'équipe ? null = pas encore su */
   invitations: {},      /* adresses conviées, en attente d'être réclamées */
   demandes: {},         /* comptes qui demandent à entrer, en attente d'un avis */
-  monEntree: null,      /* { invitation, demande, verifie } quand je ne suis pas membre */
+  monEntree: null,      /* { invitation, demande, ouverture, verifie } quand je ne suis pas membre */
+  proprietaire: false,  /* puis-je faire naître un espace ? la base seule le dit */
+  ouvertures: {},       /* espaces réclamés, en attente d'un avis — ma file à moi */
   profils: {},          /* leurs profils, lisibles de l'équipe seule */
   vitrines: {},         /* ce que chacun a choisi de rendre public */
   identite: null,       /* l'apparence publique du kiosque de l'espace */
@@ -184,9 +186,23 @@ function boutonOubli(champEmail, classes = 'btn btn--quiet btn--sm') {
   return bouton;
 }
 
-/* La porte d'un espace : le compte, et rien d'autre. */
+/* La porte d'un espace : le compte, et rien d'autre.
+
+   Elle a maintenant deux volets. Se connecter n'a pas bougé. S'INSCRIRE est
+   ce qui manquait pour qu'une médiathèque arrive ici sans que personne l'y
+   ait précédée : jusqu'à présent, la seule fabrique de comptes était
+   « Inviter », et il fallait donc déjà être dans un espace pour qu'un compte
+   existe. Qui n'avait personne à qui demander n'avait pas de porte.
+
+   Ce que ce compte donne : rien. Ni espace, ni droit d'écrire où que ce
+   soit. C'est une identité, et il faut encore qu'une liste la reconnaisse —
+   les membres d'un espace, ou la file des ouvertures. Autant le dire ICI :
+   le découvrir derrière la porte, après avoir choisi un mot de passe, c'est
+   croire s'être trompé alors qu'on a bien fait. */
 function gateCompte() {
   if (remote.session()) return open();
+
+  let inscription = false;
 
   const email = el('input', {
     class: 'input', type: 'email', autocomplete: 'username',
@@ -197,28 +213,57 @@ function gateCompte() {
   });
   const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
   const valider = el('button', { class: 'btn btn--primary btn--block', type: 'submit', text: 'Se connecter' });
+  const oubli = boutonOubli(email, 'btn btn--quiet btn--sm btn--block');
+  const bascule = el('button', { class: 'btn btn--quiet btn--sm btn--block', type: 'button' });
+  const note = el('p', { class: 'gate__note', style: { marginTop: 0 } });
+
+  /* Un seul formulaire, deux intentions. Deux écrans auraient demandé de
+     retaper une adresse déjà saisie à qui se trompe de volet — et on se
+     trompe de volet, c'est le geste le plus courant devant une porte. */
+  function peindre() {
+    valider.textContent = inscription ? 'Créer mon compte' : 'Se connecter';
+    pass.autocomplete = inscription ? 'new-password' : 'current-password';
+    bascule.textContent = inscription ? '← J’ai déjà un compte' : 'Créer un compte';
+    oubli.hidden = inscription;
+    erreur.hidden = true;
+    note.textContent = inscription
+      ? 'Six caractères au minimum. Un compte ne donne aucun droit par lui-même : il faudra ensuite qu’une équipe t’accepte, ou qu’un espace s’ouvre à ton nom.'
+      : 'Le backoffice de cette équipe. Répondre aux questionnaires ne demande aucun compte — ceci ne sert qu’à publier.';
+  }
+
+  bascule.addEventListener('click', () => { inscription = !inscription; peindre(); pass.focus(); });
 
   const form = el('form', { class: 'card gate__card stack' }, [
     el('div', { class: 'gate__emoji', text: '⌂' }),
     el('h1', { text: `Espace « ${state.espace} »` }),
-    el('p', { class: 'gate__note', style: { marginTop: 0 }, text:
-      'Le backoffice de cette équipe. Répondre aux questionnaires ne demande aucun compte — ceci ne sert qu’à publier.' }),
+    note,
     el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Adresse e-mail' }), email]),
     el('label', { class: 'field' }, [el('span', { class: 'field__label', text: 'Mot de passe' }), pass]),
     erreur,
     valider,
-    boutonOubli(email, 'btn btn--quiet btn--sm btn--block'),
-    el('p', { class: 'gate__note' }, [
-      'Pas de compte ? Il s’en crée un depuis la console Firebase du projet — ',
-      'voir la marche à suivre dans le README, § « Monter son propre espace ».',
-    ]),
+    oubli,
+    bascule,
   ]);
+  peindre();
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     valider.disabled = true;
     erreur.hidden = true;
     try {
+      if (inscription) {
+        if (pass.value.length < 6) throw new Error('Mot de passe trop court : six caractères au minimum.');
+        state.remoteSession = await remote.creerMonCompte(email.value.trim(), pass.value);
+        /* Le courriel de confirmation part tout de suite, sans qu'on ait à le
+           demander : l'adresse vérifiée est exigée par les règles pour tout ce
+           qui suit — rejoindre, demander l'accès, réclamer un espace. L'envoi
+           peut échouer sans que le compte soit perdu ; l'écran suivant sait
+           le renvoyer, et c'est lui qui le dira. */
+        await remote.envoyerCourrielVerification().catch(() => {});
+        dom.gate.hidden = true;
+        await open();
+        return toast(`Compte créé. Un courriel de confirmation part vers ${state.remoteSession.email} : ouvre-le, puis reviens ici.`, { duration: 8000 });
+      }
       state.remoteSession = await remote.signIn(email.value.trim(), pass.value);
       dom.gate.hidden = true;
       await open();
@@ -457,6 +502,15 @@ function railBadge() {
   return null;
 }
 
+/* Un espace vivant laisse au moins une trace publique : l'identité de son
+   kiosque, ou un questionnaire. Aucune des deux, et il n'y a personne
+   derrière ce nom. La question se pose à deux endroits — quel geste
+   proposer, et sous quel titre — et il ne faut pas qu'ils puissent répondre
+   différemment. */
+function espaceVierge() {
+  return !state.identite && !state.remote.length;
+}
+
 /* Les trois états de quelqu'un qui frappe à la porte. On n'en montre qu'un,
    celui où il en est, avec le seul geste qui l'avance.                   */
 function entrerDansLEspace() {
@@ -506,6 +560,30 @@ function entrerDansLEspace() {
   }
   if (e.demande) {
     return [item('⏳', 'Demande envoyée', 'l’équipe doit encore l’accepter', null)];
+  }
+  if (e.ouverture) {
+    return [item('⏳', 'Ouverture demandée', 'elle attend un avis', null)];
+  }
+
+  /* Ce nom n'est celui de personne. On le déduit sans rien demander de plus :
+     un espace vivant laisse au moins une trace publique — son identité de
+     kiosque, ou un questionnaire. Aucune des deux, et pas de porte ouverte à
+     mon nom : il n'y a rien ici, et proposer « Demander l'accès » enverrait
+     frapper chez des gens qui n'existent pas.
+
+     Le cas limite assumé : un espace réel, créé à la console, qui n'aurait
+     jamais rien publié ni nommé son kiosque. On lui proposera l'ouverture, et
+     la règle refusera — le nom est pris, et le message le dira. Mieux vaut ce
+     refus-là qu'une attente devant une porte qui n'est nulle part. */
+  if (espaceVierge()) {
+    if (!e.verifie) {
+      return [
+        item('📮', 'Vérifie ton adresse', 'il en faut une confirmée pour réclamer un espace', 'entrer-verifier'),
+        el('p', { class: 'rail__secours', text:
+          'Le courriel peut atterrir dans les indésirables. Rien n’est perdu : reviens sur cette page une fois ton adresse confirmée.' }),
+      ];
+    }
+    return [item('✦', 'Demander l’ouverture de cet espace', 'ce nom n’est celui de personne', 'entrer-ouvrir')];
   }
   /* Même exigence que pour les invitations, et pour la même raison. La règle
      de `attente` réclame désormais une adresse confirmée : sans elle,
@@ -678,11 +756,23 @@ const ONGLETS_ESPACE = [
   { id: 'vitrine',        label: 'Vitrine',        emoji: '▦', partout: true },
   { id: 'frequentation',  label: 'Fréquentation',  emoji: '📊', partout: false },
   { id: 'equipe',         label: 'Équipe',         emoji: '👥', partout: false },
+  { id: 'ouvertures',     label: 'Ouvertures',     emoji: '🔑', partout: false, proprietaire: true },
 ];
 
 function ongletsEspace() {
-  const partage = Boolean(state.espace && state.remoteSession);
-  return ONGLETS_ESPACE.filter((o) => o.partout || partage);
+  /* Un non-membre n'a ni équipe ni fréquentation à lire — la base les lui
+     refuse. Un onglet qui ne mène qu'à un refus n'est pas une navigation,
+     c'est une promesse fausse. `membre` vaut null quand la lecture n'a pas
+     abouti : dans le doute on les garde, comme partout ailleurs ici, plutôt
+     que de retirer des portes à quelqu'un qui est peut-être chez lui.
+
+     « Ouvertures » ne suit pas cette règle : la file est à la RACINE, elle
+     n'appartient à aucun espace, et un propriétaire doit pouvoir l'atteindre
+     depuis n'importe où — y compris depuis un espace dont il n'est pas. */
+  const partage = Boolean(state.espace && state.remoteSession && state.membre !== false);
+  return ONGLETS_ESPACE.filter((o) => (
+    o.proprietaire ? Boolean(state.proprietaire) : (o.partout || partage)
+  ));
 }
 
 /* Le nom de l'endroit où l'on travaille. Sans espace partagé, c'est bien un
@@ -720,6 +810,9 @@ function renderTabbar(bySection) {
          l'onglet, comme une anomalie se signale sur sa section. */
       o.id === 'equipe' && Object.keys(state.demandes || {}).length
         ? el('span', { class: 'rail__item__badge', text: String(Object.keys(state.demandes).length) })
+        : null,
+      o.id === 'ouvertures' && Object.keys(state.ouvertures || {}).length
+        ? el('span', { class: 'rail__item__badge', text: String(Object.keys(state.ouvertures).length) })
         : null,
     ])));
     return;
@@ -894,6 +987,35 @@ function panneauQuestionnaires() {
   return blocs;
 }
 
+/* La porte d'entrée, pour qui n'est pas encore de la maison.
+
+   Elle existait déjà — « Rejoindre cet espace », « Demander l'accès »,
+   « Vérifie ton adresse » — mais elle vivait dans le RAIL, et le rail est
+   masqué au niveau de l'espace (css/admin.css:58). Or c'est exactement là
+   qu'on arrive en se connectant : `open()` pose `state.vue = 'espace'`.
+
+   Qui se connectait sans être membre atterrissait donc devant ses brouillons
+   locaux, sans un mot sur l'espace dont il venait de taper le nom, et sans
+   aucun moyen d'y entrer. Tout était dans le document, tout était en
+   display:none. Il fallait ouvrir un brouillon — donc redescendre d'un
+   niveau — pour que la porte reparaisse. Personne ne devine ça.
+
+   Elle reste dans le rail pour le niveau du questionnaire, et se montre ici
+   pour le niveau de l'espace. Les deux appellent la même fonction : il n'y a
+   qu'une porte, elle est rendue à deux endroits. */
+function panneauEntree() {
+  const vierge = espaceVierge();
+  return el('section', { class: 'panel' }, [
+    el('div', { class: 'section__head' }, [
+      el('h2', { text: vierge ? `« ${state.espace} » — un nom libre` : `Espace « ${state.espace} »` }),
+    ]),
+    el('p', { class: 'panel__hint', text: vierge
+      ? 'Personne ne travaille encore sous ce nom. Demande son ouverture, et il sera le tien.'
+      : 'Tu es connecté, mais tu n’es pas de cette équipe : rien de ce qui est publié ici ne t’appartient encore.' }),
+    el('div', { class: 'rail__list entree__portes' }, entrerDansLEspace()),
+  ]);
+}
+
 /* L'écran d'espace. Les onglets qui n'ont pas encore leur panneau propre
    rouvrent la feuille existante : le déménagement se fait sans laisser de
    porte condamnée entre-temps. */
@@ -903,17 +1025,22 @@ function renderEspace() {
     equipe: contenuEquipe,
     frequentation: contenuFrequentation,
     vitrine: contenuVitrine,
+    ouvertures: contenuOuvertures,
   };
+  const entree = state.espace && state.remoteSession && state.membre === false
+    ? [panneauEntree()]
+    : [];
+
   const construire = panneaux[state.ongletEspace];
   if (construire) {
-    dom.panel.replaceChildren(...construire());
+    dom.panel.replaceChildren(...entree, ...construire());
     return;
   }
 
   /* Les cinq onglets ont leur panneau : plus rien ne se replie dans une
      fenêtre. Un onglet inconnu ramène à l'accueil plutôt qu'à un écran vide. */
   state.ongletEspace = 'questionnaires';
-  dom.panel.replaceChildren(...panneauQuestionnaires());
+  dom.panel.replaceChildren(...entree, ...panneauQuestionnaires());
 }
 
 async function renderPanel() {
@@ -1670,6 +1797,9 @@ function onClick(event) {
     case 'invitation-annuler': return annulerInvitation(id);
     case 'entrer-rejoindre': return rejoindreLEspace();
     case 'entrer-demander':  return demanderLAcces();
+    case 'entrer-ouvrir':    return demanderLOuverture();
+    case 'ouverture-valider': return validerOuverture(id);
+    case 'ouverture-refuser': return refuserOuverture(id);
     case 'entrer-verifier':  return verifierMonCourriel();
     case 'copier-uid':       return copierUid();
     case 'mon-mot-de-passe': return changerMonMotDePasse();
@@ -2259,6 +2389,66 @@ function contenuEquipe() {
   ];
 }
 
+/* Ma file à moi. C'est le pendant exact de « Demandes d'accès » dans l'onglet
+   Équipe, d'un cran au-dessus : là une personne demande à entrer dans un
+   espace et l'équipe tranche ; ici une équipe demande un espace et je
+   tranche. Même liste, mêmes deux boutons, même silence à l'arrivée — la
+   base n'envoie pas de courriel et nous n'avons pas de serveur pour le
+   faire.
+
+   L'onglet ne s'affiche qu'aux propriétaires, mais ce n'est pas lui qui
+   protège : c'est la règle, qui refuse la lecture de cette branche à tout
+   autre et lui refuserait l'écriture même s'il trouvait le chemin. L'onglet
+   ne fait que ne pas mentir sur ce qui est atteignable. */
+function contenuOuvertures() {
+  const demandes = Object.entries(state.ouvertures || {})
+    .sort(([, a], [, b]) => (a?.le || 0) - (b?.le || 0));
+
+  const ligne = ([nom, d]) => el('div', { class: 'sheet__row' }, [
+    el('span', { class: 'sheet__emoji', text: '🔑' }),
+    el('span', { class: 'sheet__label' }, [
+      el('span', { text: d?.structure || nom }),
+      el('span', { class: 'field__hint', style: { display: 'block' },
+        /* `le` n'est formaté que s'il est vraiment une date : sur une valeur
+           inattendue, Intl lève et emporterait le panneau entier. */
+        text: `?espace=${nom} · ${d?.courriel || 'adresse inconnue'}`
+          + (Number.isFinite(d?.le) ? ` · ${formatDate(d.le)}` : '') }),
+      d?.mot && el('span', { class: 'field__hint', style: { display: 'block' }, text: `« ${d.mot} »` }),
+    ]),
+    el('button', {
+      class: 'btn btn--sm btn--primary', type: 'button',
+      'data-act': 'ouverture-valider', 'data-id': nom, text: 'Ouvrir',
+      'aria-label': `Ouvrir l’espace « ${nom} » pour ${d?.structure || 'cette structure'}`,
+    }),
+    el('button', {
+      class: 'btn btn--icon btn--quiet', type: 'button',
+      'data-act': 'ouverture-refuser', 'data-id': nom,
+      /* Le nom accessible se calcule sur le contenu visible : sans
+         `aria-label`, il ne resterait que « ✕ », et deux lignes de suite
+         offriraient deux boutons qui s'annoncent pareil. */
+      title: 'Écarter cette demande', 'aria-label': `Écarter la demande de ${d?.structure || nom}`, text: '✕',
+    }),
+  ]);
+
+  return [
+    el('section', { class: 'panel' }, [
+      el('div', { class: 'section__head' }, [
+        el('h2', { text: demandes.length
+          ? `Espaces réclamés — ${demandes.length}`
+          : 'Espaces réclamés' }),
+      ]),
+
+      demandes.length
+        ? el('div', { class: 'sheet__list' }, demandes.map(ligne))
+        : el('p', { class: 'panel__hint', text:
+            'Rien en attente. Une demande arrive ici quand quelqu’un ouvre le backoffice sur un nom d’espace libre et le réclame.' }),
+
+      el('p', { class: 'field__hint', style: { marginTop: 'var(--s-4)' }, text:
+        'Ouvrir crée l’espace et en fait la personne gérante — donc irretirable, sauf depuis la console. C’est le seul geste de ce backoffice qui ne se défait pas d’ici.' }),
+    ]),
+  ];
+}
+
 /* L'espace n'a plus de panneau « Réglages ». Il ne contenait que deux boutons
    ouvrant deux fenêtres, et ses deux contenus sont retournés là où on les
    cherche : la corbeille dans les questionnaires, dont elle est l'archive de
@@ -2755,6 +2945,178 @@ function demanderLAcces() {
   document.body.append(dialog);
   dialog.showModal();
   champ.focus();
+}
+
+/* --- Réclamer un espace ------------------------------------------------------
+   Le motif ci-dessous est celui de la règle, mot pour mot, et les deux
+   doivent rester d'accord : deux à trente-et-un caractères, minuscules,
+   chiffres et traits d'union, une lettre ou un chiffre pour commencer.
+
+   Ce n'est pas de la coquetterie. Ce nom DEVIENT une adresse — `?espace=<nom>`
+   — qu'une équipe se dictera au téléphone et collera dans un courriel. Le
+   vérifier ici ne protège rien, la règle s'en charge ; cela évite seulement
+   d'apprendre par un refus de base de données ce qu'un champ de saisie sait
+   dire tout de suite.                                                     */
+const NOM_ESPACE = /^[a-z0-9][a-z0-9-]{1,30}$/;
+
+/* On demande peu : le nom voulu, celui de la structure, et deux lignes si le
+   cœur y est. Qui reçoit la demande ne connaît pas ces gens — « mediatheque »
+   et une adresse ne lui diront pas s'il faut ouvrir. */
+function demanderLOuverture() {
+  const { uid, email } = state.remoteSession;
+
+  const nom = el('input', { class: 'input input--mono', value: state.espace });
+  const structure = el('input', { class: 'input', placeholder: 'Médiathèque Guy-de-Maupassant', maxlength: '120' });
+  const mot = el('textarea', { class: 'textarea', rows: '3', maxlength: '500',
+    placeholder: 'Facultatif — qui vous êtes, ce que vous comptez en faire.' });
+  const apercu = el('span', { class: 'field__hint', style: { display: 'block' } });
+  const erreur = el('p', { class: 'alerte', role: 'alert', hidden: true });
+  const valider = el('button', { class: 'btn btn--primary', type: 'button', text: 'Envoyer la demande' });
+
+  const adresseVoulue = () => slugify(nom.value, '').slice(0, 31).replace(/-+$/, '');
+  const montrer = () => {
+    const slug = adresseVoulue();
+    apercu.textContent = slug
+      ? `Kiosque : ${location.origin}${location.pathname.replace(/admin\.html$/, '')}?espace=${slug}`
+      : 'Il faut un nom.';
+  };
+  nom.addEventListener('input', montrer);
+  montrer();
+
+  const dialog = el('dialog', { class: 'modal' }, [
+    el('div', { class: 'modal__body stack' }, [
+      el('h2', { text: 'Demander l’ouverture d’un espace' }),
+      el('p', { class: 'panel__hint', text:
+        `La demande part vers la personne qui tient cette installation. Elle verra ce que tu écris ici, et ton adresse (${email}). Elle ouvre, ou non — et si elle n’ouvre pas, tu n’en seras pas averti.` }),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'field__label', text: 'Nom de l’espace' }),
+        nom, apercu,
+      ]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'field__label', text: 'Nom de la structure' }),
+        structure,
+        el('span', { class: 'field__hint', text: 'Celui qui s’affichera en tête du kiosque. Il se change ensuite.' }),
+      ]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'field__label', text: 'Un mot' }),
+        mot,
+      ]),
+      erreur,
+    ]),
+    el('div', { class: 'modal__actions' }, [
+      el('button', { class: 'btn btn--quiet', type: 'button', text: 'Fermer', onClick: () => dismiss(dialog) }),
+      valider,
+    ]),
+  ]);
+
+  valider.addEventListener('click', async () => {
+    const slug = adresseVoulue();
+    const titre = structure.value.trim();
+    if (!NOM_ESPACE.test(slug)) {
+      erreur.textContent = 'Le nom doit faire deux caractères au moins : des lettres, des chiffres, des traits d’union.';
+      erreur.hidden = false;
+      return nom.focus();
+    }
+    if (!titre) {
+      erreur.textContent = 'Le nom de la structure est ce qui permet de décider. Il en faut un.';
+      erreur.hidden = false;
+      return structure.focus();
+    }
+
+    valider.disabled = true;
+    erreur.hidden = true;
+    try {
+      const corps = { par: uid, courriel: email, structure: titre };
+      if (mot.value.trim()) corps.mot = mot.value.trim();
+      await remote.demanderOuverture(slug, corps);
+
+      /* Le nom demandé n'est pas forcément celui de l'adresse : on arrive ici
+         par une URL, et on en repart parfois avec une autre. Y aller plutôt
+         que de laisser le backoffice parler d'un espace et la barre d'adresse
+         d'un autre — c'est le genre d'écart qu'on ne remarque qu'après avoir
+         envoyé le mauvais lien à son équipe. */
+      if (slug !== state.espace) {
+        return dismiss(dialog, () => {
+          location.search = `?espace=${encodeURIComponent(slug)}`;
+        });
+      }
+      await refreshEspace();
+      dismiss(dialog, () => {
+        toast('Demande envoyée. Tu recevras le lien si elle est acceptée.');
+        repaint();
+      });
+    } catch (err) {
+      /* Le refus le plus probable n'est pas une panne : ce nom est déjà pris,
+         par un espace ou par une demande en cours. La base répond « permission
+         denied » aux deux, parce que la règle ne distingue pas ce qui existe
+         déjà de ce qu'on n'a pas le droit de lire — et c'est bien ainsi. */
+      erreur.textContent = /permission/i.test(err.message)
+        ? `« ${slug} » n’est pas libre : un espace ou une demande porte déjà ce nom. Essaie-en un autre.`
+        : err.message;
+      erreur.hidden = false;
+      valider.disabled = false;
+    }
+  });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  structure.focus();
+}
+
+/* Ouvrir, c'est deux écritures, et l'ordre est le même que pour valider une
+   demande d'accès : la naissance d'abord, la file ensuite. Si la seconde
+   échoue, l'espace existe et la demande traîne — ce qui se répare d'un clic.
+   L'ordre inverse effacerait la demande sans rien créer, et il ne resterait
+   plus trace de rien à quoi se raccrocher. */
+async function validerOuverture(nom) {
+  const d = state.ouvertures?.[nom];
+  if (!d?.par) return toast('Cette demande ne dit pas qui l’a déposée : rien à qui donner l’espace.', 'danger');
+
+  try {
+    await remote.ouvrirEspace(nom, d.par, d.structure || nom);
+    await remote.retirerOuverture(nom).catch(() => {});
+    await refreshEspace();
+    repaint();
+
+    const lien = new URL('admin.html', location.href);
+    lien.searchParams.set('espace', nom);
+    /* Le courriel d'ouverture n'existe pas — pas de serveur pour l'envoyer.
+       Ce qu'on peut faire, c'est mettre le lien à un geste de la main : il
+       reste à l'écrire soi-même, et autant que ce soit dit. */
+    toast(`Espace « ${nom} » ouvert. ${d.courriel || 'La personne'} en est gérante — à prévenir par tes propres moyens.`, {
+      duration: 9000,
+      action: {
+        label: 'Copier le lien',
+        onClick: () => navigator.clipboard?.writeText(lien.toString())
+          .then(() => toast('Lien copié.'))
+          .catch(() => toast(lien.toString())),
+      },
+    });
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+}
+
+async function refuserOuverture(nom) {
+  const garde = state.ouvertures?.[nom];
+  try {
+    await remote.retirerOuverture(nom);
+    await refreshEspace();
+    repaint();
+    toast('Demande écartée. Elle n’en sera pas avertie.', {
+      action: garde && {
+        label: 'Annuler',
+        onClick: async () => {
+          await remote.demanderOuverture(nom, garde).catch(() => {});
+          await refreshEspace();
+          repaint();
+        },
+      },
+    });
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
 }
 
 async function verifierMonCourriel() {
@@ -3642,6 +4004,11 @@ async function refreshEspace() {
   state.presentation = normaliserPresentation(
     await remote.presentation(state.espace).catch(() => null),
   );
+  /* La file des ouvertures n'appartient à AUCUN espace — elle est à la racine,
+     et c'est la même où qu'on travaille. On la relit ici quand même : c'est le
+     seul endroit qui relit tout, et une file d'attente qu'on ne relit jamais
+     est une file qu'on découvre trop tard. */
+  ({ proprietaire: state.proprietaire, liste: state.ouvertures } = await remote.fileDOuvertures());
   await verifierGardeFou();
 }
 
@@ -3682,12 +4049,13 @@ async function releverLAppartenance() {
      entrer. Les deux lectures sont permises aux non-membres — chacune ne
      porte que sur soi. */
   const { email, uid } = state.remoteSession;
-  const [invitation, demande, verifie] = await Promise.all([
+  const [invitation, demande, ouverture, verifie] = await Promise.all([
     remote.monInvitation(state.espace, email),
     remote.maDemande(state.espace, uid),
+    remote.maDemandeOuverture(state.espace),
     remote.courrielVerifie().catch(() => false),
   ]);
-  state.monEntree = { invitation, demande, verifie };
+  state.monEntree = { invitation, demande, ouverture, verifie };
 }
 
 /* Poser une règle de base de données et croire qu'elle est là sont deux
